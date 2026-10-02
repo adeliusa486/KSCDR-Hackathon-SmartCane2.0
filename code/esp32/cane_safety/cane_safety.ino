@@ -21,21 +21,40 @@
 //
 // Serial protocol, 115200 baud, one line per message:
 //   ESP32 -> Pi   I <text>                          info / boot report
-//                 D <ms> <fwd> <down> <fok> <dok> <base>
+//                 D <ms> <fwd> <down> <fok> <dok> <base> <seq>
 //                   fwd/down in mm, -1 = nothing in range; base = learned
-//                   ground distance in mm, -1 = not learned yet
+//                   ground distance in mm, -1 = not learned yet; seq counts
+//                   D lines from 0 at boot, so the Pi can drop repeats
 //                 H drop <mm> <base>                ground fell away: hole, drain, step down
 //                 H step <mm> <base>                ground came up: kerb, step up, low object
 //                 E <text>                          error
-//   Pi -> ESP32   A0 / A1                           auto vibration off / on
-//                 B<duty>,<ms>                      one buzz, duty 0-100 %
+//   Pi -> ESP32   P                                 heartbeat, every 0.5 s
+//                 A0 / A1                           obstacle buzz muted / on.
+//                                                   A0 lapses after 60 s and
+//                                                   never mutes the ground alarm
+//                 B<duty>,<ms>                      one buzz, duty 0-100 %, plays
+//                                                   only when no safety pattern runs
 //                 R1 / R2                           sensor roles, saved
 //                 S                                 status report
+//                 T                                 wiring test, bus scan + IDs
+//
+// Step 1.5 (safety layer) added: task watchdog, reset reason and reset
+// counters, Pi heartbeat, safety patterns that the Pi cannot override,
+// a D-line sequence number, a non-blocking boot buzz and a boot self-test.
+// Every line the Pi sends counts as a heartbeat. With no line for
+// PI_TIMEOUT_MS the ESP32 drops any Pi buzz and un-mutes itself.
 
 #include <algorithm>
 #include <Wire.h>
 #include <VL53L0X.h>
 #include <Preferences.h>
+#include <esp_system.h>
+#include <esp_task_wdt.h>
+#include "safety_logic.h"
+
+using namespace safety;
+
+const char *FW_VERSION = "cane_safety 1.5-prep";
 
 const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
@@ -44,12 +63,10 @@ const int PIN_MOTOR = 13;
 const int PWM_HZ = 200;            // inaudible, coin motors respond well here
 const int PWM_BITS = 8;
 
-// Forward obstacle bands, in mm. The forward sensor runs in long-range mode
-// (about 2 m indoors, much less in direct sun), the down sensor in default
-// mode (about 1.2 m, more precise), since the ground is always close.
-const int CLOSE_MM = 400;
-const int NEAR_MM = 800;
-const int FAR_MM = 1500;
+// Forward obstacle bands (CLOSE_MM, NEAR_MM, FAR_MM) live in safety_logic.h.
+// The forward sensor runs in long-range mode (about 2 m indoors, much less in
+// direct sun), the down sensor in default mode (about 1.2 m, more precise),
+// since the ground is always close.
 
 // Ground watching. The down sensor learns how far away the ground normally is
 // and alarms on a sudden change. Thresholds are a first guess for a cane held
@@ -65,6 +82,11 @@ const float BASE_ALPHA = 0.05;     // how fast the baseline follows slow drift
 
 const uint32_t STALE_MS = 300;     // no new reading for this long = sensor dead
 const uint32_t REPORT_MS = 50;     // 20 Hz to the Pi
+
+const uint32_t WDT_MS = 2000;      // loop stuck this long = reboot. A sensor
+                                   // re-init on a dead bus takes ~100-300 ms
+const uint32_t PI_TIMEOUT_MS = 3000;     // no line from the Pi = Pi gone
+const uint32_t AUTO_OFF_MAX_MS = 60000;  // A0 lapses after this
 
 struct Tof {
   VL53L0X dev;
@@ -95,8 +117,17 @@ uint32_t lastHazardMs = 0;
 
 // ---- motor ---------------------------------------------------------------
 
-uint32_t manualUntil = 0;   // a manual buzz from the Pi overrides auto
-uint32_t hazardUntil = 0;   // the ground alarm overrides obstacle buzzing
+uint32_t manualUntil = 0;   // a buzz requested by the Pi, until then
+int manualDuty = 0;
+uint32_t hazardUntil = 0;   // the ground alarm runs until then
+uint32_t autoOffUntil = 0;  // A0 mutes obstacle buzzing until then
+uint32_t bootMs = 0;        // setup() finished, start of the boot pulses
+
+// ---- link to the Pi -------------------------------------------------------
+
+uint32_t lastPiMs = 0;      // last line received from the Pi
+bool piAlive = false;
+uint32_t dSeq = 0;          // D-line sequence number
 
 void motor(int dutyPct) {
   ledcWrite(PIN_MOTOR, (dutyPct * 255) / 100);
@@ -104,33 +135,26 @@ void motor(int dutyPct) {
 
 // Obstacle feel is parking-sensor style: closer = stronger and faster, close =
 // solid buzz. The ground alarm is deliberately different, three long hard
-// pulses, so a hole never feels like "something in front of you".
+// pulses, so a hole never feels like "something in front of you". Which
+// pattern wins is decided in safety_logic.h: the ESP32's own patterns always
+// beat a request from the Pi.
 void updateMotor(uint32_t now) {
-  if (now < manualUntil) return;
-  if (now < hazardUntil) {
-    uint32_t t = (hazardUntil - now);
-    motor((t % 450) > 150 ? 100 : 0);   // 300 on / 150 off
-    return;
+  if (!autoBuzz && now >= autoOffUntil) {
+    autoBuzz = true;
+    Serial.println("I auto on (A0 lapsed)");
   }
   Tof &f = tof[FWD];
   int mm = (f.ok && f.mm >= 0) ? f.mm : -1;
-  if (!autoBuzz || mm < 0 || mm >= FAR_MM) { motor(0); return; }
-  if (mm < CLOSE_MM) { motor(100); return; }
-
-  int duty, onMs, offMs;
-  if (mm < NEAR_MM) { duty = 85; onMs = 120; offMs = 180; }
-  else              { duty = 60; onMs = 100; offMs = 600; }
-  motor((now % (onMs + offMs)) < (uint32_t)onMs ? duty : 0);
+  int obstacle = autoBuzz ? obstacleDuty(mm, now) : -1;
+  int request = now < manualUntil ? manualDuty : bootDuty(now - bootMs);
+  motor(arbitrate(hazardDuty(now, hazardUntil), obstacle, request));
 }
 
-void buzzBlocking(int duty, int ms) {
-  motor(duty); delay(ms); motor(0);
-}
-
+// The ground alarm always buzzes. Before Step 1.5, A0 silenced it too.
 void hazard(const char *kind, int mm, uint32_t now) {
   if (now - lastHazardMs < HAZARD_HOLDOFF_MS) return;
   lastHazardMs = now;
-  if (autoBuzz) hazardUntil = now + 3 * 450;
+  hazardUntil = now + HAZARD_LEN_MS;
   Serial.printf("H %s %d %d\n", kind, mm, (int)baseline);
 }
 
@@ -268,8 +292,67 @@ void setRoles(int fwd) {
   Serial.printf("I roles: forward=tof%d down=tof%d\n", FWD + 1, DOWN + 1);
 }
 
+// A sensor can ACK its address (power and the bus are there) yet return
+// garbage data (a marginal SDA/SCL contact). The ID registers tell the two
+// apart: a healthy VL53L0X reads EE AA 10.
+bool readId(int i, uint8_t id[3]) {
+  for (int k = 0; k < 3; k++) {
+    tof[i].bus->beginTransmission(0x29);
+    tof[i].bus->write(0xC0 + k);
+    if (tof[i].bus->endTransmission(false) != 0 ||
+        tof[i].bus->requestFrom(0x29, 1) != 1) return false;
+    id[k] = tof[i].bus->read();
+  }
+  return true;
+}
+
+// ---- reset reason ---------------------------------------------------------
+
+// Note: a reset through the EN pin (the DevKit's auto-reset from the Pi, or
+// the EN button) reports POWERON, not EXT, on this chip (measured 2 Oct 2026,
+// rst:0x1 POWERON_RESET). So "poweron" means power-on OR an EN reset.
+const char *resetName(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "poweron";
+    case ESP_RST_EXT:       return "external";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_INT_WDT:   return "interrupt-watchdog";
+    case ESP_RST_TASK_WDT:  return "task-watchdog";
+    case ESP_RST_WDT:       return "other-watchdog";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    case ESP_RST_BROWNOUT:  return "brownout";
+    case ESP_RST_SDIO:      return "sdio";
+    default:                return "unknown";
+  }
+}
+
+esp_reset_reason_t resetReason;
+uint32_t boots = 0, wdtResets = 0, brownouts = 0, panics = 0;
+
+// Counters survive resets in NVS, so a long test can tell how often the
+// watchdog or a brownout fired, not just the last cause.
+void countReset() {
+  resetReason = esp_reset_reason();
+  boots = prefs.getUInt("boots", 0) + 1;
+  prefs.putUInt("boots", boots);
+  wdtResets = prefs.getUInt("wdt", 0);
+  brownouts = prefs.getUInt("bod", 0);
+  panics = prefs.getUInt("panic", 0);
+  if (resetReason == ESP_RST_TASK_WDT || resetReason == ESP_RST_INT_WDT ||
+      resetReason == ESP_RST_WDT) prefs.putUInt("wdt", ++wdtResets);
+  if (resetReason == ESP_RST_BROWNOUT) prefs.putUInt("bod", ++brownouts);
+  if (resetReason == ESP_RST_PANIC) prefs.putUInt("panic", ++panics);
+}
+
 void handleCommand(const String &cmd) {
-  if (cmd == "A0") { autoBuzz = false; motor(0); Serial.println("I auto off"); }
+  if (cmd == "P") return;          // heartbeat only, see readSerial()
+  if (cmd == "A0") {
+    autoBuzz = false;
+    autoOffUntil = millis() + AUTO_OFF_MAX_MS;
+    Serial.printf("I auto off for %u s (ground alarm stays on)\n",
+                  (unsigned)(AUTO_OFF_MAX_MS / 1000));
+  }
   else if (cmd == "A1") { autoBuzz = true; Serial.println("I auto on"); }
   else if (cmd == "R1" || cmd == "R2") {
     setRoles(cmd == "R1" ? 0 : 1);
@@ -282,42 +365,58 @@ void handleCommand(const String &cmd) {
                     i == FWD ? "forward" : "down", tof[i].ok, tof[i].mm,
                     tof[i].reinits);
     Serial.printf("I auto=%d ground=%d\n", autoBuzz, (int)baseline);
+    Serial.printf("I %s reset=%s boots=%u wdt=%u brownout=%u panic=%u "
+                  "uptime=%lus pi=%d\n", FW_VERSION, resetName(resetReason),
+                  boots, wdtResets, brownouts, panics,
+                  (unsigned long)(millis() / 1000), piAlive);
   } else if (cmd == "T") {
-    // Wiring test. A sensor can ACK its address (power and the bus are
-    // there) yet return garbage data (a marginal SDA/SCL contact). The ID
-    // registers tell the two apart: a healthy VL53L0X reads EE AA 10.
     for (int i = 0; i < 2; i++) {
       scanBus(tof[i].bus, i);
       uint8_t id[3];
-      bool ok = true;
-      for (int k = 0; k < 3; k++) {
-        tof[i].bus->beginTransmission(0x29);
-        tof[i].bus->write(0xC0 + k);
-        if (tof[i].bus->endTransmission(false) != 0 ||
-            tof[i].bus->requestFrom(0x29, 1) != 1) { ok = false; break; }
-        id[k] = tof[i].bus->read();
-      }
-      if (ok) Serial.printf("I tof%d id %02X %02X %02X (expect EE AA 10)\n",
-                            i + 1, id[0], id[1], id[2]);
-      else    Serial.printf("E tof%d id read failed\n", i + 1);
+      if (readId(i, id)) Serial.printf("I tof%d id %02X %02X %02X (expect EE AA 10)\n",
+                                       i + 1, id[0], id[1], id[2]);
+      else               Serial.printf("E tof%d id read failed\n", i + 1);
     }
   } else if (cmd.startsWith("B")) {
+    // Stored, not played directly: updateMotor() plays it only when no
+    // safety pattern is running.
     int comma = cmd.indexOf(',');
     int duty = constrain(cmd.substring(1, comma).toInt(), 0, 100);
     int ms = comma > 0 ? constrain(cmd.substring(comma + 1).toInt(), 0, 5000) : 300;
+    manualDuty = duty;
     manualUntil = millis() + ms;
-    motor(duty);
     Serial.printf("I buzz %d%% %dms\n", duty, ms);
   } else if (cmd.length()) {
     Serial.printf("E unknown command '%s'\n", cmd.c_str());
   }
 }
 
-void readSerial() {
+void readSerial(uint32_t now) {
   while (Serial.available()) {
     char c = Serial.read();
-    if (c == '\n' || c == '\r') { handleCommand(line); line = ""; }
+    if (c == '\n' || c == '\r') {
+      if (line.length()) {
+        // Any complete line counts as a heartbeat, so Pi software that
+        // predates the P command still keeps the link alive while it talks.
+        lastPiMs = now;
+        if (!piAlive) { piAlive = true; Serial.println("I pi link up"); }
+      }
+      handleCommand(line);
+      line = "";
+    }
     else if (line.length() < 32) line += c;
+  }
+}
+
+// The Pi went quiet: crashed, rebooting, unplugged, or its software stopped.
+// Drop anything it asked for and go back to standalone defaults, so a Pi that
+// died mid-buzz or after A0 cannot leave the cane muted.
+void checkPi(uint32_t now) {
+  if (piAlive && now - lastPiMs > PI_TIMEOUT_MS) {
+    piAlive = false;
+    manualUntil = 0;
+    autoBuzz = true;
+    Serial.println("I pi link lost, standalone");
   }
 }
 
@@ -339,6 +438,10 @@ void setup() {
   Wire1.begin(PIN_SDA2, PIN_SCL2, 400000);
   delay(10);
   Serial.println("I cane_safety boot");
+  countReset();
+  Serial.printf("I version %s built %s %s\n", FW_VERSION, __DATE__, __TIME__);
+  Serial.printf("I reset %s boots=%u wdt=%u brownout=%u panic=%u\n",
+                resetName(resetReason), boots, wdtResets, brownouts, panics);
 
   for (int i = 0; i < 2; i++) {
     digitalWrite(tof[i].xshut, HIGH);
@@ -346,17 +449,38 @@ void setup() {
     scanBus(tof[i].bus, i);
     startTof(tof[i], i);
   }
+  // Boot self-test: init result plus the ID registers. A sensor that inits
+  // but reads a wrong ID has a marginal data line.
+  for (int i = 0; i < 2; i++) {
+    uint8_t id[3];
+    bool idOk = readId(i, id) && id[0] == 0xEE && id[1] == 0xAA && id[2] == 0x10;
+    Serial.printf("I selftest tof%d init=%s id=%s\n", i + 1,
+                  tof[i].ok ? "ok" : "FAIL", idOk ? "ok" : "FAIL");
+  }
   Serial.printf("I ready tof1=%d tof2=%d\n", tof[0].ok, tof[1].ok);
 
-  // "I am alive" for the user: two short pulses.
-  buzzBlocking(100, 150); delay(100); buzzBlocking(100, 150);
+  // Watch the loop task. A hang anywhere in loop() (a wedged I2C bus, a
+  // library spinning) reboots the ESP32 within WDT_MS instead of leaving
+  // the motor frozen in whatever state it was in.
+  esp_task_wdt_config_t wdt;
+  wdt.timeout_ms = WDT_MS;
+  wdt.idle_core_mask = 1;          // keep the core default: watch CPU0 idle
+  wdt.trigger_panic = true;
+  if (esp_task_wdt_reconfigure(&wdt) != ESP_OK) esp_task_wdt_init(&wdt);
+  esp_task_wdt_add(NULL);
+
+  // "I am alive" for the user: two short pulses, played by updateMotor()
+  // without blocking, so the safety loop runs from the first millisecond.
+  bootMs = millis();
 }
 
 void loop() {
   static uint32_t lastReport = 0, lastRetry = 0;
   uint32_t now = millis();
 
-  readSerial();
+  esp_task_wdt_reset();
+  readSerial(now);
+  checkPi(now);
   for (int i = 0; i < 2; i++) pollTof(tof[i], i, now);
 
   if (tof[DOWN].fresh) {
@@ -374,8 +498,8 @@ void loop() {
 
   if (now - lastReport >= REPORT_MS) {
     lastReport = now;
-    Serial.printf("D %lu %d %d %d %d %d\n", (unsigned long)now,
+    Serial.printf("D %lu %d %d %d %d %d %lu\n", (unsigned long)now,
                   tof[FWD].mm, tof[DOWN].mm, tof[FWD].ok, tof[DOWN].ok,
-                  (int)baseline);
+                  (int)baseline, (unsigned long)dSeq++);
   }
 }
