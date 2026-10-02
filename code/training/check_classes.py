@@ -33,6 +33,8 @@ def main():
     cfg = yaml.safe_load(Path(args.file).read_text())
     classes = cfg["classes"]
     oiv7 = set(json.loads(Path(args.oiv7).read_text()))
+    reg_file = Path(__file__).resolve().parent / "roboflow_sources.yaml"
+    rf = yaml.safe_load(reg_file.read_text(encoding="utf-8")) if reg_file.exists() else {}
     vistas = None
     if Path(args.vistas).exists():
         vistas = {l["name"] for l in json.loads(Path(args.vistas).read_text())["labels"]}
@@ -65,6 +67,12 @@ def main():
                 checked += 1
                 if label not in COCO:
                     errors.append(f"{c['name']}: {s} is not a COCO class")
+            elif ds.startswith("rf-"):
+                checked += 1
+                if ds not in rf:
+                    errors.append(f"{c['name']}: {ds} is not in roboflow_sources.yaml")
+                elif label not in rf[ds]["labels"]:
+                    errors.append(f"{c['name']}: {s} is not a label of {rf[ds]['project']}")
             elif ds == "mapillary" and vistas is not None:
                 checked += 1
                 if label not in vistas:
@@ -85,8 +93,9 @@ def main():
     print("by danger:", dict(Counter(c["danger"] for c in classes)))
     ready = [c["name"] for c in classes if not c.get("confirm") or
              (mtsd is not None and any(s.startswith("mapillary-mtsd:") for s in c["src"])) or
-             (vistas is not None and any(s.startswith("mapillary:") for s in c["src"]))]
-    print(f"data available now (COCO / Open Images / Mapillary): {len(ready)}")
+             (vistas is not None and any(s.startswith("mapillary:") for s in c["src"])) or
+             any(s.split(":")[0] in rf for s in c["src"])]
+    print(f"data available now (COCO / Open Images / Mapillary / Roboflow): {len(ready)}")
     print(f"waiting on accounts or downloads (confirm): {len(classes) - len(ready)}")
     print(f"region classes (poor fit for boxes): {[c['name'] for c in classes if c.get('region')]}")
     if len(classes) != args.expect:

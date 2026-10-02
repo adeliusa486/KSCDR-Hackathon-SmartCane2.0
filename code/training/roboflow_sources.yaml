@@ -1,0 +1,385 @@
+# Roboflow Universe sources for classes_v2.yaml, read from the Roboflow API.
+# Written by make_roboflow_registry.py. roboflow_fetch.py downloads these,
+# check_classes.py validates every rf- source against the labels here.
+rf-aid:
+  images: 693
+  labels:
+  - Car
+  - GTL
+  - Green PTL
+  - Green Pedestrian Traffic Light
+  - Green TL C
+  - Pedestrian Crossing
+  - Pedestrian Crossing C
+  - Person
+  - RTL
+  - Red PTL
+  - Red Pedestrian Traffic Light
+  - Red TL C
+  license: CC BY 4.0
+  project: kartezyencorp/aid-for-the-blind
+  version: 13
+rf-atm:
+  images: 497
+  labels:
+  - atm
+  - person
+  license: CC BY 4.0
+  project: mehant-kammakomati/atm-dataset
+  version: 10
+rf-blind725:
+  images: 725
+  labels:
+  - Dish
+  - Fish
+  - Flask
+  - Handle
+  - Lamppost
+  - Staircase
+  - Train
+  - a glass
+  - a sofa
+  - airplane
+  - bag
+  - ball
+  - battery charger
+  - bed
+  - beside  table
+  - bicycle
+  - bird
+  - bus
+  - car
+  - cat
+  - chair
+  - chicken
+  - child
+  - column
+  - computer
+  - cow
+  - cup
+  - desk
+  - dog
+  - donkey
+  - door
+  - glasses
+  - goat
+  - headphones
+  - horse
+  - hour
+  - jug
+  - monkey
+  - motorcycle
+  - oven
+  - person
+  - phone
+  - pigeon
+  - rabbit
+  - refrigerator
+  - sheep
+  - table
+  - tap
+  - television
+  - toilet
+  - tree
+  - wardrobe
+  - wash basin
+  - washing machine
+  - window
+  license: CC BY 4.0
+  project: obstacles-for-blind-zjnnn/obstacles-for-blind
+  version: 5
+rf-bump1:
+  images: 1692
+  labels:
+  - Rumble Strip
+  - Speed-Bump
+  license: CC BY 4.0
+  project: speed-bump-detection/speed-bump-detection-se0eh
+  version: 15
+rf-bump2:
+  images: 3243
+  labels:
+  - Pothole
+  - Speed Bump
+  license: CC BY 4.0
+  project: detection-system/humps-bumps-potholes-detection
+  version: 8
+rf-escooter:
+  images: 2524
+  labels:
+  - electric scooter
+  license: CC BY 4.0
+  project: kdigital/electric-scooter-cd7hw
+  version: 1
+rf-esera:
+  images: 839
+  labels:
+  - Bollard
+  - crosswalk
+  - downstairs
+  - upstairs
+  license: CC BY 4.0
+  project: esera/bollards-crosswalk-stairs
+  version: 1
+rf-etg:
+  images: 2015
+  labels:
+  - bollard
+  - electricscooter
+  license: CC BY 4.0
+  project: etg-ik2gp/electric_scooter
+  version: 5
+rf-exit:
+  images: 482
+  labels:
+  - Left Exit
+  - Left/Right Exit
+  - Right Exit
+  - Straight Exit
+  license: Public Domain
+  project: emergency-exit-signs/emergency-exit-signs
+  version: 4
+rf-obstacle:
+  images: 9183
+  labels:
+  - Bicycle
+  - Bus
+  - Car
+  - Dog
+  - Electric pole
+  - Motorcycle
+  - Person
+  - Traffic signs
+  - Tree
+  - Uncovered manhole
+  license: CC BY 4.0
+  project: visually-impaired-obstacle-detection-uxdze/obstacle-detection-yeuzf
+  version: 11
+rf-openhole:
+  images: 694
+  labels:
+  - Safety-barrier
+  - Safety-bollard
+  - Safety-cone
+  - open-hole
+  license: CC BY 4.0
+  project: northeastern-4sfxe/construction-safety-open-hole-excavation-detection
+  version: 5
+rf-pillar:
+  images: 323
+  labels:
+  - pillar
+  license: CC BY 4.0
+  project: adli/pillar
+  version: 4
+rf-risk:
+  images: 16304
+  labels:
+  - People
+  - boundary
+  - crack
+  - drivable_area
+  - drivable_road
+  - elevator
+  - greenlight
+  - greenlight_car
+  - pothole
+  - redlight
+  - redlight_car
+  - road
+  - slope
+  - stair
+  - yellowlight_car
+  - zebracrossing
+  license: CC BY 4.0
+  project: pbl5mu/risk-detection-1
+  version: 2
+rf-sideguide:
+  images: 6400
+  labels:
+  - barricade
+  - bench
+  - bicycle
+  - bollard
+  - bus
+  - car
+  - carrier
+  - cat
+  - chair
+  - dog
+  - fire_hydrant
+  - kiosk
+  - motorcycle
+  - movable_signage
+  - parking_meter
+  - person
+  - pole
+  - potted_plant
+  - scooter
+  - stop
+  - stroller
+  - table
+  - traffic_light
+  - traffic_sign
+  - tree_trunk
+  - truck
+  - wheelchair
+  license: CC BY 4.0
+  project: scottsdale/sideguide
+  version: 1
+rf-starvision:
+  images: 8349
+  labels:
+  - Ambulance
+  - Bus
+  - BusStop
+  - Car
+  - Exit
+  - Motorcycle
+  - Truck
+  - \
+  - bench
+  - cat
+  - caution
+  - chair
+  - cone
+  - crosswalk button
+  - dog
+  - doors
+  - elevator
+  - escalator
+  - package
+  - person
+  - pole
+  - pothole
+  - sidewalk closed
+  - stair
+  - staircase
+  - stairs
+  - stopsign
+  - table
+  - trash can
+  - wet floor sign
+  - window
+  license: CC BY 4.0
+  project: malzag3-uic-edu/starvision
+  version: 29
+rf-strollers1:
+  images: 1359
+  labels:
+  - bs
+  - ped
+  - seinor
+  - stroller
+  - suitcase
+  license: CC BY 4.0
+  project: furnitureselectronics/ultimite_strollers_detection
+  version: 1
+rf-strollers2:
+  images: 1116
+  labels:
+  - 0-human
+  - 1-wheelchair
+  - 2-suitcase
+  - 3-stroller
+  - 4-bicycle
+  license: CC BY 4.0
+  project: thales-a5kye/stroller_final
+  version: 3
+rf-tactile:
+  images: 171
+  labels:
+  - border
+  license: CC BY 4.0
+  project: susam/tactile-pavement
+  version: 2
+rf-underground:
+  images: 337
+  labels:
+  - accessible_facilities
+  - advertisement
+  - aed
+  - audible_and_aisual_alarm
+  - automated_teller_machine
+  - baby_care
+  - bench
+  - blind_lane
+  - caution
+  - closed-circuit_television
+  - customer_service_center
+  - dustbin
+  - elevator
+  - elevator_information
+  - emergency_exits
+  - entry
+  - escalator
+  - ex\
+  - exit
+  - exit_surrounding_information
+  - explosion_suppression_container
+  - fare_adjustment_information
+  - fire_alarm_button
+  - fire_extinguisher
+  - fire_hydrant
+  - helpline
+  - infor
+  - metro_line_map
+  - mind_the_gap
+  - mural
+  - no_entry
+  - no_leaning
+  - no_loitering
+  - person
+  - phone_charging_station
+  - photo_booth_strip
+  - platform_screen_door
+  - police_office
+  - queue_area
+  - ru'n
+  - runn
+  - sandbag
+  - scr
+  - security_check
+  - self_service_tickets
+  - sign
+  - slippery
+  - staircase
+  - station_name_sign
+  - surrounding_area_map
+  - ticket_vending_machine
+  - tickets_information
+  - to_train
+  - toilet
+  - train_arrival_information_screen
+  - train_running_direction
+  - transfer
+  - transit_network_map
+  - trash
+  - vending_machine
+  - warning_tape
+  - watch_your_feet
+  - watch_your_hands
+  - watch_your_head
+  - watch_your_step
+  license: CC BY 4.0
+  project: labelimg-djgsu/underground-pnj5a
+  version: 1
+rf-wetfloor:
+  images: 2324
+  labels:
+  - Balloon
+  - Desk
+  - Desk Chair
+  - Exam Chair
+  - First Aid Kit
+  - Fish Tank
+  - Height Scale
+  - Hospital Bed
+  - Person
+  - Side Table
+  - Ultrasound Machine
+  - Weight Scale
+  - Wet Floor Sign
+  license: CC BY 4.0
+  project: lena-f7w17/wet-floor-detection1
+  version: 2
