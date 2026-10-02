@@ -1598,6 +1598,43 @@ plug a 5 V / 5 A USB-C PD supply into the Pi's USB-C port, power up. Then
 Step 1.2 Part B runs remotely (~4 h). Steps 1.3 (inline USB-C power meter)
 and 1.4 (ToF 2 rewiring) also need hands on the hardware.
 
+### 2 October 2026 (late): draft prompts for Phases 3, 4 and 5
+
+Adeel asked for the Phase 3 and remaining prompts before the Phase 1 gate.
+Written as drafts in `docs/phase-prompts/` (`phase3_DRAFT.md`,
+`phase4_DRAFT.md`, `phase5_DRAFT.md`), same format and tags as the Phase 2
+draft. Each is finalised only at the gate before it.
+
+Found while checking the code for the drafts:
+
+- **The Pi can silence the ESP32's safety vibration.** In `updateMotor()` a
+  manual `B` buzz is checked before the ground-hazard pattern, so `B0,5000`
+  gives 5 s of silence. `A0` turns off obstacle and hazard buzzing until
+  reset. Breaks "ESP32 = independent safety layer". Owner Step 1.5, else 4.2.
+- **The ESP32 is powered from the Pi's USB port**, so a Pi power loss,
+  shutdown or low-battery cut-off takes the safety layer down with it.
+  Step 1.5's "reboot Pi" test must measure this.
+- **Custom classes would never be spoken by name.** `resolve()` names only
+  classes in the hard-coded `RELEVANT` set (COCO). And `extract_detections()`
+  silently drops class indexes beyond the label file, so a 93-class HEF with
+  `coco.txt` loses its 13 hazard classes with no error.
+- **Urgent speech cannot interrupt.** A ground warning waits up to 2 s for the
+  current sentence, then is dropped.
+- **The training pipeline has no data step.** `prepare_datasets.py` never
+  applies `LABEL_ALIASES` and never fills `images/train` or `images/val`.
+  `C:\ml\smartcane` holds 90 KB, no dataset downloaded. `classes.yaml` has
+  93 classes, its header still says 88.
+- **WSL2 now works** (correction to the 19 Sept entry): Ubuntu starts, kernel
+  6.18.33, sees the RTX 4060 (driver 595.79). Inside it: Python 3.14.4, no
+  torch, no Hailo DFC.
+- **The persistent journal is in RAM.** `/var/log` is a 128 MB log2ram
+  tmpfs, synced daily (23:55) and at clean shutdown, so a brownout still
+  loses the logs. `SystemMaxUse=200M` exceeds the tmpfs. Logged as G7 in
+  `experiments/phase1/step1_2_power/failure_log.md`.
+- SSH password login is not disabled (Debian default). For Step 5.10.
+- picamera2 documents `"RGB888"` as [B, G, R] byte order. detect.py feeds it
+  to the HEF as is. Not verified which order the HEF wants. Phase 3 item.
+
 ---
 
 *Last updated: 2 October 2026*

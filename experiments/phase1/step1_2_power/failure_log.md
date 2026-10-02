@@ -86,3 +86,21 @@ needs the range widened to 7.0 to 11.1 s.
 `br-connection-profile-unavailable` at 21:26:42, then `AUDIO DEAD` and a
 reconnect attempt every 10 s. Same as 21:02. Probably the earbuds are off or
 in their case. Not a power fault, but it means no speech was reaching anyone.
+
+## G7. The persistent journal does not survive a power cut (found 2 Oct, 21:52)
+
+Found while drafting the Phase 4 prompt, checked on the Pi:
+
+- `/var/log` is a `log2ram` tmpfs, 128 MB (`findmnt /var/log`). The new
+  `Storage=persistent` journal writes to `/var/log/journal`, which is RAM.
+- `log2ram` copies it to the SD card (`/var/hdd.log`) only from
+  `log2ram-daily.timer` (next run 23:55) and at a clean shutdown.
+- So an under-voltage reset or power cut still loses every log line since the
+  last sync. That is exactly the event G1 could not diagnose, and exactly
+  what the journal change was meant to catch.
+- `SystemMaxUse=200M` is larger than the 128 MB tmpfs it lives in.
+
+Not fixed. Options for Step 1.2 Part B: exclude `/var/log/journal` from
+log2ram, or set `Storage=persistent` with journald writing straight to the
+SD card and `SyncIntervalSec` short, then cap the journal well below the
+free space. Test by cutting power and reading the previous boot's log.
