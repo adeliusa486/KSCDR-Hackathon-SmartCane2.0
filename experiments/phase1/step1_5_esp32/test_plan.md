@@ -54,7 +54,7 @@ results.
 | T10 | Reboot the Pi | record whether the ESP32 loses power or resets, reset reason, time to first `D` |
 | T11 | Stop the service, start it again | ESP32 not reset (`boots` unchanged), link back within 3 s, 0 repeated lines accepted |
 | T12 | Pull the ESP32 USB for 5 s, put it back, service running | link reopens without a service restart (G4), within 5 s of the ESP32's first `D` line |
-| T13 | Force a sensor timeout (hold XSHUT low through a test hook or a pulled wire) | `ok=0` after 300 ms, Pi warning within 3 s |
+| T13 | Force a sensor timeout: test build, `K1` then `K2` (holds that sensor's XSHUT low), `K0` to release | `ok=0` and an `E` line within 400 ms, Pi warning within 3 s, sensor back within 2 s of `K0` |
 | T14 | 1 h soak, service running, no faults injected | 0 resets, 0 `E` lines, report interval P99 under 70 ms |
 
 T9 and T10 have no limit because the hardware does not allow one yet: the

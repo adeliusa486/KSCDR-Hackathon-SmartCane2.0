@@ -216,7 +216,14 @@ int median3(const int *r) {
   return max(min(a, b), min(max(a, b), c));
 }
 
+#ifdef SAFETY_TEST_HOOKS
+int heldInReset = -1;              // test: this sensor is kept in reset (K1/K2)
+#endif
+
 bool startTof(Tof &t, int idx) {
+#ifdef SAFETY_TEST_HOOKS
+  if (idx == heldInReset) { t.ok = false; return false; }
+#endif
   digitalWrite(t.xshut, LOW);
   delay(10);
   digitalWrite(t.xshut, HIGH);
@@ -357,6 +364,15 @@ void handleCommand(const String &cmd) {
     Serial.flush();
     while (true) { }
   }
+  // K1 / K2: hold that sensor in reset, so the real stale-data path fires
+  // (no reading for STALE_MS -> ok=0 and an E line). K0 lets it recover.
+  if (cmd == "K1" || cmd == "K2") {
+    heldInReset = cmd[1] - '1';
+    digitalWrite(tof[heldInReset].xshut, LOW);
+    Serial.printf("I test: tof%d held in reset\n", heldInReset + 1);
+    return;
+  }
+  if (cmd == "K0") { heldInReset = -1; Serial.println("I test: reset released"); return; }
 #endif
   if (cmd == "A0") {
     autoBuzz = false;
