@@ -111,11 +111,17 @@ def main():
     c = D / "raw/coco"
     for split in ("train2017", "val2017"):
         src, dst = c / split, c / "coco/images" / split
+        # The labels zip leaves empty coco/images/<split> folders behind, so
+        # "exists" is not enough: an empty folder must be replaced (3 Oct 2026).
+        if dst.exists() and not any(dst.iterdir()):
+            dst.rmdir()
         if src.exists() and not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
             src.rename(dst)
-        if not dst.exists():
-            fail(f"COCO {split} images missing")
+        n = sum(1 for _ in dst.glob("*.jpg")) if dst.exists() else 0
+        if n == 0:
+            fail(f"COCO {split}: no images in {dst}")
+        log(f"COCO {split}: {n} images")
 
     # 5. merge
     wait_for(D / "vistas_convert.log", "exit=0", "Vistas conversion")
