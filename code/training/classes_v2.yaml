@@ -63,7 +63,7 @@ classes:
   - {name: traffic light, say: traffic light, group: traffic, danger: high, why: "marks a crossing", src: ["coco:traffic light", "oiv7:Traffic light", "mapillary:object--traffic-light--general-upright"]}
   - {name: pedestrian signal, say: walk signal, group: traffic, danger: high, why: "the signal a pedestrian obeys", src: ["mapillary:object--traffic-light--pedestrians"], confirm: true}
   - {name: stop sign, say: stop sign, group: traffic, danger: medium, why: "marks an intersection", src: ["coco:stop sign", "oiv7:Stop sign"]}
-  - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front"]}
+  - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front", "mapillary-mtsd:any-other-sign"]}
   - {name: crosswalk, say: crosswalk, group: traffic, danger: high, why: "where to cross", src: ["mapillary:marking--crosswalk-zebra", "mapillary:construction--flat--crosswalk-plain"], confirm: true, region: true}
   - {name: street light, say: street light, group: traffic, danger: medium, why: "pole in the sidewalk", src: ["oiv7:Street light", "mapillary:object--street-light"]}
   - {name: utility pole, say: pole, group: traffic, danger: medium, why: "the most common sidewalk collision", src: ["mapillary:object--support--utility-pole"], confirm: true}
@@ -71,11 +71,11 @@ classes:
   # --- sign types (Mapillary Traffic Sign Dataset or Roboflow) ---------------
   - {name: yield sign, say: yield sign, group: sign, danger: medium, why: "marks a crossing point", src: ["mapillary-mtsd:regulatory--yield"], confirm: true}
   - {name: do not enter sign, say: do not enter sign, group: sign, danger: medium, why: "one-way streets", src: ["mapillary-mtsd:regulatory--no-entry"], confirm: true}
-  - {name: one way sign, say: one way sign, group: sign, danger: medium, why: "tells traffic direction for crossing", src: ["mapillary-mtsd:regulatory--one-way-left", "mapillary-mtsd:regulatory--one-way-right"], confirm: true}
-  - {name: pedestrian crossing sign, say: crossing sign, group: sign, danger: medium, why: "a crossing is near", src: ["mapillary-mtsd:warning--pedestrians-crossing"], confirm: true}
+  - {name: one way sign, say: one way sign, group: sign, danger: medium, why: "tells traffic direction for crossing", src: ["mapillary-mtsd:regulatory--one-way-left", "mapillary-mtsd:regulatory--one-way-right", "mapillary-mtsd:regulatory--one-way-straight"], confirm: true}
+  - {name: pedestrian crossing sign, say: crossing sign, group: sign, danger: medium, why: "a crossing is near", src: ["mapillary-mtsd:warning--pedestrians-crossing", "mapillary-mtsd:information--pedestrians-crossing"], confirm: true}
   - {name: speed limit sign, say: speed limit sign, group: sign, danger: low, why: "road type and traffic speed", src: ["mapillary-mtsd:regulatory--maximum-speed-limit"], confirm: true}
   - {name: construction sign, say: construction sign, group: sign, danger: medium, why: "sidewalk works ahead", src: ["mapillary-mtsd:warning--roadworks"], confirm: true}
-  - {name: bus stop sign, say: bus stop sign, group: sign, danger: low, why: "finding the bus stop", src: ["mapillary-mtsd:information--bus-stop"], confirm: true}
+  - {name: bus stop sign, say: bus stop sign, group: sign, danger: low, why: "finding the bus stop", src: ["mapillary-mtsd:information--bus-stop", "mapillary-mtsd:information--tram-bus-stop"], confirm: true}
   - {name: exit sign, say: exit sign, group: sign, danger: low, why: "finding the way out of buildings", src: ["roboflow:exit-sign"], confirm: true}
   - {name: wet floor sign, say: wet floor sign, group: sign, danger: medium, why: "slip hazard in malls and offices", src: ["roboflow:wet-floor-sign"], confirm: true}
   # --- street furniture and barriers ----------------------------------------
