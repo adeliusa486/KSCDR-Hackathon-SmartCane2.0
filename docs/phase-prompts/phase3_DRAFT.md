@@ -133,14 +133,17 @@ models only through `--model` and `--labels`.
     DFC wheels are built for specific Python versions. Plan a pinned
     environment for the DFC release you choose.
 
-13. **The compiler must match the runtime on the Pi** *(Step 1.1, verify)*.
-    The Pi runs HailoRT 4.20.0 from `hailo-all` 4.20.0+1. A HEF must be
-    produced by a Dataflow Compiler that HailoRT 4.20 can load. Hailo keeps
-    Hailo-8 and Hailo-8L on a different compiler and runtime line from
-    Hailo-10H and Hailo-15. Read Hailo's compatibility table before choosing
-    a DFC version. Upgrading HailoRT on the Pi is a tested change with an SD
-    image taken first: a DKMS rebuild against the wrong kernel broke the
-    driver on 19 Sept.
+13. **The compiler must match the runtime on the Pi** *(Step 1.1, research
+    2 Oct)*. The Pi runs HailoRT 4.20.0 and TAPPAS 3.31.0, exactly Hailo's
+    2025-01 suite: **DFC 3.30.0, Model Zoo v2.14**. HEFs from a newer compiler
+    fail on an older runtime. Model Zoo v2.14 already has compiled Hailo-8L
+    HEFs for YOLOv8 n/s/m, YOLOv10 n/s/b, YOLO11 n/s/m, YOLOX, NanoDet,
+    DAMO-YOLO and more. YOLO26 arrived in Model Zoo v2.18, and Ultralytics'
+    direct HEF export is validated on HailoRT 4.23, so both need a runtime
+    upgrade on the Pi. That upgrade is its own tested step with an SD image
+    first: a DKMS rebuild against the wrong kernel broke the driver on
+    19 Sept. Details and sources:
+    `docs/research/hailo8l-models-and-licences-2026-10-02.md`.
 
 14. **Class count can break the compile** *(MEMORY.md 19 Sept)*. A 600-class
     Open Images YOLOv8 is reported to fail on Hailo-8 with
@@ -208,10 +211,17 @@ post-processing on chip or on CPU, custom training supported, **licence of
 the model code and weights**, and licence of every dataset it would be
 trained on.
 
-The licence is a hard gate, not a weight. Ultralytics models (YOLOv8, v11,
-YOLO26) are published under AGPL-3.0 with a separate commercial licence
-*(verify)*. A consumer product needs a licence it can ship under. Record the
-answer before spending training time on a candidate.
+The licence is a hard gate, not a weight. Ultralytics states that YOLOv8,
+YOLO11 and YOLO26 need its Enterprise licence for "any commercial product"
+and "embedded deployments", unless the whole project is open-sourced under
+AGPL-3.0 (ultralytics.com/license, read 2 Oct 2026). **That includes the
+model the cane runs today.** Adeel decides between AGPL, an Enterprise
+licence and permissively licensed models before any training. Record each
+candidate's licence from its repository's LICENSE file.
+
+Start with what runs without touching the Pi: Model Zoo v2.14 HEFs (fact
+13). A runtime upgrade for YOLO26 or the Ultralytics export is worth doing
+only if the v2.14 candidates fall short on the scorecard.
 
 Use Hailo's documentation from the day of testing and write its version and
 date into the record.

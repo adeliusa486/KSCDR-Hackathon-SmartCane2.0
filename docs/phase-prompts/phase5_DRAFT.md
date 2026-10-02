@@ -98,7 +98,20 @@ silent failures *(Phase 4)*.
    2023 applies to any personal data the product or the project keeps
    *(verify)*.
 
-10. **Product targets on record** *(MEMORY)*. Retail ₹15,000 to 25,000. The
+10. **Hailo now belongs to Microchip** (acquisition completed 21 Sept 2026,
+    Microchip press release). Microchip says it will keep supporting Hailo's
+    products and software. Its product-longevity pledge covers chips, not
+    compilers, and the Dataflow Compiler licence is described as revocable
+    (opinion piece, check the licence text). Archive the exact compiler,
+    runtime, Model Zoo commit and calibration set behind the shipped HEF.
+    Source: `docs/research/hailo8l-models-and-licences-2026-10-02.md`.
+
+11. **Model licence** *(research 2 Oct)*. The current YOLOv8 model, and
+    YOLO11 and YOLO26, need an Ultralytics Enterprise licence in a commercial
+    product unless the project is published under AGPL-3.0. Phase 3 decides.
+    Step 5.11 confirms the decision is in place.
+
+12. **Product targets on record** *(MEMORY)*. Retail ₹15,000 to 25,000. The
     WeWALK handle weighs 152 g. The compute board alone (Pi 5 + AI HAT+ +
     camera) cost about $185 in parts.
 
