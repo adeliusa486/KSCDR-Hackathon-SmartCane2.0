@@ -106,10 +106,12 @@ silent failures *(Phase 4)*.
     runtime, Model Zoo commit and calibration set behind the shipped HEF.
     Source: `docs/research/hailo8l-models-and-licences-2026-10-02.md`.
 
-11. **Model licence** *(research 2 Oct)*. The current YOLOv8 model, and
-    YOLO11 and YOLO26, need an Ultralytics Enterprise licence in a commercial
-    product unless the project is published under AGPL-3.0. Phase 3 decides.
-    Step 5.11 confirms the decision is in place.
+11. **Model licence** *(research and Adeel's decision, 2 Oct)*. The current
+    YOLOv8 model, and YOLO11 and YOLO26, need an Ultralytics Enterprise
+    licence in a commercial product unless the project is published under
+    AGPL-3.0. Adeel: no licence while the cane is a presentation prototype.
+    **Before any sale, Step 5.11 must settle it** (Enterprise licence, AGPL,
+    or a retrain on a permissively licensed detector).
 
 12. **Product targets on record** *(MEMORY)*. Retail ₹15,000 to 25,000. The
     WeWALK handle weighs 152 g. The compute board alone (Pi 5 + AI HAT+ +

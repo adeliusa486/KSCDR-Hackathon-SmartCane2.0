@@ -118,12 +118,24 @@ models only through `--model` and `--labels`.
     puts neighbouring video frames on both sides of the split, which Step 3.7
     forbids.
 
-11. **Class list** *(code)*. `classes.yaml` holds COCO 80 plus 13: pothole,
-    manhole, open drain, stairs, curb, pole, scaffolding, door, traffic cone,
-    bollard, trash bin, roadblock, tricycle. 93 in total. Its header comment
-    still says 88. Its targets (mAP50-95 0.45, pothole recall 0.90, vehicle
-    recall 0.95, false-alarm rate 0.10, 25 FPS) predate this plan. Replace
-    them with the Step 3.5 table and the scorecard.
+11. **Class list: 150 classes for US and Gulf streets** *(Adeel, 2 Oct
+    2026; branch `prep/phase3-150-classes`)*. Target environment changed from
+    India to **USA and Gulf roads and sidewalks plus general objects**, spoken
+    in **English with US terms** (sidewalk, curb, crosswalk, trash can).
+    `code/training/classes_v2.yaml` has 150 classes, each with spoken name,
+    danger level, reason and data sources. 104 have data now (COCO, Open
+    Images), 46 wait on Mapillary Vistas, the Mapillary Traffic Sign Dataset
+    and Roboflow (Adeel is creating the accounts). Curb, crosswalk, fence and
+    rail track are surfaces, a poor fit for boxes: candidates for a
+    segmentation model or the ground ToF. The old `classes.yaml` (93,
+    India-focused, header says 88) and its targets are superseded. Replace the
+    targets with the Step 3.5 table and the scorecard.
+
+    Merged datasets leave objects unlabelled (an Open Images photo fetched
+    for "bench" may show an unlabelled car). Pseudo-label the gaps with
+    teacher models before training: COCO weights for the COCO classes and
+    `C:\ml\yolov8s-oiv7.pt` (601 Open Images classes) for the rest.
+    Otherwise the model learns that unlabelled cars are background.
 
 12. **Training and compile environment** *(laptop)*. Windows venv
     `C:\ml\venv`: torch 2.5.1+cu121, ultralytics 8.4.155 (19 Sept). **WSL2
@@ -211,13 +223,14 @@ post-processing on chip or on CPU, custom training supported, **licence of
 the model code and weights**, and licence of every dataset it would be
 trained on.
 
-The licence is a hard gate, not a weight. Ultralytics states that YOLOv8,
-YOLO11 and YOLO26 need its Enterprise licence for "any commercial product"
-and "embedded deployments", unless the whole project is open-sourced under
-AGPL-3.0 (ultralytics.com/license, read 2 Oct 2026). **That includes the
-model the cane runs today.** Adeel decides between AGPL, an Enterprise
-licence and permissively licensed models before any training. Record each
-candidate's licence from its repository's LICENSE file.
+Licence: Ultralytics states that YOLOv8, YOLO11 and YOLO26 need its
+Enterprise licence for "any commercial product" and "embedded deployments",
+unless the whole project is open-sourced under AGPL-3.0
+(ultralytics.com/license, read 2 Oct 2026). **Adeel's decision, 2 Oct 2026:
+no licence for now, the cane is a professional prototype for presentation,
+not a product on sale.** So the licence is not a gate in Phase 3. Still record
+each candidate's licence from its repository, because Step 5.11 must settle
+it before any sale.
 
 Start with what runs without touching the Pi: Model Zoo v2.14 HEFs (fact
 13). A runtime upgrade for YOLO26 or the Ultralytics export is worth doing

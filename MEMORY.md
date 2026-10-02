@@ -1689,6 +1689,57 @@ cached arduino-cli build prints no warnings, so warning counts need
 Step 1.3 (power meter), Step 1.4 (ToF 2 rewiring), Step 1.5 (flash the
 prepared firmware, T1-T14). Decide the model licence route before Phase 3.
 
+### 2 October 2026 (late night): Pi back, journal fix tested, new direction from Adeel
+
+**Outage explained (G8), my earlier reading corrected.** wtmp and the synced
+journals show the Pi did not crash: "Power key pressed short" at 22:09:17 and
+22:45:46 (clean shutdowns), power-on 22:53. Only 21:51 to 22:09 is
+unexplained: associated to Wi-Fi, no under-voltage, but no ARP reply. Wi-Fi
+power save suspected, not proven. Also: the Pi WAS reachable 22:09 to 22:45
+(an SSH login of mine at 22:24 succeeded silently), so "Pi offline" in the
+previous entry was only partly true.
+
+**G7 journal fix applied** (Step 1.2, still on the UPS supply, service kept
+stopped). log2ram off, journal on the SD card, `SyncIntervalSec=15s`, and
+**`SplitMode=none`**: with the default per-user split, every line from user
+`pi` (smartcane.service) was lost after a crash, 4 of 4. J1 pass, J2 pass 3/3,
+J3 fail (log blind window ~3 s before a crash, even for CRIT lines), J4 0 ext4
+errors in 11 crash-reboots (sysrq proxy, real plug pulls still to do).
+**The ESP32 restarted with the Pi in 11 of 11 Pi resets** (Step 1.5 T10).
+
+**Adeel's decisions:**
+
+- **No model licence for now**: the cane is a professional prototype for
+  presentation. Revisit before any sale (Step 5.11).
+- **Target environment: USA and Gulf roads and sidewalks, plus general
+  objects.** Replaces the India focus.
+- **Speech: English with US terms** (sidewalk, curb, crosswalk, trash can).
+- **150 object classes.** Adeel will create Hailo Developer Zone, Mapillary
+  and Roboflow accounts.
+- Wants ToF 1 distance accuracy and ToF 2 ground-hazard accuracy checked, and
+  professional vibration hardware.
+
+**Done:**
+
+- `code/training/classes_v2.yaml` (branch `prep/phase3-150-classes`): 150
+  classes with spoken US names, danger, reason, sources. 104 have data now,
+  46 need the Mapillary/Roboflow accounts, 4 are surfaces (curb, crosswalk,
+  fence, rail track). `check_classes.py` validates source names.
+- Open Images pipeline proven end to end on 18 real photos. **Full download
+  started**: 115 labels, up to 1,500 train + 150 val images each, to
+  `E:\smartcane-data\oiv7`, log `E:\smartcane-data\oiv7_fetch.log`. FiftyOne
+  cache in `E:\smartcane-data\fiftyone-zoo` (2.8 GB of annotation files).
+- `code/tools/tof_check.py` on main and the Pi: guided distance check against
+  a tape-measured target, fixed pass limit. ToF 1 now reads 143 mm on the
+  bench (was 90 mm, the bench changed). ToF 2 still needs rewiring (Step 1.4).
+- `docs/research/haptics-upgrade-2026-10-02.md`: TI DRV2605L + LRA, first in
+  PWM input mode on GPIO 13 so firmware and tests stay valid.
+
+**Next:** Open Images download finishes. Adeel sends the Roboflow key,
+downloads Mapillary Vistas + MTSD and the Hailo Dataflow Compiler 3.30.0 wheel
+(matches HailoRT 4.20 on the Pi). Then pseudo-label the gaps, train, compile.
+Hardware steps unchanged: USB-C supply, ToF 2 rewiring, tape-measure ToF 1.
+
 ---
 
 *Last updated: 2 October 2026*
