@@ -1774,6 +1774,59 @@ Vistas v2.0 (browser, auto-moved to D:\smartcane-data\raw\mapillary_vistas),
 MTSD fully annotated (D:\smartcane-data\raw\mapillary_mtsd, md5-checked).
 Roboflow key saved as Windows user env var ROBOFLOW_API_KEY (not in git).
 
+### 3 October 2026 (00:15 to 02:10): data assembled, overnight pipeline running
+
+Adeel asked for the highest accuracy ("no mistake is acceptable") and for
+everything to run unattended until morning. Told him plainly: no detector is
+mistake-free. The design answer: never guess a name (say "obstacle"), keep
+safety on the ToF/ESP32, and measure per-class accuracy before presenting.
+
+All on branch `prep/phase3-150-classes` (not merged, not deployed):
+
+- **Class list now 152, every class with verified training data**
+  (`check_classes.py --expect 152`: 152 of 152). Every source label name is
+  checked against the real lists: COCO, Open Images, Mapillary Vistas
+  `config_v2.0.json`, MTSD annotations, Roboflow registry. The Vistas check
+  caught two wrong names (crosswalk zebra, billboard) that would have given
+  those classes no data.
+- **Coverage measured: 93.0 %** of 117,974 countable objects in 2,000
+  exhaustively labelled Vistas street photos fall in our classes (target 80 %).
+  Biggest gaps: shop signs, banners, CCTV, left out on purpose. Streets only.
+- Classes with no usable data anywhere were replaced, not kept weak: parking
+  block, vending machine, scaffolding, handrail, glass door (56 images), bus
+  shelter OUT. Sidewalk sign (A-frame, 2,926), kiosk, sidewalk closed sign,
+  crosswalk button, coffee table, nightstand, chest of drawers, wardrobe IN.
+- **Roboflow sets checked through the API before use** (`roboflow_sources.yaml`,
+  20 sets, ~58k images, CC BY 4.0 / public domain). Rejected after checking:
+  "elevator" = buttons, scooter set with nonsense labels, vending = drink
+  products, scaffolding = parts, glass-door project deleted.
+- **Roboflow exports contain augmented copies** of each photo across splits:
+  adli/pillar v4 = 17,450 files for 298 photos. `dedupe_roboflow.py` keeps one
+  per original. Without it, test accuracy would be inflated by copies.
+- Windows 260-char path limit broke one Roboflow set; names are now shortened
+  without breaking image/label pairing.
+- **MTSD**: two downloaders ran at once by accident (a stopped task kept
+  running), corrupting train.0 and train.1: caught by md5, re-downloaded,
+  train.0 verified OK, train.1 in progress. Also: Edge saved Vistas under a
+  CDN hash name, so the watcher never fired; found and moved by hand.
+
+Data on disk: Open Images `E:\smartcane-data\oiv7` (still fetching),
+Vistas `D:\smartcane-data\raw\mapillary_vistas` (CRC OK, unpacked) and
+`D:\smartcane-data\vistas_yolo`, MTSD `D:\smartcane-data\raw\mapillary_mtsd`,
+Roboflow `D:\smartcane-data\raw\roboflow`, COCO `D:\smartcane-data\raw\coco`.
+
+**Overnight pipeline running** from a frozen copy
+`D:\smartcane-data\pipeline_code` (commit 336019d), log
+`D:\smartcane-data\pipeline.log`. It waits for each download, then MTSD
+convert, Open Images extra classes, Roboflow re-fetch, COCO layout,
+`build_dataset.py` (caps: COCO 40k, MTSD 30k) with leakage audit, stops if any
+class has no boxes, pseudo-labels with yolo11m + yolov8m-oiv7, then trains
+YOLO11s on 152 classes, 40 epochs, batch 12, run `smartcane152_v1`.
+Expected: training starts around 9-10 a.m. on 3 Oct, about 1.5 days to finish.
+
+Not done without Adeel: no change to the cane (HailoRT 4.23 upgrade, firmware),
+no Ultralytics Platform sign-up (cost unknown).
+
 ---
 
 *Last updated: 3 October 2026*
