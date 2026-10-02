@@ -110,13 +110,30 @@ def source_names(src):
     return [names[i] for i in sorted(names)] if isinstance(names, dict) else list(names)
 
 
-def target_index(name, classes):
+def target_index(name, classes, src, src_map=None):
+    """Index of the class a source label becomes, or None to drop it.
+
+    With a v2 class list (src_map), the mapping is exact: "<dataset>:<label>"
+    as written in classes_v2.yaml, case and all. Without one, the old
+    lower-cased LABEL_ALIASES lookup onto classes.yaml applies.
+    """
+    if src_map is not None:
+        target = src_map.get(f"{src.get('dataset', src['name'])}:{name}")
+        return classes.index(target) if target is not None else None
     n = str(name).strip().lower()
     n = LABEL_ALIASES.get(n, n)
     return classes.index(n) if n in classes else None
 
 
-def scan(src, classes, audit):
+def load_v2(path):
+    """Class names and the "<dataset>:<label>" -> class map from classes_v2.yaml."""
+    cfg = yaml.safe_load(Path(path).read_text())
+    names = [c["name"] for c in cfg["classes"]]
+    src_map = {s: c["name"] for c in cfg["classes"] for s in c["src"]}
+    return names, src_map
+
+
+def scan(src, classes, audit, src_map=None):
     """Yield one record per usable image of a source."""
     root = Path(src["path"])
     names = source_names(src)
@@ -155,7 +172,7 @@ def scan(src, classes, audit):
                 if not ok or not (0 <= cls < len(names)):
                     audit["bad_label_lines"].append(f"{src['name']}/{rel}:{ln}: {raw}")
                     continue
-                new = target_index(names[cls], classes)
+                new = target_index(names[cls], classes, src, src_map)
                 if new is None:
                     audit["dropped_classes"][f"{src['name']}:{names[cls]}"] += 1
                     continue
@@ -233,9 +250,15 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--split", default="0.8,0.1,0.1", help="train,val,test fractions")
     ap.add_argument("--copy", action="store_true", help="copy files instead of hard links")
+    ap.add_argument("--classes", help="classes_v2.yaml: exact dataset:label mapping. "
+                                      "Without it, classes.yaml and LABEL_ALIASES")
     args = ap.parse_args()
     fractions = [float(v) for v in args.split.split(",")]
-    _, classes = load_classes()
+    if args.classes:
+        classes, src_map = load_v2(args.classes)
+    else:
+        _, classes = load_classes()
+        src_map = None
     sources = yaml.safe_load(Path(args.sources).read_text())["sources"]
 
     audit = {"corrupt_images": [], "bad_label_lines": [], "group_regex_miss": [],
@@ -244,7 +267,7 @@ def main():
              "exact_duplicates": 0, "near_duplicates": 0}
     records = []
     for src in sources:
-        records.extend(scan(src, classes, audit))
+        records.extend(scan(src, classes, audit, src_map))
 
     uf = UnionFind()
     for r in records:
