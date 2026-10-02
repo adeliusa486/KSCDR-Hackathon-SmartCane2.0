@@ -1635,6 +1635,60 @@ Found while checking the code for the drafts:
 - picamera2 documents `"RGB888"` as [B, G, R] byte order. detect.py feeds it
   to the HEF as is. Not verified which order the HEF wants. Phase 3 item.
 
+### 2 October 2026 (night): "run all these", Pi offline, prep on branches
+
+Adeel asked to run all phase prompts. **The Pi was off the network**
+(no ARP reply at 192.168.3.51 from about 22:00). Adeel says it should be on,
+so it probably browned out or lost Wi-Fi on the UPS feed again. Needs a
+power cycle. With the journal still in log2ram RAM (G7), the log of the
+event is likely lost.
+
+Adeel chose **prep in parallel**: later-step software built and tested on
+the laptop in git branches, nothing deployed to the cane until its step's
+turn, each step still run and recorded in order. Branches (not merged):
+
+| Branch | What | Tested how |
+|---|---|---|
+| `prep/step1.5-esp32-safety` | firmware 1.5-prep (watchdog, reset reason + counters, Pi cannot silence safety patterns, A0 lapses after 60 s, Pi heartbeat, D-line seq, non-blocking boot buzz, self-test), `esp32_link.py` (reopen G4, drop repeats F5, heartbeat), test plan T1-T14 | unit test of `safety_logic.h` incl. a mutation check, link tests on a pty, clean ESP32 build with 0 warnings in our files. Not flashed |
+| `prep/step3.0-trace` | `detect.py --trace / --frames`, `tools/trace_summary.py` | runs the real detect.py against stand-in picamera2/Hailo modules (`code/tests/fakes`) |
+| `prep/phase3-data-pipeline` | `training/build_dataset.py`: merge, alias remap, split by group with duplicates joined, public data kept out of test, audit | synthetic sources with planted problems, 18 checks |
+
+On `main`: `code/tools/journal_persist.sh` and the G7 pass criteria in the
+Step 1.2 test plan (apply right after the USB-C supply, before the soak), and
+`docs/research/hailo8l-models-and-licences-2026-10-02.md`.
+
+Research findings (sources in that file):
+
+- **The Pi is exactly on Hailo's 2025-01 suite**: HailoRT 4.20.0 + TAPPAS
+  3.31.0 match the row DFC 3.30.0 / Model Zoo v2.14. Model Zoo v2.14 already
+  has Hailo-8L HEFs for YOLOv8 n/s/m, YOLOv10, YOLO11 n/s/m, YOLOX, NanoDet,
+  DAMO-YOLO. The Zoo lists yolov8s at 88 FPS, this Pi measured 58.17.
+- HEFs from a newer compiler do not load on an older runtime. YOLO26 (Model
+  Zoo 2.18) and Ultralytics' `format="hailo"` export (validated on HailoRT
+  4.23) need a runtime upgrade on the Pi.
+- **Licence: Ultralytics YOLOv8 (the current model), YOLO11 and YOLO26 need
+  an Enterprise licence in a commercial product unless the project is
+  AGPL-3.0.** Decision for Adeel before Phase 3 training.
+- **Microchip completed its acquisition of Hailo on 21 Sept 2026.** Archive
+  the exact compiler, runtime and Model Zoo used for any shipped HEF.
+
+Laptop toolchain now in WSL: arduino-cli 1.5.1, `esp32:esp32` 3.3.12, Pololu
+VL53L0X 1.3.1 (same as the Pi), g++ 15.2, venv `~/smartcane-test-venv` with
+pyserial 3.5. A baseline build on the laptop is 16 bytes larger than the
+Pi's: ESP32 images embed build date and paths, so builds never match byte
+for byte across machines. Compare with `verify-flash`, not by hash.
+
+Lessons: the first toolchain install "succeeded" (exit 0) while the ESP32
+core download had failed with "connection reset by peer", because the
+script's last command was an `echo`. Check the result, not the exit code. A
+cached arduino-cli build prints no warnings, so warning counts need
+`--clean`.
+
+**Next, needs Adeel:** power-cycle the Pi. Then, in order: Step 1.2 Part B
+(fit the 5 V / 5 A USB-C supply, apply `journal_persist.sh`, soak runs),
+Step 1.3 (power meter), Step 1.4 (ToF 2 rewiring), Step 1.5 (flash the
+prepared firmware, T1-T14). Decide the model licence route before Phase 3.
+
 ---
 
 *Last updated: 2 October 2026*
