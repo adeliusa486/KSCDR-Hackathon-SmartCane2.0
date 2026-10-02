@@ -1,0 +1,17 @@
+model  : /usr/share/hailo-models/yolov8s_h8l.hef
+labels : 80 classes
+input  : 640x640
+[1:54:43.151242175] [42934] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:330 [0mlibcamera v0.5.2+99-bfd68f78
+[1:54:43.158409602] [42995] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:720 [0mlibpisp version v1.2.1 981977ff21f3 29-04-2025 (14:13:50)
+[1:54:43.160983948] [42995] [1;32m INFO [1;37mIPAProxy [1;34mipa_proxy.cpp:180 [0mUsing tuning file /usr/share/libcamera/ipa/rpi/pisp/imx708.json
+[1:54:43.192289764] [42995] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:220 [0mAdding camera '/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a' for pipeline handler rpi/pisp
+[1:54:43.192322115] [42995] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1179 [0mRegistered camera /base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a to CFE device /dev/media0 and ISP device /dev/media2 using PiSP variant BCM2712_D0
+[1:54:43.195427645] [42934] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1215 [0mconfiguring streams: (0) 1280x720-XRGB8888/sRGB (1) 640x640-RGB888/sRGB (2) 1536x864-BGGR_PISP_COMP1/RAW
+[1:54:43.195523774] [42995] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1483 [0mSensor: /base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a - Selected sensor format: 1536x864-SBGGR10_1X10/RAW - Selected CFE format: 1536x864-PC1B/RAW
+running. ctrl-c to stop.
+
+
+stopped.
+[HailoRT] [error] Non-recoverable Async Infer Pipeline error. status error code: HAILO_STREAM_ABORT(63)
+terminate called after throwing an instance of 'std::system_error'
+  what():  Resource deadlock avoided

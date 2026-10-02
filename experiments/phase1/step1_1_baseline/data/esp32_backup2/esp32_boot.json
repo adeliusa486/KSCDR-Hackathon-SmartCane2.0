@@ -1,0 +1,102 @@
+{
+  "tool": "esp32_capture.py",
+  "started": "2026-10-02T20:06:20",
+  "seconds": 12.0,
+  "reset": true,
+  "sent": [
+    "T",
+    "S"
+  ],
+  "d_lines": 221,
+  "bad_lines": 0,
+  "rate_hz": 19.828,
+  "interval_host_ms": {
+    "n": 220,
+    "min": 0.0,
+    "max": 450.172725,
+    "mean": 50.43,
+    "median": 50.000626,
+    "stdev": 28.68,
+    "p5": 44.973864,
+    "p50": 50.000625,
+    "p95": 60.004005,
+    "p99": 60.023946
+  },
+  "interval_esp_ms": {
+    "n": 220,
+    "min": 50,
+    "max": 60,
+    "mean": 50.41,
+    "median": 50.0,
+    "stdev": 1.66,
+    "p5": 50,
+    "p50": 50,
+    "p95": 55,
+    "p99": 59
+  },
+  "gaps_over_2x_period": 1,
+  "esp_ms_went_backwards": 0,
+  "forward": {
+    "rows": 221,
+    "ok_rate": 1.0,
+    "not_ok_rows": 0,
+    "nothing_in_range_rate": 0.0045,
+    "mm": {
+      "n": 220,
+      "min": 92,
+      "max": 98,
+      "mean": 94.41,
+      "median": 94.0,
+      "stdev": 1.0,
+      "p5": 93,
+      "p50": 94,
+      "p95": 96,
+      "p99": 97
+    }
+  },
+  "down": {
+    "rows": 221,
+    "ok_rate": 0.0,
+    "not_ok_rows": 221,
+    "nothing_in_range_rate": null,
+    "mm": {
+      "n": 0
+    }
+  },
+  "ground_learned_mm": -1,
+  "E_lines": 13,
+  "H_lines": 0,
+  "info_lines": [
+    "I roles: forward=tof1 down=tof2",
+    "I cane_safety boot",
+    "I bus1 scan: 0x29",
+    "I bus2 scan: 0x29",
+    "I ready tof1=1 tof2=0",
+    "I bus1 scan: 0x29",
+    "I tof1 id EE AA 10 (expect EE AA 10)",
+    "I bus2 scan: (nothing)",
+    "I tof1 forward ok=1 mm=93 reinits=0",
+    "I tof2 down ok=0 mm=-1 reinits=0",
+    "I auto=1 ground=-1"
+  ],
+  "error_lines": [
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 id read failed",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)",
+    "E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)"
+  ],
+  "boot_ms": {
+    "banner": 168.5,
+    "ready": 456.6,
+    "first_D": 857.8
+  }
+}

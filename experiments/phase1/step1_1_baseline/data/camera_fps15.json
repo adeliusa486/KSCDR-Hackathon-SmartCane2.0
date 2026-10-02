@@ -1,0 +1,115 @@
+{
+  "model": "imx708",
+  "pixel_array": [
+    4608,
+    2592
+  ],
+  "sensor_modes": [
+    {
+      "size": [
+        1536,
+        864
+      ],
+      "crop_limits": [
+        768,
+        432,
+        3072,
+        1728
+      ],
+      "fps": 120.13,
+      "bit_depth": 10
+    },
+    {
+      "size": [
+        2304,
+        1296
+      ],
+      "crop_limits": [
+        0,
+        0,
+        4608,
+        2592
+      ],
+      "fps": 56.03,
+      "bit_depth": 10
+    },
+    {
+      "size": [
+        4608,
+        2592
+      ],
+      "crop_limits": [
+        0,
+        0,
+        4608,
+        2592
+      ],
+      "fps": 14.35,
+      "bit_depth": 10
+    }
+  ],
+  "selected_sensor": {
+    "bit_depth": 10,
+    "output_size": [
+      1536,
+      864
+    ]
+  },
+  "main": {
+    "size": [
+      1280,
+      720
+    ],
+    "format": "XRGB8888"
+  },
+  "lores": {
+    "size": [
+      640,
+      640
+    ],
+    "format": "RGB888"
+  },
+  "scaler_crop": [
+    768,
+    432,
+    3072,
+    1728
+  ],
+  "crop_fraction_w": 0.6667,
+  "crop_fraction_h": 0.6667,
+  "effective_hfov_deg_estimate": 98.2,
+  "detect_py_hfov_assumed": 120.0,
+  "lores_aspect_vs_crop_aspect": [
+    1.0,
+    1.778
+  ],
+  "frames": 90,
+  "frame_interval_ms": {
+    "mean": 66.66,
+    "min": 66.65,
+    "max": 66.66,
+    "stdev": 0.001,
+    "over_1.5x_nominal": 0
+  },
+  "exposure_us": {
+    "min": 66212,
+    "max": 66212
+  },
+  "analogue_gain": {
+    "min": 11.64,
+    "max": 11.64
+  },
+  "lux_last": 42.5134391784668,
+  "controls_requested": {
+    "FrameRate": 15,
+    "AeEnable": true,
+    "AwbEnable": true,
+    "ExposureValue": 0.7,
+    "FrameDurationLimits": [
+      66666,
+      66666
+    ],
+    "AeExposureMode": 0,
+    "NoiseReductionMode": 2
+  }
+}

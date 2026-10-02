@@ -1,0 +1,202 @@
+{
+  "step": "1.1",
+  "date": "2026-10-02",
+  "status": "BLOCKED",
+  "blocked_on": [
+    "offline SD card image (needs physical access)",
+    "Hailo + vision FPS re-measured after a power cycle on the unchanged supply"
+  ],
+  "git": {
+    "as_found_commit": "6d928cc",
+    "tag": "consumer-baseline-before-phase1"
+  },
+  "system": {
+    "model": "Raspberry Pi 5 Model B Rev 1.1",
+    "os": "Debian 12.15 bookworm, image 'Raspberry Pi reference 2026-04-13'",
+    "kernel": "6.12.109+rpt-rpi-2712",
+    "firmware": "2026/05/26 086b83e3",
+    "bootloader": "2026-05-26 (up to date)",
+    "boot_time_s": {
+      "total": 9.394,
+      "kernel": 5.823,
+      "userspace": 3.571,
+      "note": "6.787 s on 19 Sep; cause of increase not established"
+    },
+    "sd_card": "SL32G manfid 0x03 date 01/2025, 29.7 GB, 13 GB used"
+  },
+  "power": {
+    "feed": "UPS into 5V header pin",
+    "undervoltage_events_this_boot": 19,
+    "first": "18:03:46",
+    "last": "18:19:42",
+    "throttled": "0x50000 (under-voltage has occurred, throttling has occurred)",
+    "firmware_psu_max_current_ma": 3000,
+    "usb_max_current_enable": 0,
+    "window_1hz": {
+      "samples": 180,
+      "from": "19:57:14",
+      "to": "20:00:18",
+      "ext5v_min_v": 4.86822,
+      "ext5v_median_v": 4.98212,
+      "ext5v_max_v": 5.00624,
+      "temp_min_c": 45.0,
+      "temp_max_c": 49.4,
+      "new_undervoltage_events": 0,
+      "note": "light load only: Hailo was not inferring"
+    }
+  },
+  "hailo": {
+    "arch": "HAILO8L",
+    "firmware": "4.20.0",
+    "hailort": "4.20.0",
+    "hailo_pci": "4.20.0 (dkms)",
+    "tappas_core": "3.31.0",
+    "pcie_link": "8GT/s x1 (cap x4)",
+    "hef": "/usr/share/hailo-models/yolov8s_h8l.hef",
+    "hef_sha256": "a051fc1551b689952494ed4b2c972f57f4de65fba7c2afa645e36f63a51ba3c9",
+    "input": "640x640x3 UINT8",
+    "output": "NMS by class, 80 classes",
+    "identify": "OK",
+    "benchmark_fps": 0.0,
+    "benchmark_result": "HAILO_TIMEOUT(4)",
+    "device_disconnected_lines": 33,
+    "last_camera_speech": "18:19:49",
+    "status": "FAIL: control path alive, inference dead"
+  },
+  "vision_loop": {
+    "fps15_report_lines_30s": 0,
+    "fps30_report_lines_30s": 0,
+    "expected_lines_30s": 100,
+    "status": "FAIL (blocked in hailo.run)"
+  },
+  "camera": {
+    "model": "imx708",
+    "selected_sensor": {
+      "bit_depth": 10,
+      "output_size": [
+        1536,
+        864
+      ]
+    },
+    "scaler_crop": [
+      768,
+      432,
+      3072,
+      1728
+    ],
+    "crop_fraction_w": 0.6667,
+    "effective_hfov_deg_estimate": 98.2,
+    "detect_py_hfov_assumed": 120.0,
+    "lores_aspect_vs_crop_aspect": [
+      1.0,
+      1.778
+    ],
+    "frame_interval_ms": {
+      "mean": 66.66,
+      "min": 66.65,
+      "max": 66.66,
+      "stdev": 0.001,
+      "over_1.5x_nominal": 0
+    },
+    "exposure_us": {
+      "min": 66212,
+      "max": 66212
+    },
+    "analogue_gain": {
+      "min": 11.64,
+      "max": 11.64
+    },
+    "lux_last": 42.5134391784668
+  },
+  "esp32": {
+    "chip": "ESP32-D0WD-V3 rev 3.1",
+    "mac": "3c:8a:1f:09:d3:ac",
+    "flash": "4MB, manufacturer 0x85 device 0x2016",
+    "bridge": "CP2102 10c4:ea60",
+    "firmware_app_sha256": "12a2c90dfb79648843f3eb6a4de2a3c5c1eca80c8e8321abaf3b3a54f3b3f042",
+    "firmware_identity": "verify-flash PASS (all 4 regions)",
+    "rollback_test": "PASS (write low 64 KB + app, verify-flash)",
+    "arduino_core": "esp32:esp32 3.3.12",
+    "vl53l0x_lib": "Pololu 1.3.1",
+    "stream_steady_state": {
+      "rows": 1152,
+      "rate_hz": 19.87,
+      "interval_ms": {
+        "min": 44.8,
+        "p50": 50.0,
+        "p95": 51.28,
+        "p99": 60.03,
+        "max": 60.14
+      }
+    },
+    "open_burst": {
+      "duplicate_lines_in_first_90ms": 2676,
+      "distinct_readings": 2
+    },
+    "boot_ms": [
+      {
+        "banner": 168.5,
+        "ready": 456.6,
+        "first_D": 857.8
+      },
+      {
+        "banner": 168.5,
+        "ready": 456.6,
+        "first_D": 857.8
+      },
+      {
+        "banner": 168.5,
+        "ready": 456.6,
+        "first_D": 857.8
+      }
+    ],
+    "boot_trials": 3
+  },
+  "tof1_forward": {
+    "id": "EE AA 10",
+    "ok_rate": 1.0,
+    "rows": 1152,
+    "mm": {
+      "n": 1152,
+      "min": 85,
+      "max": 93,
+      "mean": 90.34,
+      "median": 90.0,
+      "stdev": 1.04,
+      "p5": 89,
+      "p50": 90,
+      "p95": 92,
+      "p99": 93
+    },
+    "reinits": 0,
+    "target": "bench object, distance not independently measured",
+    "note": "steady-state rows only (first 2 s after port open excluded, see failure_log F5)"
+  },
+  "tof2_down": {
+    "id": "read failed",
+    "ok_rate": 0.0,
+    "E_lines_60s": 61,
+    "status": "FAIL: absent from bus 2"
+  },
+  "audio": {
+    "sink": "bluez_sink.B0_38_E2_19_DC_CC.a2dp_sink",
+    "earbuds": "Paired, Bonded, Trusted, LinkKey stored",
+    "pulseaudio_starts_this_boot": 134,
+    "ssh_sessions_this_boot": 355,
+    "audio_dead_events": 89,
+    "ssh_logout_to_pa_restart": "12 of 12 since 19:47, 1-3 s"
+  },
+  "service": {
+    "unit_matches_repo": true,
+    "deployed_code_matches_repo": "9 of 9 files byte-identical",
+    "state_after_window": "active, NRestarts=0, started 20:06:28",
+    "starting_vision_lines_this_boot": 40
+  },
+  "backups": {
+    "pi_config_tar": "backups/pi_config_2026-10-02.tar.gz",
+    "pi_config_sha256": "0361d3365debe9e8775c1d0abd78f9a7b2f381b9e5517efa26c2cdd737f021d2",
+    "pi_config_entries": 5261,
+    "esp32": "baseline/esp32/",
+    "sd_image": "PENDING"
+  }
+}

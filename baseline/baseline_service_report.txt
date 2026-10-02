@@ -1,0 +1,136 @@
+SERVICE REPORT  2026-10-02T19:55:11+03:00
+
+### unit file
+# /home/pi/.config/systemd/user/smartcane.service
+[Unit]
+# Smart cane - vision + speech, started automatically at boot.
+#
+# This is a USER service, not a system service, and that is deliberate.
+# Speech goes through PulseAudio, which lives in the user session. A system
+# service running as root cannot reach the user's audio sink without a pile of
+# fragile workarounds. Running it as the pi user means audio just works.
+#
+# Requires lingering so the user session starts at boot without anyone logging
+# in:   sudo loginctl enable-linger pi
+Description=Smart cane vision and speech
+After=network.target sound.target bluetooth.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/smartcane
+
+# Give Bluetooth a moment to reconnect the headset before we start talking.
+# The headset is already trusted, so bluetoothd reconnects it on its own, but
+# it is not instant and the first spoken line would otherwise be lost.
+ExecStartPre=/bin/sleep 8
+# Hard 10 s limit: with the earbuds off or unpaired, bluetoothctl connect can
+# hang until systemd's start timeout kills the whole unit, so the cane would
+# not start at all. Earbuds being off must never stop the cane from running.
+ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:CC
+
+# --conf low and --name-conf high on purpose. The detector sees almost
+# everything, and only confident detections get a name. Anything in between is
+# announced as "obstacle", so nothing physical goes unreported while wrong
+# names stay rare. See resolve() in speak_detect.py.
+#
+# --interval 0.3 with --confirm 3: an object is spoken ~0.6-0.9 s after it
+# appears, against 1.2-2.4 s with the old 1.2 / 2. Three agreeing reports
+# instead of two keeps one-frame false labels out.
+ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
+    --interval 0.3 \
+    --conf 0.25 \
+    --name-conf 0.35 \
+    --confirm 3 \
+    --max-objects 2 \
+    --repeat-after 4.0 \
+    --keepalive-after 20 \
+    --retry-every 10 \
+    --all-classes \
+    --fps 15 \
+    --ev 0.7
+
+# Restart if the vision loop dies for any reason. A cane that goes silent
+# after a crash is worse than one that stutters.
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+
+### state
+MainPID=18758
+Result=success
+NRestarts=0
+ExecMainStartTimestamp=Fri 2026-10-02 19:26:44 +03
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+
+### linger
+Linger=yes
+
+### processes
+    PID    PPID %CPU   RSS     ELAPSED COMMAND
+   4893       1  0.0  6272    01:25:42 /usr/local/bin/hailort_service
+  18417       1  0.0  6592       29:08 /usr/libexec/bluetooth/bluetoothd
+  18758     812  0.7 14352       28:27 /usr/bin/python3 -u /home/pi/smartcane/speak_detect.py --interval 0.3 --conf 0.25 --name-conf 0.35 --confirm 3 --max-objects 2 --repeat-after 4.0 --keepalive-after 20 --retry-every 10 --all-classes --fps 15 --ev 0.7
+  18762   18758  3.6 520832      28:27 /usr/bin/python3 -u /home/pi/smartcane/detect.py --interval 0.3 --conf 0.25 --fps 15 --ev 0.7 --all-classes
+  38102     812  3.0 20976       00:04 /usr/bin/pulseaudio --daemonize=no --log-target=journal
+
+### detect.py environment (secrets filtered)
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+HOME=/home/pi
+INVOCATION_ID=7088ab42bba14fd1a840709b0d584c0f
+JOURNAL_STREAM=9:106682
+LANG=en_GB.UTF-8
+LOGNAME=pi
+MANAGERPID=812
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+QT_ACCESSIBILITY=1
+SHELL=/bin/bash
+SYSTEMD_EXEC_PID=18758
+USER=pi
+XDG_RUNTIME_DIR=/run/user/1000
+
+### smartcane journal counts this boot
+No journal files were found.
+Started smartcane  0
+SPEAKING           0
+AUDIO OK           0
+AUDIO DEAD         0
+Warning            0
+not responding     0
+Traceback          0
+HAILO_             0
+starting vision    0
+stopped            0
+
+### smartcane journal (last 30)
+No journal files were found.
+-- No entries --
+
+### related system services
+active
+active
+active
+
+### errors this boot (prio err)
+lines=580
+Oct 02 19:49:48 smartcane pulseaudio[34385]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:49:48 smartcane pulseaudio[34385]: Failed to find a working profile.
+Oct 02 19:49:48 smartcane pulseaudio[34385]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:50:56 smartcane pulseaudio[35223]: Failed to find a working profile.
+Oct 02 19:50:56 smartcane pulseaudio[35223]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:50:56 smartcane pulseaudio[35223]: Failed to find a working profile.
+Oct 02 19:50:56 smartcane pulseaudio[35223]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:55:06 smartcane pulseaudio[38041]: Failed to find a working profile.
+Oct 02 19:55:06 smartcane pulseaudio[38041]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:55:06 smartcane pulseaudio[38041]: Failed to find a working profile.
+Oct 02 19:55:06 smartcane pulseaudio[38041]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:55:07 smartcane pulseaudio[38102]: Failed to find a working profile.
+Oct 02 19:55:07 smartcane pulseaudio[38102]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 19:55:07 smartcane pulseaudio[38102]: Failed to find a working profile.
+Oct 02 19:55:07 smartcane pulseaudio[38102]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.

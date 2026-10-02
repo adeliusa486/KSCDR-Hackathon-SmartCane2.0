@@ -1,0 +1,36 @@
+       4.4 ms  ets Jul 29 2019 12:21:46
+       9.9 ms  rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+      12.7 ms  configsip: 0, SPIWP:0xee
+      18.2 ms  clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+      21.0 ms  mode:DIO, clock div:1
+      23.9 ms  load:0x3fff0030,len:4876
+      23.9 ms  ho 0 tail 12 room 4
+      26.6 ms  load:0x40078000,len:16532
+      29.4 ms  load:0x40080400,len:3500
+      30.0 ms  entry 0x400805b4
+     159.0 ms  I roles: forward=tof1 down=tof2
+     168.5 ms  I cane_safety boot
+     195.9 ms  I bus1 scan: 0x29
+     302.9 ms  I bus2 scan: 0x29
+     455.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+     456.6 ms  I ready tof1=1 tof2=0
+    1017.8 ms  > T
+    1217.9 ms  > S
+    1418.0 ms  I bus1 scan: 0x29
+    1418.0 ms  I tof1 id EE AA 10 (expect EE AA 10)
+    1418.0 ms  I bus2 scan: (nothing)
+    1418.0 ms  E tof2 id read failed
+    1418.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    1418.0 ms  I tof1 forward ok=1 mm=90 reinits=0
+    1418.0 ms  I tof2 down ok=0 mm=-1 reinits=0
+    1418.0 ms  I auto=1 ground=-1
+    2177.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    3186.9 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    4195.9 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    5201.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    6206.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    7212.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    8222.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+    9231.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+   10236.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)
+   11241.0 ms  E tof2 init failed (no reply at 0x29 on SDA 18 / SCL 19)

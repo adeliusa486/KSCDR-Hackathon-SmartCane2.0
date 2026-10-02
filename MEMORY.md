@@ -290,7 +290,19 @@ new smart cane 2.0/
     haptics.py                      <- vibration motor patterns, PWM on GPIO18
     tof.py                          <- two VL53L0X, XSHUT GPIO23/24 -> 0x30/0x31
     training/                       <- dataset prep + training scripts (laptop)
+    tools/                          <- measurement tools (2 Oct 2026, Phase 1):
+                                       snapshot_pi.sh, esp32_capture.py,
+                                       camera_probe.py, baseline_window.sh,
+                                       esp32_backup.sh
+  docs/consumer-readiness-plan.md   <- 5-phase master plan, verbatim (2 Oct 2026)
+  docs/phase-prompts/               <- revised prompt for each next phase
+  baseline/                         <- frozen pre-Phase-1 state + rollback steps
+  experiments/phase1/...            <- one folder per step, report + raw data
+  backups/                          <- NOT in git: Pi config tarball, SD image
 ```
+
+The project is a git repository since 2 Oct 2026 (branch `main`). Tag
+`consumer-baseline-before-phase1` marks the frozen baseline.
 
 ---
 
@@ -1430,6 +1442,81 @@ its VCC/GND/SDA (D18)/SCL (D19) connections redone.
 **Earbuds dropped again at 19:19** as predicted (pairing made before the
 `Pairable` fix, so unbonded). They reconnected on service restart. One more
 pairing is still needed to make it permanent.
+
+### 2 October 2026: Consumer-readiness plan adopted, Phase 1 Step 1.1 (baseline)
+
+Adeel handed over a 5-phase consumer-readiness plan (power and safety
+foundation, sensor validation + IMU, model selection, fusion and fault
+handling, product validation). Saved verbatim in
+`docs/consumer-readiness-plan.md`. Rules that now govern all work: never move
+to the next step until the current one is tested and passes, record every
+step under `experiments/`, tag known-good states. **After each phase passes
+its gate, write the next phase's prompt from the plan, revised with what the
+phase measured, into `docs/phase-prompts/`.**
+
+Step 1.1 froze the system. Full record in
+`experiments/phase1/step1_1_baseline/` (README, failure_log, results.json).
+Status **BLOCKED** on one power-down: SD card image plus a Hailo re-measure.
+
+**The project folder is now a git repo.** Commit `6d928cc` is the code as
+found, byte-identical to the Pi's `/home/pi/smartcane` (9 of 9 files and the
+unit). Tag `consumer-baseline-before-phase1`.
+
+**CRITICAL: vision had been dead for 1 h 46 min with no warning.** 19
+under-voltage events from 18:03 to 18:19, last camera-derived speech 18:19:49,
+then 33 Hailo `Device disconnected` lines and a PCI rescan at 18:29. After
+the rescan `hailortcli fw-control identify` works but the benchmark runs at
+**0.00 FPS** (`HAILO_TIMEOUT`) and detect.py hangs in `hailo.run`. The service
+stayed `active`, `NRestarts=0`, and spoke only ToF warnings. **A PCI rescan
+is not a recovery: identify passing does not mean inference works.** The
+ground-sensor fault is announced ("Warning, ground sensor not working"), the
+vision fault is not. Power is the cause, so Step 1.2 is the fix.
+
+Other measured facts worth keeping:
+
+- **Camera FOV is about 98 degrees, not 120.** Picamera2 picks sensor mode
+  1536x864, a centre crop (768,432,3072,1728) of the sensor. detect.py's
+  `--hfov 120` makes the ±10 degree "ahead" corridor about ±6.7 degrees in
+  reality. The 16:9 crop is squeezed into 640x640, 1.78x horizontally. Indoor
+  bench: exposure pinned at 66.2 ms, gain 11.6, 42 lux.
+- **Every SSH logout restarts PulseAudio** (12 of 12 since 19:47, 134 starts
+  vs 355 SSH sessions this boot, 89 `AUDIO DEAD` events healed in ~2 s).
+  Bench artifact, but never measure audio with an SSH session open.
+- **`journalctl --user` finds nothing on this Pi.** Read user units with
+  `sudo journalctl _SYSTEMD_USER_UNIT=smartcane.service`.
+- **Full ESP32 `read-flash` fails at 0x2A000** at 921600 and 460800 baud,
+  with `cp210x ... failed set request 0x12 status: -110`. Use `verify-flash`
+  (MD5 on chip) to prove firmware identity. Running firmware verified equal
+  to the 19:22 build (app sha256 `12a2c90d...`). Rollback written back and
+  verified. Files and restore commands in `baseline/`.
+- ESP32 link steady state 19.87 Hz, interval P50 50.0 / P99 60.0 / max
+  60.1 ms. ESP32 reset to first report 858 ms (3 trials), of which ~400 ms is
+  the blocking "alive" double buzz. EN reset reports as `POWERON_RESET`.
+- Opening the serial port delivered 2,676 duplicate stale D lines in 90 ms
+  even after `reset_input_buffer()`. Too fast for the UART, so a Pi-side
+  buffer. Open item for Step 1.5.
+- ToF 2 still absent (loose wire). ToF 1 mean 90.3 mm, stdev 1.04 mm, 1,152
+  samples, 0 dropouts.
+- Boot this time 9.394 s (5.823 kernel), not 6.8 s. Cause not known.
+- Power: firmware sees `max_current 3000`, `usb_max_current_enable 0`, so the
+  USB ports (ESP32 + motor) share 600 mA. EXT5V 4.868 to 5.006 V during a
+  light-load window.
+- Earbuds now `Bonded: yes` with a stored link key, so the pairing problem
+  from step 3f is fixed.
+- `icecast2` still listens on port 8000.
+
+**Tooling lesson:** the first measurement script wrote the ESP32 flash with
+no check that the read had succeeded. The read failed, esptool refused the
+missing file, nothing was written, but the bench ESP32 sat in its bootloader
+for ~85 s. Flash work now goes only through `code/tools/esp32_backup.sh`,
+which verifies before it writes. Also: `pkill -f <name>` over SSH kills the
+SSH session itself when the command line contains `<name>`. Use
+`pgrep -f "[n]ame"`.
+
+**Next:** Adeel powers down, images the SD card, powers up on the same
+supply. Then re-measure Hailo and vision, close Step 1.1, and start Step 1.2
+(USB-C 5 V / 5 A supply). Ask Adeel whether he has the official 27 W supply
+and an inline USB-C power meter for Step 1.3.
 
 ---
 
