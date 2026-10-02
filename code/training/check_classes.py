@@ -26,11 +26,16 @@ def main():
     ap.add_argument("--expect", type=int, default=150)
     ap.add_argument("--mtsd", default="D:/smartcane-data/raw/mapillary_mtsd/mtsd_fully_annotated_annotation.zip",
                     help="MTSD annotation zip, checks mapillary-mtsd: sources if present")
+    ap.add_argument("--vistas", default="D:/smartcane-data/raw/mapillary_vistas/config_v2.0.json",
+                    help="Vistas config, checks mapillary: sources if present")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(Path(args.file).read_text())
     classes = cfg["classes"]
     oiv7 = set(json.loads(Path(args.oiv7).read_text()))
+    vistas = None
+    if Path(args.vistas).exists():
+        vistas = {l["name"] for l in json.loads(Path(args.vistas).read_text())["labels"]}
     mtsd = None
     if Path(args.mtsd).exists():
         import zipfile
@@ -60,6 +65,10 @@ def main():
                 checked += 1
                 if label not in COCO:
                     errors.append(f"{c['name']}: {s} is not a COCO class")
+            elif ds == "mapillary" and vistas is not None:
+                checked += 1
+                if label not in vistas:
+                    errors.append(f"{c['name']}: {s} is not a Mapillary Vistas v2.0 label")
             elif ds == "mapillary-mtsd" and mtsd is not None:
                 checked += 1
                 if label != "any-other-sign" and not any(m == label or m.startswith(label + "-") for m in mtsd):
@@ -75,8 +84,9 @@ def main():
     print("by group :", dict(Counter(c["group"] for c in classes)))
     print("by danger:", dict(Counter(c["danger"] for c in classes)))
     ready = [c["name"] for c in classes if not c.get("confirm") or
-             (mtsd is not None and any(s.startswith("mapillary-mtsd:") for s in c["src"]))]
-    print(f"data available now (COCO / Open Images / MTSD): {len(ready)}")
+             (mtsd is not None and any(s.startswith("mapillary-mtsd:") for s in c["src"])) or
+             (vistas is not None and any(s.startswith("mapillary:") for s in c["src"]))]
+    print(f"data available now (COCO / Open Images / Mapillary): {len(ready)}")
     print(f"waiting on accounts or downloads (confirm): {len(classes) - len(ready)}")
     print(f"region classes (poor fit for boxes): {[c['name'] for c in classes if c.get('region')]}")
     if len(classes) != args.expect:

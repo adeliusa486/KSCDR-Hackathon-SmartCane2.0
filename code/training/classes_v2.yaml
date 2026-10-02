@@ -60,14 +60,14 @@ classes:
   - {name: shopping cart, say: shopping cart, group: vehicle, danger: medium, why: "parking lots and stores", src: ["oiv7:Cart"]}
   - {name: trailer, say: trailer, group: vehicle, danger: medium, why: "parked, low tow bars at shin height", src: ["mapillary:object--vehicle--trailer"], confirm: true}
   # --- traffic control ------------------------------------------------------
-  - {name: traffic light, say: traffic light, group: traffic, danger: high, why: "marks a crossing", src: ["coco:traffic light", "oiv7:Traffic light", "mapillary:object--traffic-light--general-upright"]}
+  - {name: traffic light, say: traffic light, group: traffic, danger: high, why: "marks a crossing", src: ["coco:traffic light", "oiv7:Traffic light", "mapillary:object--traffic-light--general-upright", "mapillary:object--traffic-light--general-single", "mapillary:object--traffic-light--general-horizontal"]}
   - {name: pedestrian signal, say: walk signal, group: traffic, danger: high, why: "the signal a pedestrian obeys", src: ["mapillary:object--traffic-light--pedestrians"], confirm: true}
   - {name: stop sign, say: stop sign, group: traffic, danger: medium, why: "marks an intersection", src: ["coco:stop sign", "oiv7:Stop sign"]}
-  - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front", "mapillary-mtsd:any-other-sign"]}
-  - {name: crosswalk, say: crosswalk, group: traffic, danger: high, why: "where to cross", src: ["mapillary:marking--crosswalk-zebra", "mapillary:construction--flat--crosswalk-plain"], confirm: true, region: true}
+  - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front", "mapillary:object--traffic-sign--back", "mapillary:object--traffic-sign--direction-front", "mapillary:object--traffic-sign--direction-back", "mapillary:object--traffic-sign--temporary-front", "mapillary:object--traffic-sign--temporary-back", "mapillary-mtsd:any-other-sign"]}
+  - {name: crosswalk, say: crosswalk, group: traffic, danger: high, why: "where to cross", src: ["mapillary:marking--discrete--crosswalk-zebra", "mapillary:construction--flat--crosswalk-plain"], confirm: true, region: true}
   - {name: street light, say: street light, group: traffic, danger: medium, why: "pole in the sidewalk", src: ["oiv7:Street light", "mapillary:object--street-light"]}
   - {name: utility pole, say: pole, group: traffic, danger: medium, why: "the most common sidewalk collision", src: ["mapillary:object--support--utility-pole"], confirm: true}
-  - {name: pole, say: pole, group: traffic, danger: medium, why: "sign posts and other poles", src: ["mapillary:object--support--pole"], confirm: true}
+  - {name: pole, say: pole, group: traffic, danger: medium, why: "sign posts and other poles", src: ["mapillary:object--support--pole", "mapillary:object--support--traffic-sign-frame"], confirm: true}
   # --- sign types (Mapillary Traffic Sign Dataset or Roboflow) ---------------
   - {name: yield sign, say: yield sign, group: sign, danger: medium, why: "marks a crossing point", src: ["mapillary-mtsd:regulatory--yield"], confirm: true}
   - {name: do not enter sign, say: do not enter sign, group: sign, danger: medium, why: "one-way streets", src: ["mapillary-mtsd:regulatory--no-entry"], confirm: true}
@@ -86,7 +86,7 @@ classes:
   - {name: bike rack, say: bike rack, group: furniture, danger: medium, why: "low metal loops, trip hazard", src: ["mapillary:object--bike-rack"], confirm: true}
   - {name: mailbox, say: mailbox, group: furniture, danger: medium, why: "US sidewalk obstacle and landmark", src: ["mapillary:object--mailbox"], confirm: true}
   - {name: utility box, say: utility box, group: furniture, danger: medium, why: "boxes on sidewalks", src: ["mapillary:object--junction-box"], confirm: true}
-  - {name: billboard, say: billboard, group: furniture, danger: low, why: "landmark, stands block sidewalks", src: ["oiv7:Billboard", "mapillary:object--billboard"]}
+  - {name: billboard, say: billboard, group: furniture, danger: low, why: "landmark, stands block sidewalks", src: ["oiv7:Billboard", "mapillary:object--sign--advertisement"]}
   - {name: fountain, say: fountain, group: furniture, danger: medium, why: "water and low walls in plazas and malls", src: ["oiv7:Fountain"]}
   - {name: potted plant, say: planter, group: furniture, danger: medium, why: "planters line Gulf and US sidewalks", src: ["coco:potted plant", "oiv7:Flowerpot", "oiv7:Houseplant"]}
   - {name: barrel, say: barrel, group: furniture, danger: medium, why: "US construction barrels", src: ["oiv7:Barrel"]}
@@ -106,7 +106,7 @@ classes:
   - {name: stairs, say: stairs, group: ground, danger: high, why: "falls", src: ["oiv7:Stairs", "roboflow:stairs"]}
   - {name: escalator, say: escalator, group: ground, danger: high, why: "malls and stations", src: ["roboflow:escalator"], confirm: true}
   - {name: ramp, say: ramp, group: ground, danger: medium, why: "slope change, accessible entrances", src: ["roboflow:ramp"], confirm: true}
-  - {name: pothole, say: pothole, group: ground, danger: high, why: "trip and ankle injury", src: ["rdd:D40", "roboflow:pothole"], confirm: true}
+  - {name: pothole, say: pothole, group: ground, danger: high, why: "trip and ankle injury", src: ["mapillary:object--pothole", "rdd:D40", "roboflow:pothole"], confirm: true}
   - {name: manhole, say: manhole cover, group: ground, danger: high, why: "open or loose covers", src: ["mapillary:object--manhole", "roboflow:manhole"], confirm: true}
   - {name: storm drain, say: storm drain, group: ground, danger: high, why: "grates and inlets at the curb", src: ["mapillary:object--catch-basin"], confirm: true}
   - {name: sidewalk crack, say: crack, group: ground, danger: medium, why: "trip hazard", src: ["rdd:D00", "rdd:D10", "rdd:D20"], confirm: true}
