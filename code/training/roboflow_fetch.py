@@ -78,8 +78,16 @@ def main():
         top = sorted((r["classes"] or {}).items(), key=lambda kv: -kv[1])[:14]
         print(f"{s}: {r['images']} images, type {r['type']}, v{r['latest']}, licence {r['license']}")
         print(f"    {top}")
+    failed = []
     for s in args.download:
-        download(s, args.out)
+        try:
+            download(s, args.out)
+        except Exception as e:          # one bad project must not stop the rest
+            print(f"{s}: FAILED {type(e).__name__}: {e}", flush=True)
+            failed.append(s)
+    if failed:
+        print(f"{len(failed)} failed: {failed}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
