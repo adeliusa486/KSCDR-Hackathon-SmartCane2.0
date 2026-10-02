@@ -5,4 +5,6 @@ One file per phase, written when the previous phase passes its gate:
 (`../consumer-readiness-plan.md`) section for that phase, rewritten with what
 the finished phases measured.
 
-None yet. Phase 1 is in progress.
+| File | Status |
+|---|---|
+| `phase2_DRAFT.md` | Draft, written 2 Oct 2026 after Step 1.1 only, at Adeel's request. Revise with the Phase 1 gate's numbers, then rename to `phase2.md` |

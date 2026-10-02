@@ -1,11 +1,7 @@
 {
   "step": "1.1",
   "date": "2026-10-02",
-  "status": "BLOCKED",
-  "blocked_on": [
-    "offline SD card image (needs physical access)",
-    "Hailo + vision FPS re-measured after a power cycle on the unchanged supply"
-  ],
+  "status": "PASS",
   "git": {
     "as_found_commit": "6d928cc",
     "tag": "consumer-baseline-before-phase1"
@@ -22,7 +18,8 @@
       "userspace": 3.571,
       "note": "6.787 s on 19 Sep; cause of increase not established"
     },
-    "sd_card": "SL32G manfid 0x03 date 01/2025, 29.7 GB, 13 GB used"
+    "sd_card": "SL32G manfid 0x03 date 01/2025, 29.7 GB, 13 GB used",
+    "boot_time_after_power_cycle_s": 6.995
   },
   "power": {
     "feed": "UPS into 5V header pin",
@@ -43,6 +40,17 @@
       "temp_max_c": 49.4,
       "new_undervoltage_events": 0,
       "note": "light load only: Hailo was not inferring"
+    },
+    "after_power_cycle_window": {
+      "duration": "21:00:14-21:03:05, 167 samples at 1 Hz",
+      "ext5v_min_v": 4.769,
+      "ext5v_min_at": "21:00:54, during Hailo benchmark",
+      "ext5v_mean_benchmark_v": 4.916,
+      "ext5v_mean_vision_v": 4.933,
+      "undervoltage_events": 0,
+      "throttled": "0x0",
+      "temp_max_c": 41.1,
+      "note": "no under-voltage in 3 min, but the rail dipped 0.10 V lower under Hailo load than at light load (4.868 V). Short window, not a stability result"
     }
   },
   "hailo": {
@@ -57,17 +65,37 @@
     "input": "640x640x3 UINT8",
     "output": "NMS by class, 80 classes",
     "identify": "OK",
-    "benchmark_fps": 0.0,
-    "benchmark_result": "HAILO_TIMEOUT(4)",
     "device_disconnected_lines": 33,
     "last_camera_speech": "18:19:49",
-    "status": "FAIL: control path alive, inference dead"
+    "before_power_cycle": {
+      "benchmark_fps": 0.0,
+      "benchmark_result": "HAILO_TIMEOUT(4)",
+      "status": "FAIL: control path alive, inference dead"
+    },
+    "after_power_cycle": {
+      "identify": "OK",
+      "benchmark_fps_hw_only": 58.17,
+      "benchmark_fps_streaming": 58.18,
+      "hw_latency_ms": 13.14,
+      "disconnect_lines_this_boot": 0,
+      "status": "PASS: inference restored by power cycle"
+    }
   },
   "vision_loop": {
-    "fps15_report_lines_30s": 0,
-    "fps30_report_lines_30s": 0,
     "expected_lines_30s": 100,
-    "status": "FAIL (blocked in hailo.run)"
+    "before_power_cycle": {
+      "fps15_report_lines_30s": 0,
+      "fps30_report_lines_30s": 0,
+      "status": "FAIL (blocked in hailo.run)"
+    },
+    "after_power_cycle": {
+      "fps15_report_lines_30s": 81,
+      "fps15_loop_fps_median": 15.0,
+      "fps30_report_lines_30s": 83,
+      "fps30_loop_fps_median": 30.0,
+      "note": "about 5 s of each 30 s run is model load + camera start, so ~83 lines is the ceiling at --interval 0.3",
+      "status": "PASS"
+    }
   },
   "camera": {
     "model": "imx708",
@@ -106,7 +134,14 @@
       "min": 11.64,
       "max": 11.64
     },
-    "lux_last": 42.5134391784668
+    "lux_last": 42.5134391784668,
+    "after_power_cycle": {
+      "effective_hfov_deg_estimate": 98.2,
+      "frame_interval_ms_mean": 66.66,
+      "exposure_us": 66212,
+      "analogue_gain": 14.22,
+      "lux": 24.0
+    }
   },
   "esp32": {
     "chip": "ESP32-D0WD-V3 rev 3.1",
@@ -190,13 +225,19 @@
     "unit_matches_repo": true,
     "deployed_code_matches_repo": "9 of 9 files byte-identical",
     "state_after_window": "active, NRestarts=0, started 20:06:28",
-    "starting_vision_lines_this_boot": 40
+    "starting_vision_lines_this_boot": 40,
+    "state_after_retest": "active, NRestarts=0, started 21:02:25. AUDIO DEAD: earbuds not connected (br-connection-profile-unavailable), so speech after the retest could not be checked"
   },
   "backups": {
     "pi_config_tar": "backups/pi_config_2026-10-02.tar.gz",
     "pi_config_sha256": "0361d3365debe9e8775c1d0abd78f9a7b2f381b9e5517efa26c2cdd737f021d2",
     "pi_config_entries": 5261,
     "esp32": "baseline/esp32/",
-    "sd_image": "PENDING"
-  }
+    "sd_image": "backups/sd_2026-10-02.img (not in git)",
+    "sd_image_bytes": 31914983424,
+    "sd_image_sha256": "ceeda80651b3510b41bcd2d9409a7fb5c2f2a8188efb9adf497663593a0960cb",
+    "sd_image_checks": "read hash = file hash; MBR signature 4cd0d5a4 = cmdline PARTUUID; p1 FAT32 536870912 B clean; p2 ext4 31369723904 B clean, needs_recovery clear, 0 errors",
+    "sd_image_location_risk": "only copy is on the laptop's single SSD (C:, D:, E: are one physical disk)"
+  },
+  "closed": "2026-10-02 21:03, after SD image (20:22-20:54) and power cycle (boot 20:59:02) on the unchanged UPS supply"
 }

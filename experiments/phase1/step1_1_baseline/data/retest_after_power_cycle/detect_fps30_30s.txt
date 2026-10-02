@@ -1,0 +1,97 @@
+model  : /usr/share/hailo-models/yolov8s_h8l.hef
+labels : 80 classes
+input  : 640x640
+[0:02:45.487148595] [2850] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:330 [0mlibcamera v0.5.2+99-bfd68f78
+[0:02:45.494303294] [2895] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:720 [0mlibpisp version v1.2.1 981977ff21f3 29-04-2025 (14:13:50)
+[0:02:45.496877763] [2895] [1;32m INFO [1;37mIPAProxy [1;34mipa_proxy.cpp:180 [0mUsing tuning file /usr/share/libcamera/ipa/rpi/pisp/imx708.json
+[0:02:45.520238588] [2895] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:220 [0mAdding camera '/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a' for pipeline handler rpi/pisp
+[0:02:45.520269736] [2895] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1179 [0mRegistered camera /base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a to CFE device /dev/media0 and ISP device /dev/media1 using PiSP variant BCM2712_D0
+[0:02:45.523374094] [2850] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1215 [0mconfiguring streams: (0) 1280x720-XRGB8888/sRGB (1) 640x640-RGB888/sRGB (2) 1536x864-BGGR_PISP_COMP1/RAW
+[0:02:45.523466502] [2895] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1483 [0mSensor: /base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a - Selected sensor format: 1536x864-SBGGR10_1X10/RAW - Selected CFE format: 1536x864-PC1B/RAW
+running. ctrl-c to stop.
+
+[  0.0 fps]  laptop right, near @0.28
+[  0.0 fps]  clear
+[  0.0 fps]  clear
+[ 26.8 fps]  laptop right, near @0.27
+[ 26.8 fps]  clear
+[ 26.8 fps]  clear
+[ 29.9 fps]  laptop right, near @0.40
+[ 29.9 fps]  clear
+[ 29.9 fps]  laptop right, near @0.31
+[ 30.0 fps]  laptop right, near @0.29
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.39
+[ 30.0 fps]  laptop right, near @0.31
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.30
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.25
+[ 30.0 fps]  laptop right, near @0.36
+[ 30.0 fps]  laptop right, near @0.35
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.26
+[ 30.0 fps]  laptop right, near @0.28
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  vase right, near @0.28
+[ 30.0 fps]  vase right, near @0.37
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  vase right, near @0.28
+[ 30.0 fps]  laptop right, near @0.26
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  vase right, near @0.27
+[ 30.0 fps]  cat right, near @0.29
+[ 30.1 fps]  vase right, near @0.32
+[ 30.1 fps]  laptop right, near @0.26
+[ 30.1 fps]  clear
+[ 30.0 fps]  vase right, near @0.26
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.26
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  vase right, near @0.31
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.1 fps]  clear
+[ 30.1 fps]  clear
+[ 30.1 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  vase right, near @0.33
+[ 30.0 fps]  clear
+[ 30.0 fps]  laptop right, near @0.26
+[ 30.0 fps]  vase right, near @0.26
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.0 fps]  clear
+[ 30.1 fps]  vase right, near @0.26
+[ 30.1 fps]  clear
+[ 30.1 fps]  clear
+[ 30.0 fps]  clear
+
+stopped.

@@ -1518,6 +1518,86 @@ supply. Then re-measure Hailo and vision, close Step 1.1, and start Step 1.2
 (USB-C 5 V / 5 A supply). Ask Adeel whether he has the official 27 W supply
 and an inline USB-C power meter for Step 1.3.
 
+### 2 October 2026: Step 1.1 closed (PASS), SD card imaged, Hailo back
+
+**SD card image done.** `backups/sd_2026-10-02.img`, 31,914,983,424 B, sha256
+`ceeda806...60cb` (full value in `baseline/README.md`). Read in 32 min at
+16 MB/s through the laptop's USB card reader, with the read-only script
+`code/tools/sd_image.ps1`, launched elevated from a non-admin VS Code via
+`Start-Process -Verb RunAs` (Adeel clicks one UAC prompt, no VS Code
+restart needed). `code/tools/sd_image_check.py` checks MBR, FAT32 and ext4
+headers without mounting. The laptop has ONE physical SSD: C:, D: and E:
+are partitions of it, so the image still needs a copy on a separate device.
+
+**Hailo restored by a power cycle on the same UPS supply.** 58.17 FPS,
+13.14 ms, 0 disconnect lines. detect.py 81 / 83 report lines in 30 s at
+fps 15 / 30 (about 5 s of each run is start-up, so ~83 is the ceiling at
+`--interval 0.3`). F1 is a power-state fault, not chip damage. EXT5V dipped
+to 4.769 V during the benchmark vs 4.868 V at light load. No under-voltage in
+the 3 min window, but the margin is thin. Retest tool:
+`code/tools/vision_retest.sh` (the vision half of `baseline_window.sh`).
+
+Boot this time 6.995 s (3.398 kernel + 3.597 userspace), against 9.394 s on
+the 18:04 boot. Boot time varies by 2.4 s, cause unknown.
+
+After the retest the earbuds did not reconnect
+(`br-connection-profile-unavailable`), so the service ran with AUDIO DEAD.
+
+**Next:** Step 1.2 (5 V / 5 A USB-C supply, 30 min / 60 min / 2 h load runs).
+Needs from Adeel: the supply, and ideally an inline USB-C power meter for
+Step 1.3. Phase 1 still has Steps 1.2 to 1.5 before its gate. A DRAFT Phase 2
+prompt was written early at Adeel's request (`docs/phase-prompts/phase2_DRAFT.md`)
+and must be revised at the Phase 1 gate.
+
+### 2 October 2026 (evening): Phase 2 draft fixed, Step 1.2 Part A (BLOCKED)
+
+**Phase 2 draft revised** (`docs/phase-prompts/phase2_DRAFT.md`) after a check
+against the code. Corrections that matter beyond Phase 2:
+
+- A down ToF that **stops answering** never raises the drop alarm
+  (`watchGround()` only runs on fresh, ok readings). The Pi says "Warning,
+  ground sensor not working" after 3 s of `ok=0`, but **the ESP32 has no
+  haptic fault signal**, so with the Pi or the earbuds down the user gets
+  nothing.
+- The relearn (`RELEARN_MS`) at a drop that reads "nothing in range" never
+  completes: ground watching stays off with no warning.
+- The `D` line is a median of 3 resampled from ~30 Hz to 20 Hz, and failed
+  reads leave no trace. Sensor characterization needs a raw logging mode.
+- The down ToF runs in default mode (~1.2 m), the forward one in long-range.
+- The 98 degree FOV is straight-lens arithmetic on a barrel-distorted lens. An
+  estimate only.
+
+**Step 1.2 Part A: the UPS supply fails at normal load.** Record in
+`experiments/phase1/step1_2_power/`. The load ladder hit under-voltage 43 s
+into the plain service phase. **11 under-voltage events in 9.5 min** on the
+21:26 boot with nothing heavier than the service. 1 Hz EXT5V never read below
+4.749 V, so the dips are under 1 s: judge a supply by the kernel event count.
+
+**The Pi dropped off the network at ~21:20** and came back on a new boot at
+21:26:23. Cause unknown, because the journal was `Storage=volatile`. The
+journal is now persistent (`/etc/systemd/journald.conf.d/50-smartcane-persistent.conf`,
+200 MB cap). Boot took 11.1 s.
+
+**After that boot the service's ESP32 link stayed dead** ("ESP32 LINK SILENT",
+no recovery in 80 s) while the ESP32 was sending. A restart fixed it. The
+reader thread never reopens the port. Also `cp210x ... failed set request
+0x12 status: -110` (probably the purge from `reset_input_buffer()`), which
+may be behind the F5 stale burst. Both for Step 1.5.
+
+**`smartcane.service` left STOPPED** at 21:37 so the bench Pi stops browning
+out. `systemctl --user start smartcane.service` to bring it back.
+
+Tools: `code/tools/power_soak.sh` (1 s logger + load phases + abort on
+under-voltage, deployed to `~/smartcane/tools/`), `code/tools/soak_summary.py`.
+Lessons: Python `write_text` on Windows writes CRLF, which breaks bash on the
+Pi. `pgrep -f detect.py` also matches `speak_detect.py`, use
+`smartcane/[d]etect.py`. `speak_detect.py` never logs detect.py's reports.
+
+**Next (needs Adeel):** power down, remove the UPS feed from the 5V header pin,
+plug a 5 V / 5 A USB-C PD supply into the Pi's USB-C port, power up. Then
+Step 1.2 Part B runs remotely (~4 h). Steps 1.3 (inline USB-C power meter)
+and 1.4 (ToF 2 rewiring) also need hands on the hardware.
+
 ---
 
 *Last updated: 2 October 2026*

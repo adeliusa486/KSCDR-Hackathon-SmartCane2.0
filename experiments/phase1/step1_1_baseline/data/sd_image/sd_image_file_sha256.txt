@@ -1,0 +1,1 @@
+ceeda80651b3510b41bcd2d9409a7fb5c2f2a8188efb9adf497663593a0960cb  sd_2026-10-02.img  (Get-FileHash on the saved file, 30 s)

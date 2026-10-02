@@ -79,9 +79,29 @@ files with `tar -xzf ... path/inside/archive`.
 It holds secrets: the Wi-Fi password, Bluetooth link keys and SSH host keys.
 Keep `backups/` off any shared drive.
 
-### 4. Whole OS
+### 4. Whole OS (tested 2 Oct 2026, PASS)
 
-Pending. Needs an image of the SD card taken with the Pi powered off. Until
-that image exists, a full OS rollback means a rebuild from `dpkg_full.txt`,
-`apt_manual.txt` and the config tarball, and apt may no longer serve every
-exact version.
+`backups/sd_2026-10-02.img` (not in git), raw image of the whole 32 GB SD
+card, taken 20:22 to 20:54 with the Pi cleanly shut down.
+
+| | |
+|---|---|
+| bytes | 31,914,983,424 (equal to `mmcblk0`) |
+| sha256 | `ceeda80651b3510b41bcd2d9409a7fb5c2f2a8188efb9adf497663593a0960cb` |
+| MBR disk signature | `4cd0d5a4` (the `root=PARTUUID=4cd0d5a4-02` in `cmdline.txt`) |
+| p1 | FAT32 `bootfs`, 536,870,912 B, clean |
+| p2 | ext4 `rootfs`, 31,369,723,904 B, clean, journal recovery flag clear |
+
+Made with `code/tools/sd_image.ps1` (read-only, elevated), checked with
+`code/tools/sd_image_check.py`. Check before any restore:
+
+    Get-FileHash backups\sd_2026-10-02.img -Algorithm SHA256
+    python code	ools\sd_image_check.py backups\sd_2026-10-02.img
+
+Restore: write the image to a card of at least 31,914,983,424 bytes with
+Raspberry Pi Imager ("Use custom") or Win32 Disk Imager ("Write"). A card that
+is nominally 32 GB can be a few MB smaller, so check the size first. The image
+holds the same secrets as the config tarball.
+
+The only copy is on the laptop's single SSD (C:, D: and E: are one physical
+disk). Copy it to a separate device.

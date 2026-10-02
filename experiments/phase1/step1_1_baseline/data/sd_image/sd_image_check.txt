@@ -1,0 +1,26 @@
+MBR
+  [PASS] boot signature 55 AA
+  [PASS] disk signature 4cd0d5a4 (cmdline.txt PARTUUID 4cd0d5a4)
+    p1: type 0x0c start sector 16384 sectors 1048576 = 536870912 bytes
+    p2: type 0x83 start sector 1064960 sectors 61268992 = 31369723904 bytes
+  [PASS] two partitions
+  [PASS] p1 FAT32 LBA (0x0c), 536870912 bytes
+  [PASS] p2 Linux (0x83), 31369723904 bytes
+p1 FAT32 (/boot/firmware)
+  [PASS] boot sector signature 55 AA
+  [PASS] filesystem type 'FAT32   '
+    label 'bootfs', volume id 568dc01f, 512 bytes/sector, 4 sectors/cluster
+  [PASS] FAT clean-shutdown bit set (FAT[1] = ffffffff)
+  [PASS] FAT no-hard-errors bit set
+p2 ext4 (/)
+  [PASS] superblock magic ef53
+    label 'rootfs', uuid c6c3fb9d-86a8-472f-b6ab-6eef573c5cac
+    block size 4096, filesystem 31369723904 bytes, mount count 1
+    last mount 2026-10-02 13:25:30 UTC, last write 2026-10-02 17:14:10 UTC
+  [PASS] filesystem fits inside p2
+  [PASS] state 'clean' bit set (s_state = 1)
+  [PASS] no 'errors detected' bit
+  [PASS] journal needs_recovery flag clear (incompat = 00002242)
+  [PASS] error count 0
+
+ALL CHECKS PASS

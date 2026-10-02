@@ -34,6 +34,12 @@ Step 1.1 close-out measurement. Detection of "Hailo alive but not inferring"
 belongs in Step 4.8 (health monitor). Consider pulling a minimal vision
 watchdog forward, because the same silent outage can return any time.
 
+**Close-out 21:03:** a clean shutdown and power-on on the same supply
+restored the Hailo: 58.17 FPS, 13.14 ms, 0 disconnect lines, and detect.py
+printed 81 report lines in 30 s. Confirmed as a power-state fault, not chip
+damage. The rail dipped to 4.769 V during the benchmark (no under-voltage
+event in the 3 min window). Fix still owned by Step 1.2.
+
 ## F2. Every SSH logout restarts PulseAudio
 
 - 134 PulseAudio starts this boot against 355 SSH sessions.
