@@ -104,3 +104,41 @@ Not fixed. Options for Step 1.2 Part B: exclude `/var/log/journal` from
 log2ram, or set `Storage=persistent` with journald writing straight to the
 SD card and `SyncIntervalSec` short, then cap the journal well below the
 free space. Test by cutting power and reading the previous boot's log.
+
+### G7 fix applied and tested, 2 Oct 2026, 22:56 to 23:12
+
+Applied `code/tools/journal_persist.sh` (log2ram off, journal on the SD
+card, `SyncIntervalSec=15s`), on the old UPS supply because the Pi had just
+had another unexplained outage (G8). Service kept stopped (Part A decision).
+"Power cut" below means a kernel crash-reboot (`echo b > /proc/sysrq-trigger`),
+a proxy: it drops everything not yet on the card, but the card itself stays
+powered. Real plug pulls are still to do.
+
+| # | Result |
+|---|---|
+| J1 | **PASS.** `verify` exit 0, `/var/log` on the card, previous boots listed after a reboot |
+| J2 | **PASS 3/3 after a second fix.** First run: root lines 20 s before the crash survived 3/3, but lines from user `pi` were lost entirely. With the default `SplitMode=uid`, `pi`'s messages (smartcane.service runs as `pi`) went to a separate user-1000 journal, which was set aside as `*.journal~` after every crash, and the crashed boot showed 0 `pi` entries, 4 of 4 times. Fixed with `SplitMode=none`. Then `pi` lines 21 s before the crash survived 3/3 |
+| J3 | **FAIL 3/3 as written.** A crit line 1 s before the crash was lost every time, although journald documents an immediate sync for CRIT. Controls: after `journalctl --sync` the line survives 2/2, and plain lines survive up to 3.0 s before the crash (6 of 8 one-per-second lines, 2 trials). Measured log blind window: the last ~3 s before a crash |
+| J4 | **PASS so far.** 0 ext4 errors in 11 crash-reboots, only the normal orphan cleanup. `fsck` on the next SD image still to do |
+
+J3 decision for Adeel: accept a 3 s blind window (under-voltage warnings on
+2 Oct came seconds to minutes before the faults they caused), or add kernel
+pstore/ramoops, which keeps the kernel log across a reset (not across a real
+power cut). Not blocking: Part B waits for the USB-C supply anyway.
+
+Bonus data for Step 1.5 T10: **the ESP32 restarted with the Pi in 11 of 11
+Pi resets** (1 clean reboot, 10 crash-reboots). Its `millis` always read about
+0.4 s less than the Pi's uptime, so the ESP32 is unpowered or held in reset
+from the Pi's shutdown until shortly after the Pi kernel starts.
+
+## G8. The Pi stopped answering on the network for about 18 min (21:51 to 22:09)
+
+The synced journals of that boot show no under-voltage, no Wi-Fi
+disconnect, wlan0 associated with its lease the whole time, yet the laptop
+got no ARP reply. The outage ended with `Power key pressed short` at
+22:09:17 (a person pressing the power button, presumably Adeel), a second
+press at 22:45:46, and power-on at 22:53. Both shutdowns were clean, so the
+logs of those boots survived even under log2ram. Leading candidate: Wi-Fi
+power saving (NetworkManager `powersave 0 = default`, `iw` not installed to
+confirm). Not fixed. Worth testing because it may also explain older "SSH
+drops" that were blamed on under-voltage.

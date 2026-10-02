@@ -30,6 +30,11 @@ apply)
 Storage=persistent
 SystemMaxUse=200M
 SyncIntervalSec=15s
+# One journal file for everything. With the default (uid), messages from the
+# pi user, which runs smartcane.service, go to a separate user-1000 journal.
+# After a crash that file was set aside as corrupt and the crashed boot showed
+# no pi entries at all, 4 of 4 times (2 Oct 2026). The system file survived.
+SplitMode=none
 EOF
   systemctl disable log2ram.service log2ram-daily.timer 2>&1
   echo "applied. Reboot now: log2ram syncs RAM to the card on the way down,"
