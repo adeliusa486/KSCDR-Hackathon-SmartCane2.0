@@ -56,7 +56,7 @@ import yaml
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from prepare_datasets import LABEL_ALIASES, load_classes  # noqa: E402
+from prepare_datasets import COCO, LABEL_ALIASES, load_classes  # noqa: E402
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 NEAR_DUP_BITS = 3        # Hamming distance on the 64-bit dHash
@@ -103,6 +103,8 @@ class UnionFind:
 
 
 def source_names(src):
+    if src.get("names") == "coco":
+        return list(COCO)
     if "names" in src:
         return [str(n) for n in src["names"]]
     data = yaml.safe_load((Path(src["path"]) / src["names_from"]).read_text())
@@ -139,11 +141,24 @@ def scan(src, classes, audit, src_map=None):
     names = source_names(src)
     group_re = re.compile(src["group"]) if src.get("group") else None
     stems = []
-    for img_path in sorted((root / "images").rglob("*")):
-        if img_path.suffix.lower() not in IMAGE_EXT:
-            continue
-        rel = img_path.relative_to(root / "images")
-        label_path = (root / "labels" / rel).with_suffix(".txt")
+    # Any image under a folder called "images"; its label sits at the same
+    # place under the matching "labels" folder. Covers root/images/<split>/x
+    # (YOLO, FiftyOne) and root/<split>/images/x (Roboflow).
+    images = sorted(p for p in root.rglob("*") if p.suffix.lower() in IMAGE_EXT
+                    and "images" in p.relative_to(root).parts)
+    cap = src.get("max_images")
+    if cap and len(images) > cap:
+        # deterministic subset: the same photos on every rebuild
+        images = sorted(images, key=lambda p: hashlib.sha1(p.name.encode()).hexdigest())[:cap]
+        audit["capped"][src["name"]] = cap
+    for img_path in images:
+        rel = img_path.relative_to(root)
+        parts = list(rel.parts)
+        i = len(parts) - 1 - parts[::-1].index("images")
+        parts[i] = "labels"
+        label_path = (root / Path(*parts)).with_suffix(".txt")
+        # the output name leaves the "images" folder out, as before
+        rel = Path(*(rel.parts[:i] + rel.parts[i + 1:]))
         try:
             with Image.open(img_path) as im:
                 im.verify()
@@ -264,7 +279,7 @@ def main():
     audit = {"corrupt_images": [], "bad_label_lines": [], "group_regex_miss": [],
              "video_frame_warnings": [], "missing_labels": Counter(),
              "empty_after_remap": Counter(), "dropped_classes": Counter(),
-             "exact_duplicates": 0, "near_duplicates": 0}
+             "exact_duplicates": 0, "near_duplicates": 0, "capped": {}}
     records = []
     for src in sources:
         records.extend(scan(src, classes, audit, src_map))
