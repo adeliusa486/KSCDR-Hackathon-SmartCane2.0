@@ -12,6 +12,7 @@ their counts, licence. The download writes <out>/<ws>__<project>/ in YOLOv8
 layout (train/valid/test folders with images/ and labels/, plus data.yaml).
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -49,6 +50,22 @@ def inspect(slug):
             "type": p.get("type")}
 
 
+def short_name(member, limit=120):
+    """Windows refuses paths over 260 characters, and some Roboflow file
+    names are longer than that on their own (obstacles-for-blind v5). Hash
+    an over-long original-photo part, keep the '_jpg.rf.<hash>' ending so
+    dedupe_roboflow.py still groups the copies, and do the same to the
+    matching label (same stem, same hash)."""
+    p = Path(member)
+    if len(p.name) <= limit:
+        return p
+    stem, suffix = p.stem, p.suffix
+    orig, sep, rest = stem.partition(".rf.")
+    head, _, ext = orig.rpartition("_")
+    short = hashlib.sha1(head.encode()).hexdigest()[:20]
+    return p.with_name(f"{short}_{ext}{sep}{rest}{suffix}" if sep else f"{short}{suffix}")
+
+
 def download(slug, out):
     ws, proj = slug.split("/")[:2]
     ver = slug.split(":")[1] if ":" in slug else None
@@ -59,7 +76,13 @@ def download(slug, out):
     link = d["export"]["link"]
     dest = Path(out) / f"{ws}__{proj}__v{ver}"
     with urllib.request.urlopen(link, timeout=600) as r:
-        zipfile.ZipFile(io.BytesIO(r.read())).extractall(dest)
+        z = zipfile.ZipFile(io.BytesIO(r.read()))
+    for m in z.infolist():
+        if m.is_dir():
+            continue
+        target = dest / short_name(m.filename)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(z.read(m))
     n = sum(1 for _ in dest.rglob("*.jpg")) + sum(1 for _ in dest.rglob("*.png"))
     print(f"{slug} v{ver}: {n} images -> {dest}", flush=True)
 
