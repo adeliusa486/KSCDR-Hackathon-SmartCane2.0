@@ -1,0 +1,158 @@
+SERVICE REPORT  2026-10-02T21:29:26+03:00
+
+### unit file
+# /home/pi/.config/systemd/user/smartcane.service
+[Unit]
+# Smart cane - vision + speech, started automatically at boot.
+#
+# This is a USER service, not a system service, and that is deliberate.
+# Speech goes through PulseAudio, which lives in the user session. A system
+# service running as root cannot reach the user's audio sink without a pile of
+# fragile workarounds. Running it as the pi user means audio just works.
+#
+# Requires lingering so the user session starts at boot without anyone logging
+# in:   sudo loginctl enable-linger pi
+Description=Smart cane vision and speech
+After=network.target sound.target bluetooth.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/smartcane
+
+# Give Bluetooth a moment to reconnect the headset before we start talking.
+# The headset is already trusted, so bluetoothd reconnects it on its own, but
+# it is not instant and the first spoken line would otherwise be lost.
+ExecStartPre=/bin/sleep 8
+# Hard 10 s limit: with the earbuds off or unpaired, bluetoothctl connect can
+# hang until systemd's start timeout kills the whole unit, so the cane would
+# not start at all. Earbuds being off must never stop the cane from running.
+ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:CC
+
+# --conf low and --name-conf high on purpose. The detector sees almost
+# everything, and only confident detections get a name. Anything in between is
+# announced as "obstacle", so nothing physical goes unreported while wrong
+# names stay rare. See resolve() in speak_detect.py.
+#
+# --interval 0.3 with --confirm 3: an object is spoken ~0.6-0.9 s after it
+# appears, against 1.2-2.4 s with the old 1.2 / 2. Three agreeing reports
+# instead of two keeps one-frame false labels out.
+ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
+    --interval 0.3 \
+    --conf 0.25 \
+    --name-conf 0.35 \
+    --confirm 3 \
+    --max-objects 2 \
+    --repeat-after 4.0 \
+    --keepalive-after 20 \
+    --retry-every 10 \
+    --all-classes \
+    --fps 15 \
+    --ev 0.7
+
+# Restart if the vision loop dies for any reason. A cane that goes silent
+# after a crash is worse than one that stutters.
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+
+### state
+MainPID=1865
+Result=success
+NRestarts=0
+ExecMainStartTimestamp=Fri 2026-10-02 21:28:27 +03
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+
+### linger
+Linger=yes
+
+### processes
+    PID    PPID %CPU   RSS     ELAPSED COMMAND
+    691       1  0.0  6272       02:53 /usr/libexec/bluetooth/bluetoothd
+    790       1  0.0  7568       02:52 /usr/local/bin/hailort_service
+   1865     816  0.7 13904       00:59 /usr/bin/python3 -u /home/pi/smartcane/speak_detect.py --interval 0.3 --conf 0.25 --name-conf 0.35 --confirm 3 --max-objects 2 --repeat-after 4.0 --keepalive-after 20 --retry-every 10 --all-classes --fps 15 --ev 0.7
+   1869    1865 13.8 532560      00:59 /usr/bin/python3 -u /home/pi/smartcane/detect.py --interval 0.3 --conf 0.25 --fps 15 --ev 0.7 --all-classes
+   2527     816  3.1 20384       00:05 /usr/bin/pulseaudio --daemonize=no --log-target=journal
+
+### detect.py environment (secrets filtered)
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+HOME=/home/pi
+INVOCATION_ID=bd18f175bc3748f88fb783f8a45c47fb
+JOURNAL_STREAM=9:12192
+LANG=en_GB.UTF-8
+LOGNAME=pi
+MANAGERPID=816
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+QT_ACCESSIBILITY=1
+SHELL=/bin/bash
+SYSTEMD_EXEC_PID=1865
+USER=pi
+XDG_RUNTIME_DIR=/run/user/1000
+
+### smartcane journal counts this boot
+SPEAKING           0
+AUDIO OK           0
+AUDIO DEAD         2
+Warning            0
+not responding     0
+Traceback          0
+HAILO_             0
+starting vision    2
+stopped            0
+last camera-derived speech: none this boot
+
+### smartcane journal (last 30)
+Oct 02 21:26:42 smartcane timeout[981]: Attempting to connect to B0:38:E2:19:DC:CC
+Oct 02 21:26:42 smartcane timeout[981]: Failed to connect: org.bluez.Error.Failed br-connection-profile-unavailable
+Oct 02 21:26:42 smartcane python3[982]: ESP32 on /dev/ttyUSB0: ToF distances + ground watch, vibration handled by the ESP32
+Oct 02 21:26:42 smartcane python3[982]: starting vision...
+Oct 02 21:26:42 smartcane python3[982]:   ESP32 LINK SILENT
+Oct 02 21:26:43 smartcane python3[982]:   AUDIO DEAD: default sink is 'auto_null' - nothing can be heard
+Oct 02 21:26:43 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:26:53 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:03 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:13 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:23 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:33 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:43 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:27:53 smartcane python3[982]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:28:27 smartcane timeout[1864]: Attempting to connect to B0:38:E2:19:DC:CC
+Oct 02 21:28:27 smartcane timeout[1864]: Failed to connect: org.bluez.Error.Failed br-connection-page-timeout
+Oct 02 21:28:27 smartcane python3[1865]: ESP32 on /dev/ttyUSB0: ToF distances + ground watch, vibration handled by the ESP32
+Oct 02 21:28:27 smartcane python3[1865]: starting vision...
+Oct 02 21:28:28 smartcane python3[1865]:   AUDIO DEAD: default sink is 'auto_null' - nothing can be heard
+Oct 02 21:28:28 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:28:38 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:28:48 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:28:58 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:29:08 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+Oct 02 21:29:18 smartcane python3[1865]:   reconnecting B0:38:E2:19:DC:CC ...
+
+### related system services
+active
+active
+active
+
+### errors this boot (prio err)
+lines=71
+Oct 02 21:28:52 smartcane pulseaudio[2069]: Failed to find a working profile.
+Oct 02 21:28:52 smartcane pulseaudio[2069]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:28:52 smartcane pulseaudio[2069]: Failed to find a working profile.
+Oct 02 21:28:52 smartcane pulseaudio[2069]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:29:03 smartcane bluetoothd[691]: src/profile.c:record_cb() Unable to get Hands-Free Voice gateway SDP record: Host is down
+Oct 02 21:29:04 smartcane pulseaudio[2252]: Failed to find a working profile.
+Oct 02 21:29:04 smartcane pulseaudio[2252]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:29:04 smartcane pulseaudio[2252]: Failed to find a working profile.
+Oct 02 21:29:04 smartcane pulseaudio[2252]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:29:13 smartcane bluetoothd[691]: src/profile.c:record_cb() Unable to get Hands-Free Voice gateway SDP record: Host is down
+Oct 02 21:29:21 smartcane pulseaudio[2527]: Failed to find a working profile.
+Oct 02 21:29:21 smartcane pulseaudio[2527]: Failed to load module "module-alsa-card" (argument: "device_id="0" name="platform-107c701400.hdmi" card_name="alsa_card.platform-107c701400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:29:21 smartcane pulseaudio[2527]: Failed to find a working profile.
+Oct 02 21:29:21 smartcane pulseaudio[2527]: Failed to load module "module-alsa-card" (argument: "device_id="1" name="platform-107c706400.hdmi" card_name="alsa_card.platform-107c706400.hdmi" namereg_fail=false tsched=no fixed_latency_range=no ignore_dB=no deferred_volume=yes use_ucm=yes avoid_resampling=no card_properties="module-udev-detect.discovered=1""): initialization failed.
+Oct 02 21:29:22 smartcane kernel: hwmon hwmon3: Undervoltage detected!

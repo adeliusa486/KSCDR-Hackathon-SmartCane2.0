@@ -1,0 +1,4 @@
+Oct 02 21:36:26.061681 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:36:30.089637 smartcane kernel: hwmon hwmon3: Voltage normalised
+Oct 02 21:37:02.481674 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:37:06.509650 smartcane kernel: hwmon hwmon3: Voltage normalised

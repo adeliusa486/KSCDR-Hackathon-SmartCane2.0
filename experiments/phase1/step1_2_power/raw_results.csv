@@ -1,0 +1,23 @@
+part,phase,metric,value,unit,note
+A,idle,duration,124.9,s,service stopped
+A,idle,undervoltage_events,0,count,
+A,idle,ext5v_min,4.92986,V,1 Hz sample
+A,idle,ext5v_mean,4.952,V,
+A,idle,temp_max,44.4,C,
+A,idle,pmic_w_mean,2.11,W,PMIC rails only (lower bound)
+A,idle,ping_lost_pct,0.87,%,1 of 115
+A,service,duration_to_fail,43.3,s,21:31:46.5 start to 21:32:29.8 under-voltage
+A,service,undervoltage_events,1,count,abort-on-uv stopped the ladder
+A,service,ext5v_min,4.75432,V,1 Hz sample, kernel flagged under-voltage between samples
+A,service,ext5v_mean,4.9227,V,
+A,service,temp_max,46.1,C,
+A,service,pmic_w_mean,2.35,W,PMIC rails only (lower bound)
+A,service,pmic_w_max,3.778,W,
+A,bench,not_run,,,ladder aborted in the service phase
+A,bench_cpu,not_run,,,ladder aborted in the service phase
+A,svc_cpu,not_run,,,ladder aborted in the service phase
+A,aborted_idle,ext5v_min,4.74896,V,includes service restore at the end
+boot_21:26,all,undervoltage_events,11,count,21:27:33 to 21:37:02 with only idle or normal service load
+boot_21:26,all,boot_time,11.107,s,7.443 kernel + 3.663 userspace
+boot_20:59,service,undervoltage_events,1,count,21:03:16
+B,all,not_run,,,needs the 5 V / 5 A USB-C supply

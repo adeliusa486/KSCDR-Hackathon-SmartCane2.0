@@ -1,0 +1,95 @@
+{
+  "samples": 254,
+  "phases": {
+    "start": {
+      "samples": 1,
+      "duration_s": 0,
+      "ext5v_min_v": 4.88698,
+      "ext5v_mean_v": 4.887,
+      "temp_max_c": 41.7,
+      "arm_min_mhz": 1600,
+      "pmic_w_mean": 3.17,
+      "pmic_w_max": 3.173,
+      "ping_lost": 0,
+      "ping_lost_pct": 0.0,
+      "detect_samples": 0,
+      "detect_cpu_median": null,
+      "detect_stuck_samples": 0,
+      "throttle_bits_seen": [
+        "uv_since_boot",
+        "throttled_since_boot"
+      ]
+    },
+    "idle": {
+      "samples": 115,
+      "duration_s": 124.9,
+      "ext5v_min_v": 4.92986,
+      "ext5v_mean_v": 4.952,
+      "temp_max_c": 44.4,
+      "arm_min_mhz": 1500,
+      "pmic_w_mean": 2.11,
+      "pmic_w_max": 3.335,
+      "ping_lost": 1,
+      "ping_lost_pct": 0.87,
+      "detect_samples": 0,
+      "detect_cpu_median": null,
+      "detect_stuck_samples": 0,
+      "throttle_bits_seen": [
+        "uv_since_boot",
+        "throttled_since_boot"
+      ]
+    },
+    "service": {
+      "samples": 47,
+      "duration_s": 49.6,
+      "ext5v_min_v": 4.75432,
+      "ext5v_mean_v": 4.9227,
+      "temp_max_c": 46.1,
+      "arm_min_mhz": 1500,
+      "pmic_w_mean": 2.35,
+      "pmic_w_max": 3.778,
+      "ping_lost": 0,
+      "ping_lost_pct": 0.0,
+      "detect_samples": 0,
+      "detect_cpu_median": null,
+      "detect_stuck_samples": 0,
+      "throttle_bits_seen": [
+        "uv_since_boot",
+        "throttled_since_boot"
+      ]
+    },
+    "aborted_idle": {
+      "samples": 91,
+      "duration_s": 96.7,
+      "ext5v_min_v": 4.74896,
+      "ext5v_mean_v": 4.9524,
+      "temp_max_c": 46.6,
+      "arm_min_mhz": 1500,
+      "pmic_w_mean": 2.04,
+      "pmic_w_max": 4.236,
+      "ping_lost": 0,
+      "ping_lost_pct": 0.0,
+      "detect_samples": 0,
+      "detect_cpu_median": null,
+      "detect_stuck_samples": 0,
+      "throttle_bits_seen": [
+        "uv_since_boot",
+        "throttled_since_boot"
+      ]
+    }
+  },
+  "kernel_events": {
+    "undervoltage": 2,
+    "hailo": 0,
+    "cp210x_timeout": 2,
+    "usb_disconnect": 0,
+    "mmc": 0,
+    "ext4": 0,
+    "io_error": 0,
+    "oom": 0
+  },
+  "undervoltage_times": [
+    "21:32:29.841643",
+    "21:34:12.749646"
+  ]
+}

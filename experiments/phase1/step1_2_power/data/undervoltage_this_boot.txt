@@ -1,0 +1,13 @@
+inactive
+Oct 02 21:27:33.393642 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:27:59.597656 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:29:22.349640 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:29:34.445664 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:32:29.841643 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:34:12.749646 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:34:20.813641 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:35:27.405640 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:35:55.633653 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:36:26.061681 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+Oct 02 21:37:02.481674 smartcane kernel: hwmon hwmon3: Undervoltage detected!
+     EXT5V_V volt(24)=4.94594000V

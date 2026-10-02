@@ -1,0 +1,40 @@
+{
+  "step": "1.2",
+  "title": "Fix Raspberry Pi power before optimizing AI",
+  "date": "2026-10-02",
+  "status": "BLOCKED",
+  "blocked_on": "5 V / 5 A USB-C supply (Raspberry Pi 27 W PSU or equivalent) plugged into the Pi's USB-C port, UPS feed removed from the 5V header pin",
+  "part_a_current_ups_supply": {
+    "result": "FAIL (expected, this is the comparison baseline)",
+    "supply": {"max_current_mA": 3000, "usb_max_current_enable": 0, "feed": "UPS into the 5V header pin"},
+    "ladder": "idle:120 service:180 bench:120 bench_cpu:120 svc_cpu:180, abort on first under-voltage",
+    "failed_in_phase": "service (camera + Hailo + ESP32 + audio, no extra CPU load)",
+    "seconds_into_phase": 43.3,
+    "idle_undervoltage_events": 0,
+    "ext5v_min_v_1hz": {"idle": 4.92986, "service": 4.75432},
+    "pmic_w_mean": {"idle": 2.11, "service": 2.35},
+    "temp_max_c": 46.6,
+    "phases_not_reached": ["bench", "bench_cpu", "svc_cpu"],
+    "summary_file": "data/partA_ups/summary.json"
+  },
+  "undervoltage_events": {
+    "boot_2059": ["21:03:16"],
+    "boot_2126": ["21:27:33", "21:27:59", "21:29:22", "21:29:34", "21:32:29", "21:34:12", "21:34:20", "21:35:27", "21:35:55", "21:36:26", "21:37:02"],
+    "note": "boot_2126 count is 11 in 9.5 min with only idle or normal service load. 1 Hz EXT5V samples never went below 4.749 V, so the dips are shorter than 1 s. The kernel event count is the reliable signal."
+  },
+  "unexplained_outage": {"lost_network": "about 21:20", "new_boot": "21:26:23", "cause": "unknown, journal was volatile", "rsts": "0x00001000", "see": "failure_log G1"},
+  "boot_time_s": {"boot_2126": 11.107, "kernel_s": 7.443, "userspace_s": 3.663},
+  "changes_made": [
+    "journald: /etc/systemd/journald.conf.d/50-smartcane-persistent.conf, Storage=persistent, SystemMaxUse=200M",
+    "smartcane.service stopped at 21:37 to stop repeated under-voltage on the bench. Start with: systemctl --user start smartcane.service"
+  ],
+  "tools": ["code/tools/power_soak.sh", "code/tools/soak_summary.py"],
+  "tool_defects_found_and_fixed": [
+    "kernel event filter matched the module list in Hailo warning traces (cp210x appears in it)",
+    "vision liveness read the service journal, which never contains detect.py reports",
+    "process pattern 'detect.py' also matched speak_detect.py, so data/harness_check is invalid for detect_cpu",
+    "files saved with CRLF on Windows broke bash on the Pi"
+  ],
+  "part_b": "not run",
+  "pass_criteria": "test_plan.md P1 to P11, all pending Part B"
+}

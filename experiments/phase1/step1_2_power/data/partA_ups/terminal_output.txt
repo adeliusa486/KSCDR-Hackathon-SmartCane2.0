@@ -1,0 +1,12 @@
+=== 21:29:40.349  SOAK START  boot 2026-10-02 21:26:24, supply max_current 3000 mA, usb_max_current_enable 0, under-voltage events 4, throttled=0x50000, abort_on_uv=1
+=== 21:29:40.393  phase idle for 120 s
+=== 21:31:46.502  phase idle done, under-voltage events 4, throttled=0x50000
+=== 21:31:46.503  phase service for 180 s
+=== 21:32:31.774  UNDER-VOLTAGE during phase service (5 events this boot, was 4)
+=== 21:32:36.975  aborted: load stopped, idling 60 s
+=== 21:33:36.989  restore: start smartcane.service
+NRestarts=0
+ActiveState=active
+=== 21:34:15.140  end: under-voltage events this boot 6, throttled=0x50000
+=== 21:34:15.154  RESULT FAIL
+=== 21:34:15.155  SOAK DONE

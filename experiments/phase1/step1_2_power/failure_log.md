@@ -1,0 +1,88 @@
+# Step 1.2 failure log
+
+Every fault seen during Step 1.2, in the order found. Nothing here is hidden
+or tidied up. Items owned by a later step say so.
+
+## G1. The Pi dropped off the network at about 21:20 and came back at 21:26 (cause unknown)
+
+- 21:18:52 last good SSH (up 19 min, boot 20:59).
+- 21:20 to 21:21: SSH timed out, then ARP failed ("Destination host
+  unreachable"). The Pi was off the network, not just slow.
+- Adeel reported it "turned on" again. New boot at 21:26:23.
+- **The previous boot's logs are lost.** `journald.conf` line 18 had
+  `Storage=volatile`, so there is no record of a crash, panic, power loss or
+  shutdown. This is the second time today a power-related event could not be
+  fully reconstructed.
+- Clues, not proof:
+  - `chosen/bootloader/rsts` = `0x00001000`. On Pi boards this bit is usually
+    read as a power-on reset. Not confirmed for the Pi 5 from documentation.
+  - The clock was correct at boot (21:26:58) while `timedatectl` said
+    "System clock synchronized: no", and `fake-hwclock.data` held 21:17:01.
+    So the time came from the RTC, which suggests the RTC kept power.
+  - The ESP32 had been up 108 s at 21:28:10, so it restarted with the Pi.
+    It is powered from the Pi's USB, so the Pi's USB 5 V went away.
+- Most likely explanation: a power event on the UPS supply. Not proven.
+
+**Change made:** `/etc/systemd/journald.conf.d/50-smartcane-persistent.conf`
+sets `Storage=persistent`, `SystemMaxUse=200M`. Undo by deleting the file
+and restarting `systemd-journald`. Needed so Step 1.2's "unexpected reboot"
+failure condition can be diagnosed.
+
+## G2. Under-voltage on the UPS supply at normal service load
+
+| Boot | Time | Load at the time |
+|---|---|---|
+| 20:59 | 21:03:16 | service had started 50 s earlier (vision + Hailo + ESP32) |
+| 21:26 | 21:27:33 | service running normally |
+| 21:26 | 21:27:59 | service running normally |
+| 21:26 | 21:29:22 to 21:29:28 | service running, snapshot script |
+| 21:26 | 21:29:34 | service running, snapshot script |
+| 21:26 | 21:32:29 | Part A ladder, 43 s into the `service` phase (ladder aborted) |
+| 21:26 | 21:34:12, 21:34:20 | service restored after the ladder |
+| 21:26 | 21:35:27, 21:35:55, 21:36:26, 21:37:02 | service running normally, no other load |
+
+11 events in 9.5 min on the 21:26 boot. The service was stopped at 21:37 to
+end it.
+
+The Step 1.1 retest window (3 min, 21:0x) saw none. Under-voltage is not
+limited to heavy load: the current supply cannot carry the cane's normal
+operation. This is the problem Step 1.2 exists to fix.
+
+## G3. Boot took 11.1 s
+
+`systemd-analyze`: 7.443 s kernel + 3.663 s userspace = 11.107 s. Previous
+measurements 6.8 s, 6.995 s, 9.394 s. Under-voltage may slow the kernel
+phase. Recheck boot time on the new supply. Fact 12 of the Phase 2 draft
+needs the range widened to 7.0 to 11.1 s.
+
+## G4. After boot, the service's ESP32 link stayed dead (owner: Step 1.5)
+
+- 21:26:42 service logged `ESP32 LINK SILENT`. No `ESP32 link back` followed
+  in the next 80 s.
+- Meanwhile the ESP32 was running and sending: a direct capture at 21:28
+  (service stopped) got D lines with ESP32 uptime 108 s.
+- After `systemctl --user restart`, the link came up at once.
+- So the service can start, fail to read the ESP32, and never recover. The
+  reader thread in `esp32_link.py` catches `SerialException` and keeps
+  reading the same handle. It never reopens the port.
+- The user would have heard "Warning, distance sensors not responding" every
+  30 s, but the earbuds were not connected (`AUDIO DEAD`), so in practice
+  they heard nothing. The ESP32's own buzzing still worked.
+
+## G5. Serial bridge errors and the stale burst again (owner: Step 1.5)
+
+- The 6 s direct capture at 21:28 saw 3,222 D lines, an apparent 538 Hz.
+  That is the F5 stale burst from Step 1.1 again.
+- `dmesg` at the same moment: `cp210x ttyUSB0: failed set request 0x12
+  status: -110`. Request 0x12 is very likely the purge sent by
+  `reset_input_buffer()`, timing out. The same error stopped the full flash
+  read in Step 1.1 (F3). A purge that times out may explain why
+  `reset_input_buffer()` did not clear the stale data in F5. Not proven.
+- The ESP32 received one garbled command (`E unknown command 'bev...'`) when
+  the port opened.
+
+## G6. Earbuds did not reconnect after boot (known, Step 1.1)
+
+`br-connection-profile-unavailable` at 21:26:42, then `AUDIO DEAD` and a
+reconnect attempt every 10 s. Same as 21:02. Probably the earbuds are off or
+in their case. Not a power fault, but it means no speech was reaching anyone.

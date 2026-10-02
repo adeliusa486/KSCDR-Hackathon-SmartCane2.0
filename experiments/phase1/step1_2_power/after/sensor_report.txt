@@ -1,0 +1,140 @@
+SENSOR REPORT  2026-10-02T21:34:22+03:00
+ESP32 ToF data is captured separately by esp32_capture.py (service stopped).
+
+### cameras
+Available cameras
+-----------------
+0 : imx708 [4608x2592 10-bit] (/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a)
+    Modes: 'SBGGR10_CSI2P' : 1536x864 [30.00 fps - (65535, 65535)/65535x65535 crop]
+                             2304x1296 [30.00 fps - (65535, 65535)/65535x65535 crop]
+                             4608x2592 [30.00 fps - (65535, 65535)/65535x65535 crop]
+
+
+### kernel: camera
+Oct 02 21:33:46 smartcane kernel: Modules linked in: tcp_diag inet_diag rfcomm algif_hash algif_skcipher af_alg bnep binfmt_misc imx708 dw9807_vcm brcmfmac_wcc spidev vc4 aes_ce_blk aes_ce_cipher ghash_ce hci_uart gf128mul sha2_ce btbcm sha256_arm64 brcmfmac sha1_ce bluetooth snd_soc_hdmi_codec cp210x drm_display_helper usbserial cec drm_dma_helper sha1_generic raspberrypi_hwmon brcmutil snd_soc_core cfg80211 ecdh_generic ecc snd_compress snd_pcm_dmaengine libaes snd_pcm rfkill rpi_hevc_dec pisp_be rp1_cfe snd_timer v4l2_mem2mem v4l2_fwnode v3d snd v4l2_async videobuf2_dma_contig videobuf2_memops hailo_pci(O) videobuf2_v4l2 gpu_sched gpio_keys videodev i2c_brcmstb spi_bcm2835 drm_shmem_helper drm_kms_helper videobuf2_common pwm_fan mc rp1_pio rp1_fw i2c_designware_platform i2c_designware_core nvmem_rmem rp1_mailbox rp1_adc raspberrypi_gpiomem drm i2c_dev drm_panel_orientation_quirks fuse dm_mod backlight ip_tables x_tables ipv6 uio_pdrv_genirq uio
+Oct 02 21:33:46 smartcane kernel: Modules linked in: tcp_diag inet_diag rfcomm algif_hash algif_skcipher af_alg bnep binfmt_misc imx708 dw9807_vcm brcmfmac_wcc spidev vc4 aes_ce_blk aes_ce_cipher ghash_ce hci_uart gf128mul sha2_ce btbcm sha256_arm64 brcmfmac sha1_ce bluetooth snd_soc_hdmi_codec cp210x drm_display_helper usbserial cec drm_dma_helper sha1_generic raspberrypi_hwmon brcmutil snd_soc_core cfg80211 ecdh_generic ecc snd_compress snd_pcm_dmaengine libaes snd_pcm rfkill rpi_hevc_dec pisp_be rp1_cfe snd_timer v4l2_mem2mem v4l2_fwnode v3d snd v4l2_async videobuf2_dma_contig videobuf2_memops hailo_pci(O) videobuf2_v4l2 gpu_sched gpio_keys videodev i2c_brcmstb spi_bcm2835 drm_shmem_helper drm_kms_helper videobuf2_common pwm_fan mc rp1_pio rp1_fw i2c_designware_platform i2c_designware_core nvmem_rmem rp1_mailbox rp1_adc raspberrypi_gpiomem drm i2c_dev drm_panel_orientation_quirks fuse dm_mod backlight ip_tables x_tables ipv6 uio_pdrv_genirq uio
+Oct 02 21:33:46 smartcane kernel: Modules linked in: tcp_diag inet_diag rfcomm algif_hash algif_skcipher af_alg bnep binfmt_misc imx708 dw9807_vcm brcmfmac_wcc spidev vc4 aes_ce_blk aes_ce_cipher ghash_ce hci_uart gf128mul sha2_ce btbcm sha256_arm64 brcmfmac sha1_ce bluetooth snd_soc_hdmi_codec cp210x drm_display_helper usbserial cec drm_dma_helper sha1_generic raspberrypi_hwmon brcmutil snd_soc_core cfg80211 ecdh_generic ecc snd_compress snd_pcm_dmaengine libaes snd_pcm rfkill rpi_hevc_dec pisp_be rp1_cfe snd_timer v4l2_mem2mem v4l2_fwnode v3d snd v4l2_async videobuf2_dma_contig videobuf2_memops hailo_pci(O) videobuf2_v4l2 gpu_sched gpio_keys videodev i2c_brcmstb spi_bcm2835 drm_shmem_helper drm_kms_helper videobuf2_common pwm_fan mc rp1_pio rp1_fw i2c_designware_platform i2c_designware_core nvmem_rmem rp1_mailbox rp1_adc raspberrypi_gpiomem drm i2c_dev drm_panel_orientation_quirks fuse dm_mod backlight ip_tables x_tables ipv6 uio_pdrv_genirq uio
+Oct 02 21:33:46 smartcane kernel: Modules linked in: tcp_diag inet_diag rfcomm algif_hash algif_skcipher af_alg bnep binfmt_misc imx708 dw9807_vcm brcmfmac_wcc spidev vc4 aes_ce_blk aes_ce_cipher ghash_ce hci_uart gf128mul sha2_ce btbcm sha256_arm64 brcmfmac sha1_ce bluetooth snd_soc_hdmi_codec cp210x drm_display_helper usbserial cec drm_dma_helper sha1_generic raspberrypi_hwmon brcmutil snd_soc_core cfg80211 ecdh_generic ecc snd_compress snd_pcm_dmaengine libaes snd_pcm rfkill rpi_hevc_dec pisp_be rp1_cfe snd_timer v4l2_mem2mem v4l2_fwnode v3d snd v4l2_async videobuf2_dma_contig videobuf2_memops hailo_pci(O) videobuf2_v4l2 gpu_sched gpio_keys videodev i2c_brcmstb spi_bcm2835 drm_shmem_helper drm_kms_helper videobuf2_common pwm_fan mc rp1_pio rp1_fw i2c_designware_platform i2c_designware_core nvmem_rmem rp1_mailbox rp1_adc raspberrypi_gpiomem drm i2c_dev drm_panel_orientation_quirks fuse dm_mod backlight ip_tables x_tables ipv6 uio_pdrv_genirq uio
+Oct 02 21:33:46 smartcane kernel: rp1-cfe 1f00110000.csi: Using a link rate of 900 Mbps
+
+### camera settings used by the service
+--fps 15
+--ev 0.7
+189:    ap.add_argument("--hfov", type=float, default=120.0,
+192:    ap.add_argument("--corridor", type=float, default=10.0,
+194:    ap.add_argument("--fps", type=int, default=15,
+198:    ap.add_argument("--ev", type=float, default=0.7,
+201:    ap.add_argument("--width", type=int, default=1280)
+202:    ap.add_argument("--height", type=int, default=720)
+248:            "AeExposureMode": 0,
+251:            "NoiseReductionMode": 2,
+254:            main={"size": (args.width, args.height), "format": "XRGB8888"},
+255:            lores={"size": (in_w, in_h), "format": "RGB888"},
+
+### ESP32 serial device
+total 0
+lrwxrwxrwx 1 root root 13 Oct  2 21:26 usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 -> ../../ttyUSB0
+
+### BLUETOOTH
+
+### adapter
+Controller 98:FE:54:08:9E:80 (public)
+	Name: smartcane
+	Alias: smartcane
+	Class: 0x006c0000
+	Powered: yes
+	Discoverable: no
+	DiscoverableTimeout: 0x000000b4
+	Pairable: yes
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree Audio Gateway   (0000111f-0000-1000-8000-00805f9b34fb)
+	UUID: PnP Information           (00001200-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Sink                (0000110b-0000-1000-8000-00805f9b34fb)
+	UUID: Headset                   (00001108-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control Target (0000110c-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Source              (0000110a-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Attribute Profile (00001801-0000-1000-8000-00805f9b34fb)
+	UUID: Device Information        (0000180a-0000-1000-8000-00805f9b34fb)
+	Modalias: usb:v1D6Bp0246d0542
+	Discovering: no
+	Roles: central
+	Roles: peripheral
+Advertising Features:
+	ActiveInstances: 0x00 (0)
+	SupportedInstances: 0x05 (5)
+	SupportedIncludes: tx-power
+	SupportedIncludes: appearance
+	SupportedIncludes: local-name
+
+### headset B0:38:E2:19:DC:CC
+Device B0:38:E2:19:DC:CC (public)
+	Name: Soundcore Life P2 Mini
+	Alias: Soundcore Life P2 Mini
+	Class: 0x00240404
+	Icon: audio-headset
+	Paired: yes
+	Bonded: yes
+	Trusted: yes
+	Blocked: no
+	Connected: no
+	LegacyPairing: no
+	UUID: Audio Sink                (0000110b-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control Target (0000110c-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree                 (0000111e-0000-1000-8000-00805f9b34fb)
+
+### link key stored? (key itself not printed)
+1
+
+### /etc/bluetooth/main.conf (active lines)
+[General]
+AlwaysPairable = true
+PairableTimeout = 0
+[BR]
+[LE]
+[GATT]
+[AVDTP]
+[Policy]
+AutoEnable=true
+[AdvMon]
+
+### AUDIO
+
+### pactl info
+Server String: /run/user/1000/pulse/native
+Library Protocol Version: 35
+Server Protocol Version: 35
+Is Local: yes
+Client Index: 21
+Tile Size: 65472
+User Name: pi
+Host Name: smartcane
+Server Name: pulseaudio
+Server Version: 16.1
+Default Sample Specification: s16le 2ch 44100Hz
+Default Channel Map: front-left,front-right
+Default Sink: auto_null
+Default Source: auto_null.monitor
+Cookie: c489:7386
+
+### sinks
+0	auto_null	module-null-sink.c	s16le 2ch 44100Hz	IDLE
+
+### suspend module loaded? (must be empty)
+(exit 1)
+
+### user default.pa vs system
+110c110
+< load-module module-suspend-on-idle
+---
+> #load-module module-suspend-on-idle
+(exit 1)
+
+### pulseaudio starts vs SSH sessions this boot
+pulseaudio starts : 22
+ssh sessions      : 34
+
+### speech engine
+eSpeak NG text-to-speech: 1.51  Data at: /usr/lib/aarch64-linux-gnu/espeak-ng-data
+/usr/bin/paplay

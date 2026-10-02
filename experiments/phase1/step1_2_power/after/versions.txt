@@ -1,0 +1,156 @@
+VERSIONS  2026-10-02T21:34:22+03:00
+
+### key packages
+bluez 5.66-1+rpt2+deb12u2
+espeak-ng 1.51+dfsg-10+deb12u2
+hailo-all 4.20.0+1
+hailo-dkms 4.20.0-1
+hailo-tappas-core 3.31.0+1-1
+hailofw 4.20.0-1
+hailort 4.20.0-1
+libcamera-ipa 0.5.2+rpt20250903-1~bpo12+1
+libcamera0.5 0.5.2+rpt20250903-1~bpo12+1
+linux-image-rpi-2712 1:6.12.109-1+rpt1
+log2ram 1.7.2
+pulseaudio 16.1+dfsg1-2+rpt1.1
+pulseaudio-module-bluetooth 16.1+dfsg1-2+rpt1.1
+python3-hailort 4.20.0-1
+python3-numpy 1:1.24.2-1+deb12u1
+python3-opencv 4.6.0+dfsg-12
+python3-picamera2 0.3.31-1
+python3-serial 3.5-1.1
+raspi-firmware 1:1.20260907-1~bookworm
+rpi-eeprom 28.31-1
+rpicam-apps 1.9.0-1~bpo12+1
+rpicam-apps-core 1.9.0-1~bpo12+1
+rpicam-apps-encoder 1.9.0-1~bpo12+1
+rpicam-apps-hailo-postprocess 1.9.0-1~bpo12+1
+rpicam-apps-lite 1.9.0-1~bpo12+1
+rpicam-apps-opencv-postprocess 1.9.0-1~bpo12+1
+rpicam-apps-preview 1.9.0-1~bpo12+1
+systemd 252.39-1~deb12u2
+
+### python
+Python 3.11.2
+
+### python modules (system interpreter used by the service)
+picamera2 ?
+numpy 1.24.2
+cv2 4.6.0
+serial 3.5
+hailo_platform 4.20.0
+libcamera ?
+
+### venv pip freeze (/home/pi/smartcane/venv)
+Adafruit-Blinka==9.2.0
+adafruit-circuitpython-busdevice==5.2.17
+adafruit-circuitpython-connectionmanager==3.1.8
+adafruit-circuitpython-requests==4.1.17
+adafruit-circuitpython-typing==1.12.3
+adafruit-circuitpython-vl53l0x==3.6.19
+Adafruit-PlatformDetect==3.89.1
+Adafruit_PureIO==1.1.12
+argcomplete==2.0.0
+attrs==22.2.0
+av==12.3.0
+binho-host-adapter==0.1.6
+certifi==2022.9.24
+chardet==5.1.0
+charset-normalizer==3.0.1
+colorzero==2.0
+contextlib2==0.6.0.post1
+distlib==0.3.6
+distro==1.8.0
+filelock==3.9.0
+future==0.18.2
+gpiozero==2.0.1
+hailort==4.20.0
+idna==3.3
+jsonpointer==2.3
+jsonschema==4.10.3
+lgpio==0.2.2.0
+libarchive-c==2.9
+Mako==1.2.4.dev0
+Markdown==3.4.1
+MarkupSafe==2.1.2
+netaddr==0.8.0
+netifaces==0.11.0
+numpy==1.24.2
+olefile==0.46
+picamera2==0.3.31
+pidng==4.0.9
+piexif==1.1.3
+pigpio==1.78
+Pillow==9.4.0
+platformdirs==2.6.0
+pycryptodomex==3.11.0
+pyftdi==0.57.2
+Pygments==2.14.0
+PyGObject==3.42.2
+PyOpenGL==3.1.6
+PyQt5==5.15.9
+PyQt5-sip==12.11.1
+pyrsistent==0.18.1
+pyserial==3.5
+python-apt==2.6.0
+python-prctl==1.8.1
+pyusb==1.3.1
+PyYAML==6.0
+requests==2.28.1
+rfc3987==1.3.8
+rpi-keyboard-config==1.0
+RPi.GPIO==0.7.1a4
+simplejpeg==1.8.1
+six==1.16.0
+smbus2==0.4.2
+spidev==3.5
+ssh-import-id==5.10
+sysv_ipc==1.2.0
+toml==0.10.2
+tqdm==4.64.1
+typing_extensions==4.16.0
+uritemplate==4.1.1
+urllib3==1.26.12
+videodev2==0.0.4
+virtualenv==20.17.1+ds
+webcolors==1.11.1
+
+### arduino-cli
+arduino-cli  Version: 1.5.1 Commit: 01f3d4f2b Date: 2026-06-05T10:22:11Z
+ID          Installed Latest Name
+esp32:esp32 3.3.12    3.3.12 esp32
+
+Name    Installed     Available         Location Description
+VL53L0X 1.3.1         -                 user     -
+
+
+### esptool
+esptool v5.3.1
+5.3.1
+
+### deployed files sha256
+d8891a961ffdd22f7b76c0abb1c17f6bdee01cdb86a8cfbee4b1f8ffa1771f82  ./check_hardware.py
+bd17f1ee35d5f3c862a4894605855abbb9dda4b0621fdb0ac4c2c8c7bb7e730a  ./coco.txt
+0ada2f81f12a43a1d62d4b15b004ee6a3c52eb51a18bbe415e6e794d60601daa  ./detect.py
+0d968fa554e0be59013b3902a8963edd9801cdb1a2f6935956c1ab94d9fd615e  ./esp32/cane_safety/cane_safety.ino
+5637b37fc7d717bef17d02b0cfdc72322bc4f2f33d46e4d5e0a2d0a00ffb1e4f  ./esp32_link.py
+a1e4fab94937134eb79ddf85aa9290fa67e8e4b719d69a4906fe59b7de04aa8f  ./haptics.py
+5ad2138642aff1fe665e90a119eeed4c33e428f277fd60e1aef7d875864f4137  ./setup_pi.sh
+14e185ea75d6481fee0b3c1fc8232922c90373a89305876c12f6ac2ef697adbd  ./speak_detect.py
+5aac7101d756d896018fb869746d09cb08c5c43c68ab66f44af2ee1fb230c991  ./tof.py
+e80a290aea2a5547ed443fdcf43f001955b1181bced5a30687abe702232d73c4  ./tools/baseline_window.sh
+234504d5642c9b0daa8c68e9f6324f0e0d64a7382825f4e0770ab2aabefbf559  ./tools/camera_probe.py
+0cbcc42a46b7ef5130bffc0027957729df924ddd8e7f291887e414d7ff165952  ./tools/esp32_backup.sh
+13a87dff6054aba8adf1e0a89477321b8f2a08e73e51e3e68d7a26c3f30e49f7  ./tools/esp32_capture.py
+5a76b5bd1ac72800e5ff80a041b38628df1b93375b39738681a036626d417c12  ./tools/power_soak.sh
+52ed75f7e32b5a87298dd9416af766b4846e80d814fdb605920fa1d262fd2c55  ./tools/snapshot_pi.sh
+f271b324baedd293ac2ed4fcccee6bf1df4699863c222cec42888939f4942803  ./tools/vision_retest.sh
+
+### installed unit sha256
+3d956d4dac0a4541511187a79975ff6fe5f5e56f781885a5328f597f342c795b  /home/pi/.config/systemd/user/smartcane.service
+
+### flashed ESP32 app (build artifact)
+12a2c90dfb79648843f3eb6a4de2a3c5c1eca80c8e8321abaf3b3a54f3b3f042  /home/pi/smartcane/esp32/build/cane_safety.ino.bin
+
+### dpkg package count
+1282
