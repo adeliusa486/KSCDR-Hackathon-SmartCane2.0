@@ -1,0 +1,196 @@
+# Smart cane - curated detection class list.
+#
+# WHY THIS IS NOT 300 CLASSES
+# ---------------------------
+# Two hard constraints, both recorded in MEMORY.md:
+#
+#   1. The Hailo-8L is the 13 TOPS board. Compiling a 600-class OpenImages
+#      YOLOv8 for Hailo-8 is documented to fail with BackendAllocatorException
+#      because the detection head exhausts on-chip memory. The risk rises with
+#      class count and our board has half the resources of the one that failed.
+#
+#   2. Accuracy per class dilutes as the head grows on a fixed compute budget.
+#      300 thin classes is worse for a blind user than 90 reliable ones.
+#
+# Anything NOT in this list is still announced. speak_detect.py renames
+# unrecognised detections to "obstacle" plus a direction, so the user is never
+# left uninformed about a physical thing in their path. That fallback is what
+# makes a curated list safe.
+#
+# EXPANSION PLAN
+#   Phase 1 (this file): COCO 80 + 8 hazard classes = 88
+#   Phase 2: split hazards finer (broken pavement, construction barrier,
+#            parked motorcycle on footpath) once we have field footage
+#   Phase 3: Indian currency notes and bus route numbers, which need their own
+#            models rather than more detection classes
+
+# ---------------------------------------------------------------------------
+# Base: the 80 COCO classes. Kept in COCO's exact order so pretrained weights
+# transfer cleanly and index 0 stays "person".
+# ---------------------------------------------------------------------------
+base_dataset: coco
+base_class_count: 80
+
+# ---------------------------------------------------------------------------
+# Hazard classes added on top. Index continues from 80.
+# Every one of these has real labelled data available. Nothing here is
+# aspirational.
+# ---------------------------------------------------------------------------
+added_classes:
+  - name: pothole
+    index: 80
+    sources: [bharat_pothole, rdd2022, roboflow_pothole]
+    why: "Primary differentiator. Ultrasonic-only canes miss these entirely."
+
+  - name: manhole
+    index: 81
+    sources: [intel_unnati, rdd2022]
+    why: "A closed manhole is a trip hazard, an open one is a fall hazard."
+
+  - name: open drain
+    index: 82
+    sources: [intel_unnati]
+    why: "Named separately from manhole because the danger level differs."
+
+  - name: stairs
+    index: 83
+    sources: [vocal_feedback, indoor_objects]
+    why: "Direction of travel matters: up is an obstacle, down is a fall."
+
+  - name: curb
+    index: 84
+    sources: [obstacle_dataset, rdd2022]
+    why: "The most common daily trip hazard on any footpath."
+
+  - name: pole
+    index: 85
+    sources: [obstacle_dataset, construction_site]
+    why: "Head-height collision risk that ground-facing sensors never see."
+
+  - name: scaffolding
+    index: 86
+    sources: [construction_site]
+    why: "Extremely common on Indian streets, and overhead."
+
+  - name: door
+    index: 87
+    sources: [vocal_feedback, indoor_objects]
+    why: "Navigation landmark rather than a hazard. Needed indoors."
+
+  # The five below come from Obstacle-Dataset OD, which turned out to carry
+  # exactly the street furniture COCO lacks, already in YOLO format.
+  - name: traffic cone
+    index: 88
+    sources: [obstacle_dataset]
+    why: "Marks roadworks and temporary hazards. Very common, never in COCO."
+
+  - name: bollard
+    index: 89
+    sources: [obstacle_dataset]
+    why: >
+      Waist-height post at footpath entrances. A classic cane-miss: too high
+      for a swinging tip to catch reliably, hard enough to injure.
+
+  - name: trash bin
+    index: 90
+    sources: [obstacle_dataset]
+    why: "Fixed street obstacle, and a useful navigation landmark."
+
+  - name: roadblock
+    index: 91
+    sources: [obstacle_dataset]
+    why: "Spherical and barrier roadblocks on Indian footpaths."
+
+  - name: tricycle
+    index: 92
+    sources: [obstacle_dataset]
+    why: >
+      Three-wheelers and rickshaws. COCO has no class for these at all, and
+      they are among the most common moving vehicles on Indian streets.
+
+# ---------------------------------------------------------------------------
+# Dataset registry.
+#
+# auth: none    = direct download, the script handles it
+# auth: key     = needs a free Roboflow API key in the ROBOFLOW_API_KEY env var
+# auth: manual  = you must download it by hand, the script will tell you where
+# ---------------------------------------------------------------------------
+datasets:
+  coco:
+    auth: none
+    note: "Ultralytics downloads this automatically on first train."
+    images: ~118000
+
+  rdd2022:
+    auth: manual
+    url: "https://github.com/sekilab/RoadDamageDetector"
+    images: 47420
+    note: >
+      Road Damage Detection 2022. Six countries INCLUDING INDIA. Eight damage
+      categories including potholes and manhole covers. This is the single most
+      valuable set for real city infrastructure. Labels are in Pascal VOC XML
+      and need converting.
+
+  bharat_pothole:
+    auth: manual
+    images: 7000
+    note: >
+      Dashcam footage from Indian roads. Closest match to our actual operating
+      environment. Check licensing before any commercial use.
+
+  intel_unnati:
+    auth: key
+    url: "https://universe.roboflow.com/intel-unnati-training-program/pothole-detection-bqu6s"
+    images: 3770
+    note: "Potholes + manholes + sewer covers. Our open-drain class comes from here."
+
+  roboflow_pothole:
+    auth: key
+    url: "https://universe.roboflow.com/gerapothole/pothole-detection-yolov8"
+    images: 608
+    note: "Small, already in YOLO format, good for a fast smoke test."
+
+  obstacle_dataset:
+    auth: manual
+    url: "https://drive.google.com/drive/folders/1ksPQTc1BkBljqLqEtIWmXFnkgHWs9Hqv"
+    mirror: "https://pan.baidu.com/s/1NquX0rmVngvTAV82A-NkMg  (code 0521)"
+    images: 7915   # 5066 train + 1583 test + 1266 val
+    note: >
+      Obstacle-Dataset OD. The GitHub repo is a README only, the data is on
+      Google Drive. Ships in BOTH Pascal VOC XML and YOLO txt format, so the
+      YOLO folders can be used directly with only a class remap.
+      Its 15 classes: stop_sign, person, bicycle, bus, truck, car, motorbike,
+      reflective_cone, ashcan, warning_column, spherical_roadblock, pole, dog,
+      tricycle, fire_hydrant.
+      The last five of those are street furniture COCO has no class for, which
+      is why this set punches above its size for us.
+
+  construction_site:
+    auth: manual
+    url: "https://arxiv.org/abs/2503.04139"
+    images: 447
+    note: "Scaffolding poles and horizontal scaffolding, urban settings."
+
+  vocal_feedback:
+    auth: manual
+    url: "https://arxiv.org/abs/2401.01362"
+    images: 2200
+    note: "Four obstacle classes for the visually impaired, including stairs and doors."
+
+  indoor_objects:
+    auth: manual
+    url: "https://arxiv.org/abs/2501.18444"
+    images: 7331
+    note: "Ten indoor classes for visually impaired navigation."
+
+# ---------------------------------------------------------------------------
+# Training targets. These are the numbers to judge the result against, not 99%.
+# Best-in-class COCO mAP50-95 is about 54, so anything above 45 on a merged
+# set is a good outcome.
+# ---------------------------------------------------------------------------
+targets:
+  overall_map50_95: 0.45
+  pothole_recall: 0.90      # missing a pothole is the dangerous failure
+  vehicle_recall: 0.95      # missing a car is the unacceptable failure
+  false_alarm_rate: 0.10    # crying wolf makes users switch the device off
+  min_fps_on_hailo8l: 25

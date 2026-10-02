@@ -1,0 +1,661 @@
+#!/usr/bin/env python3
+"""Smart cane - speak what the camera sees.
+
+Wraps detect.py, reads its printed reports, and speaks them through the
+default audio sink (Bluetooth headset while developing, wired bone-conduction
+headset in the product).
+
+Deliberately does NOT modify detect.py. It runs it as a subprocess so the
+vision path and the speech path can be tested and replaced independently.
+
+Four things matter more than the words themselves:
+
+  1. Do not repeat. A cane that says "person ahead" thirty times a second is
+     unusable. Each phrase is muted for --repeat seconds after it is spoken.
+  2. Do not queue. If speech is still playing, new reports are dropped rather
+     than stacked, or the user hears warnings about obstacles they already
+     walked past.
+  3. Never speak into a black hole. Bluetooth earbuds sleep when idle. When
+     they drop, PulseAudio silently falls back to a null sink and everything
+     is swallowed with no error at all. We check the sink before every phrase
+     and reconnect when it is dead. This was a real failure in testing: the
+     log said SPEAKING for minutes while the user heard nothing.
+  4. Never block forever. espeak-ng and paplay both get hard timeouts. A
+     hung paplay against a half-dead Bluetooth link would otherwise hold the
+     speech lock forever and the cane would go permanently silent while still
+     appearing healthy.
+
+    python3 speak_detect.py --interval 1.5
+"""
+import argparse
+import math
+import os
+import re
+import struct
+import subprocess
+import sys
+import threading
+import time
+import wave
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# detect.py prints lines like:
+#   [ 30.0 fps]  person ahead, close | car left, far
+REPORT = re.compile(r"^\[\s*[\d.]+\s*fps\]\s*(.*)$")
+
+# Things worth interrupting someone's day for, most urgent first. Anything not
+# in this list is still spoken, just ranked below these.
+PRIORITY = [
+    "car", "bus", "truck", "motorcycle", "train", "bicycle",
+    "person", "dog", "cow", "horse",
+    "traffic light", "stop sign", "fire hydrant", "bench", "pole",
+]
+
+# COCO classes a walking person can actually be harmed by or needs to find.
+# Everything else in the 80 is indoor clutter that only adds false alarms:
+# toothbrush, hair drier, teddy bear, spoon, and so on. Used unless
+# --no-filter is passed.
+RELEVANT = {
+    # things that move and can hit you
+    "person", "bicycle", "car", "motorcycle", "bus", "train", "truck",
+    "boat", "airplane",
+    # animals on Indian streets
+    "dog", "cat", "cow", "horse", "sheep", "bird",
+    # street furniture and navigation landmarks
+    "traffic light", "stop sign", "fire hydrant", "parking meter", "bench",
+    "chair", "couch", "bed", "dining table", "toilet", "tv", "refrigerator",
+    # carried objects worth finding
+    "backpack", "handbag", "suitcase", "umbrella", "bottle", "cup",
+    "cell phone", "laptop", "book", "clock",
+}
+
+# A sink named like this means PulseAudio has no real output device and is
+# throwing audio away.
+DEAD_SINKS = ("auto_null", "@DEFAULT_SINK@", "")
+
+
+def rank(phrase):
+    """Lower is more urgent."""
+    for i, p in enumerate(PRIORITY):
+        if phrase.startswith(p):
+            return i
+    return len(PRIORITY)
+
+
+def split_phrase(phrase):
+    """'person left, close @0.87' -> ('person', 'left', 'close', 0.87)."""
+    score = 0.0
+    if "@" in phrase:
+        phrase, _, raw = phrase.rpartition("@")
+        try:
+            score = float(raw)
+        except ValueError:
+            pass
+    head, _, dist = phrase.partition(",")
+    head = head.strip()
+    dist = dist.strip()
+    for direction in ("ahead", "left", "right"):
+        if head.endswith(" " + direction):
+            return head[: -len(direction) - 1].strip(), direction, dist, score
+    return head, "", dist, score
+
+
+def class_of(phrase):
+    """'person left, close' -> 'person'. Handles two-word classes."""
+    return split_phrase(phrase)[0]
+
+
+def spoken_distance(mm):
+    """1240 -> '1.2 metres', 640 -> '60 centimetres', 999 -> '1 metre'."""
+    cm = max(10, int(round(mm / 100.0)) * 10)   # 10 cm steps, ToF is +-3 cm
+    if cm < 100:
+        return f"{cm} centimetres"
+    m = cm / 100.0
+    return "1 metre" if cm == 100 else f"{m:g} metres"
+
+
+def distance_band(mm):
+    """Coarse band used to decide whether a changed distance is worth saying
+    again. Re-announcing every 10 cm would never let the user hear anything
+    else, but 'it just got close' must not be muted by the repeat timer."""
+    return "close" if mm < 500 else "near" if mm < 1000 else "far"
+
+
+def with_tof(phrases, fwd_mm):
+    """Replace the camera's distance guess with the measured ToF distance for
+    things straight ahead.
+
+    Only 'ahead' gets it. The VL53L0X sees a ~25 degree cone, roughly the
+    camera's ahead corridor, so a left or right object is not what the ToF is
+    measuring. Giving it that number would be a confident wrong answer.
+
+    Returns (spoken phrases, repeat keys). The key carries a distance band, not
+    the exact number, so 'person ahead' approaching from 1.1 m to 0.4 m is said
+    again while 1.1 m to 1.0 m is not.
+    """
+    spoken, keys = [], []
+    for p in phrases:
+        cls, direction, dist, _ = split_phrase(p)
+        if direction == "ahead" and fwd_mm is not None:
+            spoken.append(f"{cls} ahead, {spoken_distance(fwd_mm)}")
+            keys.append(f"{cls} ahead {distance_band(fwd_mm)}")
+        else:
+            spoken.append(p)
+            keys.append(p)
+    return spoken, keys
+
+
+def resolve(phrases, relevant, name_conf):
+    """Decide, per detection, whether to say its name or call it an obstacle.
+
+    This is how the cane gets high recall and trustworthy names at the same
+    time, which otherwise pull in opposite directions:
+
+        detector runs at a LOW threshold    -> almost nothing is missed
+        naming needs a HIGH confidence      -> names are trustworthy
+        everything in between becomes       -> "obstacle <direction>"
+
+    So a faint, uncertain blob is never silently dropped. The user is told
+    something is in their way, just not told a name we do not believe. A wrong
+    name erodes trust in the device. "Obstacle" never does.
+
+    Multiple unknowns in the same direction collapse into one, otherwise a
+    cluttered pavement produces "obstacle left. obstacle left. obstacle left".
+    """
+    out = []
+    seen_obstacle = set()
+    for p in phrases:
+        cls, direction, dist, score = split_phrase(p)
+        named = cls in relevant and score >= name_conf
+        if named:
+            out.append(f"{cls} {direction}, {dist}" if direction
+                       else f"{cls}, {dist}")
+            continue
+        key = (direction, dist)
+        if key in seen_obstacle:
+            continue
+        seen_obstacle.add(key)
+        out.append(f"obstacle {direction}, {dist}" if direction else
+                   f"obstacle, {dist}")
+    return out
+
+
+class Confirmer:
+    """Suppresses one-frame flickers.
+
+    A single frame of YOLO calling a shadow a 'dog' is normal and harmless.
+    Speaking it is not. A class must be seen in `need` consecutive reports
+    before it is allowed through, which removes almost all spurious labels at
+    the cost of one report of latency (about 1.5 s at default interval).
+
+    Misses are forgiven once, so an object that flickers out for a single
+    frame does not have to earn its place again from zero.
+    """
+
+    def __init__(self, need):
+        self.need = need
+        self.streak = {}
+        self.grace = {}
+
+    def update(self, phrases):
+        seen = {class_of(p) for p in phrases}
+        for cls in list(self.streak):
+            if cls not in seen:
+                if self.grace.get(cls, 0) > 0:
+                    self.grace[cls] -= 1
+                else:
+                    del self.streak[cls]
+                    self.grace.pop(cls, None)
+        for cls in seen:
+            self.streak[cls] = self.streak.get(cls, 0) + 1
+            self.grace[cls] = 1
+        return [p for p in phrases if self.streak.get(class_of(p), 0) >= self.need]
+
+
+def run(cmd, timeout):
+    """Run a command with a hard timeout. Returns True on success."""
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
+        return True
+    except subprocess.TimeoutExpired:
+        print(f"  TIMEOUT after {timeout}s: {' '.join(cmd[:2])}", file=sys.stderr)
+        return False
+    except subprocess.CalledProcessError:
+        return False
+    except FileNotFoundError:
+        print(f"  missing command: {cmd[0]}", file=sys.stderr)
+        return False
+
+
+class AudioLink:
+    """Knows whether sound can actually reach the user, and fixes it if not."""
+
+    def __init__(self, mac, retry_every, verbose):
+        self.mac = mac
+        self.retry_every = retry_every
+        self.verbose = verbose
+        self.last_attempt = 0.0
+        self.was_alive = None
+
+    def current_sink(self):
+        try:
+            out = subprocess.run(["pactl", "info"], capture_output=True,
+                                 text=True, timeout=5).stdout
+            for line in out.splitlines():
+                if line.startswith("Default Sink:"):
+                    return line.split(":", 1)[1].strip()
+        except Exception:
+            pass
+        return ""
+
+    def alive(self):
+        """True if there is a real output device, not a null sink."""
+        sink = self.current_sink()
+        ok = sink not in DEAD_SINKS and not sink.startswith("auto_null")
+        if ok != self.was_alive:
+            if ok:
+                print(f"  AUDIO OK: {sink}")
+            else:
+                print(f"  AUDIO DEAD: default sink is '{sink}' - nothing "
+                      f"can be heard", file=sys.stderr)
+            self.was_alive = ok
+        return ok
+
+    def try_reconnect(self):
+        """Throttled attempt to bring the Bluetooth headset back."""
+        if not self.mac:
+            return
+        now = time.time()
+        if now - self.last_attempt < self.retry_every:
+            return
+        self.last_attempt = now
+        print(f"  reconnecting {self.mac} ...")
+        run(["bluetoothctl", "connect", self.mac], timeout=15)
+        time.sleep(2)
+        sink = self.current_sink()
+        if sink and not sink.startswith("auto_null"):
+            # Make the freshly connected headset the default again.
+            run(["pactl", "set-default-sink", sink], timeout=5)
+            print(f"  reconnected, sink is {sink}")
+
+    def keepalive(self, path):
+        """Near-silent blip so idle earbuds do not fall asleep."""
+        if not os.path.exists(path):
+            sr = 44100
+            f = wave.open(path, "w")
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(sr)
+            frames = [struct.pack("<h", int(2 * math.sin(2 * math.pi * 440 * i / sr)))
+                      for i in range(int(sr * 0.3))]
+            f.writeframes(b"".join(frames))
+            f.close()
+        run(["paplay", path], timeout=8)
+
+
+class Speaker:
+    """Speaks phrases, never overlapping, never repeating too soon."""
+
+    def __init__(self, voice, speed, repeat_after, link, verbose,
+                 dry_run=False):
+        self.dry_run = dry_run
+        self.voice = voice
+        self.speed = speed
+        self.repeat_after = repeat_after
+        self.link = link
+        self.verbose = verbose
+        self.busy = threading.Lock()
+        self.last_said = {}
+        self.last_sound = time.time()
+
+    def _play(self, text, on_start=None):
+        try:
+            wav = "/tmp/cane_speech.wav"
+            if run(["espeak-ng", "-v", self.voice, "-s", str(self.speed),
+                    "-w", wav, text], timeout=10):
+                # Fire the sync buzz only now, after synthesis, so the user
+                # feels it as the words begin rather than ~150 ms before.
+                if on_start is not None:
+                    try:
+                        on_start()
+                    except Exception as e:
+                        print(f"  on_start failed: {e}", file=sys.stderr)
+                if run(["paplay", wav], timeout=15):
+                    self.last_sound = time.time()
+        finally:
+            # Always release, whatever happened. A stuck lock here would make
+            # the cane silent forever while still looking healthy.
+            self.busy.release()
+
+    def say(self, text, key=None, urgent=False, repeat_after=None,
+            on_start=None):
+        """key: what the repeat timer is keyed on, default the text itself.
+        urgent: wait up to 2 s for current speech to finish instead of
+        dropping. Only for ground hazards, where a dropped warning means the
+        user steps into a hole with only the vibration to go on.
+        on_start: called the moment audio starts, used for the sync buzz."""
+        key = key or text
+        repeat_after = self.repeat_after if repeat_after is None else repeat_after
+        if self.dry_run:
+            now = time.time()
+            if now - self.last_said.get(key, 0) < repeat_after:
+                return
+            self.last_said[key] = now
+            print(f"  WOULD SAY: {text}")
+            if on_start is not None:
+                on_start()
+            return
+
+        # Check the link BEFORE consuming the repeat timer, so a phrase muted
+        # by a dead sink is still spoken once audio comes back.
+        if not self.link.alive():
+            self.link.try_reconnect()
+            return
+
+        now = time.time()
+        if now - self.last_said.get(key, 0) < repeat_after:
+            if self.verbose:
+                print(f"  (muted) {text}")
+            return
+        if urgent:
+            self.last_said[key] = now
+            threading.Thread(target=self._say_when_free, args=(text,),
+                             daemon=True).start()
+            return
+        if not self.busy.acquire(blocking=False):
+            if self.verbose:
+                print(f"  (still speaking, dropped) {text}")
+            return
+        self.last_said[key] = now
+        print(f"  SPEAKING: {text}")
+        threading.Thread(target=self._play, args=(text, on_start),
+                         daemon=True).start()
+
+    def _say_when_free(self, text):
+        if self.busy.acquire(timeout=2.0):
+            print(f"  SPEAKING (urgent): {text}")
+            self._play(text)
+        else:
+            print(f"  (urgent dropped, speech stuck) {text}", file=sys.stderr)
+
+
+def watchdog(link, speaker, keepalive_after, stop):
+    """Background health loop: keeps the headset awake and reconnects it."""
+    while not stop.is_set():
+        time.sleep(5)
+        if not link.alive():
+            link.try_reconnect()
+            continue
+        idle = time.time() - speaker.last_sound
+        if keepalive_after and idle > keepalive_after:
+            if speaker.busy.acquire(blocking=False):
+                try:
+                    link.keepalive("/tmp/cane_keepalive.wav")
+                    speaker.last_sound = time.time()
+                finally:
+                    speaker.busy.release()
+
+
+# Buzz sent to the ESP32 the moment a sentence starts, so the user feels and
+# hears the same object at once. Same urgency ladder as the ESP32's own
+# obstacle feel: closer = stronger and longer.
+SYNC_BUZZ = {"close": "B100,400", "near": "B85,250", "far": "B60,150"}
+BAND_ORDER = {"close": 0, "near": 1, "far": 2}
+
+
+def nearest_band(phrases, fwd_mm):
+    """Most urgent distance band among the phrases about to be spoken. Things
+    ahead use the measured ToF distance, others the camera's estimate."""
+    bands = []
+    for p in phrases:
+        _, direction, dist, _ = split_phrase(p)
+        bands.append(distance_band(fwd_mm)
+                     if direction == "ahead" and fwd_mm is not None else dist)
+    bands = [b for b in bands if b in BAND_ORDER]
+    return min(bands, key=BAND_ORDER.get) if bands else None
+
+
+HAZARD_PHRASES = {
+    "drop": "Careful, drop ahead",   # hole, open drain, step down, kerb edge
+    "step": "Step up ahead",         # kerb, step up, low object at the tip
+}
+
+
+class SensorWatch:
+    """Speaks what only the ESP32's ToF sensors know.
+
+    The ESP32 has already buzzed by the time any of this runs. Speech adds the
+    words: ground hazards, obstacles the camera cannot name, and a warning if
+    the sensor link itself goes quiet, because a cane that silently loses its
+    sensors looks healthy while protecting nobody.
+    """
+
+    def __init__(self, link, speaker, obstacle_mm, stop):
+        self.link = link
+        self.speaker = speaker
+        self.obstacle_mm = obstacle_mm
+        self.stop = stop
+        self.camera_ahead_at = 0.0   # last time the camera named something ahead
+        self.bad_since = {}          # sensor name -> when it started failing
+        link.on_hazard = self.on_hazard
+
+    def on_hazard(self, kind, mm):
+        text = HAZARD_PHRASES.get(kind)
+        if text:
+            print(f"  GROUND {kind}: {mm} mm")
+            self.speaker.say(text, urgent=True, repeat_after=2.5)
+
+    def run(self):
+        was_alive = True
+        while not self.stop.is_set():
+            time.sleep(0.2)
+            if not self.link.alive(within=2.0):
+                if was_alive:
+                    print("  ESP32 LINK SILENT", file=sys.stderr)
+                was_alive = False
+                self.speaker.say("Warning, distance sensors not responding",
+                                 key="esp32-dead", repeat_after=30)
+                continue
+            if not was_alive:
+                print("  ESP32 link back")
+                was_alive = True
+            # One sensor dead while the ESP32 itself is fine. Same rule: the
+            # user must know they have lost pothole or obstacle warnings. The
+            # ESP32 re-inits a dead sensor every second, so 3 s of failure is
+            # a real fault, not a hiccup.
+            now = time.time()
+            for name, ok in (("ground", self.link.down_ok),
+                             ("obstacle", self.link.fwd_ok)):
+                if ok:
+                    self.bad_since.pop(name, None)
+                elif now - self.bad_since.setdefault(name, now) > 3:
+                    self.speaker.say(f"Warning, {name} sensor not working",
+                                     key=f"{name}-sensor-dead", repeat_after=60)
+            mm = self.link.fwd_mm if self.link.fwd_ok else None
+            # Something solid ahead that the camera has not named recently:
+            # glass, a pole, a wall, anything outside the model's classes.
+            if (mm is not None and mm < self.obstacle_mm
+                    and time.time() - self.camera_ahead_at > 2.5):
+                cmd = SYNC_BUZZ[distance_band(mm)]
+                self.speaker.say(f"obstacle ahead, {spoken_distance(mm)}",
+                                 key=f"tof-obstacle {distance_band(mm)}",
+                                 on_start=lambda c=cmd: self.link.send(c))
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Speak what the camera sees")
+    ap.add_argument("--interval", type=float, default=1.5,
+                    help="seconds between detection reports")
+    ap.add_argument("--conf", type=float, default=0.25,
+                    help="DETECTION threshold passed to detect.py. Keep this "
+                         "low so faint objects are still seen at all.")
+    ap.add_argument("--name-conf", type=float, default=0.55,
+                    help="NAMING threshold. Above it we say the class name, "
+                         "below it we say 'obstacle'. Keep this high so names "
+                         "are trustworthy.")
+    ap.add_argument("--max-objects", type=int, default=2,
+                    help="how many objects to speak per report")
+    ap.add_argument("--repeat-after", type=float, default=4.0,
+                    help="seconds before the same phrase may be repeated")
+    ap.add_argument("--voice", default="en-us")
+    ap.add_argument("--speed", type=int, default=165, help="words per minute")
+    ap.add_argument("--bt-mac", default="B0:38:E2:19:DC:CC",
+                    help="Bluetooth headset to reconnect, empty to disable")
+    ap.add_argument("--retry-every", type=float, default=20.0,
+                    help="seconds between reconnect attempts")
+    ap.add_argument("--keepalive-after", type=float, default=45.0,
+                    help="seconds of silence before a blip keeps earbuds "
+                         "awake, 0 to disable")
+    ap.add_argument("--confirm", type=int, default=2,
+                    help="consecutive reports a class must appear in before "
+                         "it is spoken. 1 disables flicker suppression")
+    ap.add_argument("--no-filter", action="store_true",
+                    help="speak every COCO class, not just the ones a walking "
+                         "person needs")
+    ap.add_argument("--all-classes", action="store_true")
+    ap.add_argument("--fps", type=int, default=15,
+                    help="camera fps, forwarded to detect.py. Lower = "
+                         "longer exposure = far better in dim light.")
+    ap.add_argument("--ev", type=float, default=0.7,
+                    help="exposure bias, forwarded to detect.py")
+    ap.add_argument("--no-haptics", action="store_true",
+                    help="do not drive the vibration motor")
+    ap.add_argument("--motor-pin", type=int, default=18,
+                    help="BCM pin the motor signal is on (header pin 12)")
+    ap.add_argument("--esp32-port", default="/dev/ttyUSB0",
+                    help="serial port of the ESP32 safety co-processor, "
+                         "empty to run camera-only")
+    ap.add_argument("--obstacle-mm", type=int, default=1000,
+                    help="forward ToF distance under which an unnamed "
+                         "obstacle is announced")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print what would be spoken, play no audio")
+    ap.add_argument("--verbose", action="store_true")
+    args = ap.parse_args()
+
+    link = AudioLink(args.bt_mac, args.retry_every, args.verbose)
+    speaker = Speaker(args.voice, args.speed, args.repeat_after, link,
+                      args.verbose, dry_run=args.dry_run)
+    confirmer = Confirmer(max(1, args.confirm))
+
+    stop = threading.Event()
+
+    # The ESP32 owns the ToF sensors and the motor. Optional: if it is not
+    # plugged in, the cane still speaks what the camera sees.
+    esp = None
+    watch = None
+    if args.esp32_port:
+        try:
+            from esp32_link import Esp32Link
+            esp = Esp32Link(args.esp32_port)
+            watch = SensorWatch(esp, speaker, args.obstacle_mm, stop)
+            threading.Thread(target=watch.run, daemon=True).start()
+            print(f"ESP32 on {args.esp32_port}: ToF distances + ground watch, "
+                  "vibration handled by the ESP32")
+        except Exception as e:
+            print(f"ESP32 unavailable ({e}), camera only")
+            esp = None
+
+    # Pi-side haptics only when there is no ESP32. The motor now hangs off the
+    # ESP32, and two masters for one motor would fight. Optional either way: if
+    # the motor is not wired, the cane must still speak rather than refuse to
+    # start.
+    haptic = None
+    if not args.no_haptics and esp is None:
+        try:
+            from haptics import Haptics
+            h = Haptics(pin=args.motor_pin)
+            if h.available():
+                haptic = h
+                print(f"haptics on GPIO{args.motor_pin} "
+                      f"(gpiochip{h.chip_num})")
+            else:
+                print("haptics unavailable, continuing without vibration")
+        except Exception as e:
+            print(f"haptics unavailable ({e}), continuing without vibration")
+
+    if not args.dry_run:
+        threading.Thread(target=watchdog,
+                         args=(link, speaker, args.keepalive_after, stop),
+                         daemon=True).start()
+
+    cmd = [sys.executable, "-u", os.path.join(HERE, "detect.py"),
+           "--interval", str(args.interval), "--conf", str(args.conf),
+           "--fps", str(args.fps), "--ev", str(args.ev)]
+    if args.all_classes:
+        cmd.append("--all-classes")
+
+    print("starting vision...")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True, bufsize=1)
+
+    said_ready = False
+    try:
+        for line in proc.stdout:
+            m = REPORT.match(line.strip())
+            if not m:
+                continue
+            if not said_ready:
+                if haptic is not None:
+                    haptic.buzz("ready")
+                speaker.say("Smart cane ready")
+                said_ready = True
+                continue
+            body = m.group(1).strip()
+            phrases = [] if (not body or body == "clear") else \
+                [p.strip() for p in body.split("|") if p.strip()]
+
+            if not args.no_filter:
+                phrases = resolve(phrases, RELEVANT, args.name_conf)
+
+            # Flicker suppression runs on every report, including empty ones,
+            # so streaks decay when an object genuinely leaves the frame.
+            phrases = confirmer.update(phrases)
+            if not phrases:
+                continue
+
+            phrases.sort(key=rank)
+
+            fwd_mm = None
+            if esp is not None and esp.alive() and esp.fwd_ok:
+                fwd_mm = esp.fwd_mm
+            if watch is not None and any(
+                    split_phrase(p)[1] == "ahead" for p in phrases):
+                watch.camera_ahead_at = time.time()
+            spoken, keys = with_tof(phrases[:args.max_objects], fwd_mm)
+
+            # Buzz BEFORE speaking, not after. Vibration reaches the user in
+            # about 200 ms, a spoken sentence takes well over a second. The
+            # feel says "something is there, and how urgent", the words that
+            # follow say what it is. Urgency is taken from the closest thing in
+            # view, not the first one named.
+            if haptic is not None:
+                order = {"close": 0, "near": 1, "far": 2}
+                nearest = min(
+                    (split_phrase(p)[2] for p in phrases),
+                    key=lambda d: order.get(d, 3), default=None)
+                if nearest in order:
+                    haptic.for_distance(nearest)
+
+            on_start = None
+            if esp is not None:
+                cmd = SYNC_BUZZ.get(nearest_band(phrases[:args.max_objects], fwd_mm))
+                if cmd:
+                    on_start = lambda c=cmd: esp.send(c)
+            speaker.say(". ".join(spoken), key=" | ".join(keys),
+                        on_start=on_start)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop.set()
+        proc.terminate()
+        if esp is not None:
+            esp.close()
+        if haptic is not None:
+            haptic.close()
+        print("\nstopped.")
+
+
+if __name__ == "__main__":
+    main()

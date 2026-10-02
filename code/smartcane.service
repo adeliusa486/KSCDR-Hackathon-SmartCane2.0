@@ -1,0 +1,57 @@
+[Unit]
+# Smart cane - vision + speech, started automatically at boot.
+#
+# This is a USER service, not a system service, and that is deliberate.
+# Speech goes through PulseAudio, which lives in the user session. A system
+# service running as root cannot reach the user's audio sink without a pile of
+# fragile workarounds. Running it as the pi user means audio just works.
+#
+# Requires lingering so the user session starts at boot without anyone logging
+# in:   sudo loginctl enable-linger pi
+Description=Smart cane vision and speech
+After=network.target sound.target bluetooth.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/smartcane
+
+# Give Bluetooth a moment to reconnect the headset before we start talking.
+# The headset is already trusted, so bluetoothd reconnects it on its own, but
+# it is not instant and the first spoken line would otherwise be lost.
+ExecStartPre=/bin/sleep 8
+# Hard 10 s limit: with the earbuds off or unpaired, bluetoothctl connect can
+# hang until systemd's start timeout kills the whole unit, so the cane would
+# not start at all. Earbuds being off must never stop the cane from running.
+ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:CC
+
+# --conf low and --name-conf high on purpose. The detector sees almost
+# everything, and only confident detections get a name. Anything in between is
+# announced as "obstacle", so nothing physical goes unreported while wrong
+# names stay rare. See resolve() in speak_detect.py.
+#
+# --interval 0.3 with --confirm 3: an object is spoken ~0.6-0.9 s after it
+# appears, against 1.2-2.4 s with the old 1.2 / 2. Three agreeing reports
+# instead of two keeps one-frame false labels out.
+ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
+    --interval 0.3 \
+    --conf 0.25 \
+    --name-conf 0.35 \
+    --confirm 3 \
+    --max-objects 2 \
+    --repeat-after 4.0 \
+    --keepalive-after 20 \
+    --retry-every 10 \
+    --all-classes \
+    --fps 15 \
+    --ev 0.7
+
+# Restart if the vision loop dies for any reason. A cane that goes silent
+# after a crash is worse than one that stutters.
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

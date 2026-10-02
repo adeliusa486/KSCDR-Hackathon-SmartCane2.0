@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+
+# Full-system backups (SD card images, Pi config tarballs) live next to the
+# repo, not in it. Their sha256 sums are committed under baseline/.
+backups/
+*.img
+*.img.gz
+*.img.xz
