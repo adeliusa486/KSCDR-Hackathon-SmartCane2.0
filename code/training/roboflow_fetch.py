@@ -17,6 +17,7 @@ import io
 import json
 import os
 import sys
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -61,9 +62,8 @@ def short_name(member, limit=120):
         return p
     stem, suffix = p.stem, p.suffix
     orig, sep, rest = stem.partition(".rf.")
-    head, _, ext = orig.rpartition("_")
-    short = hashlib.sha1(head.encode()).hexdigest()[:20]
-    return p.with_name(f"{short}_{ext}{sep}{rest}{suffix}" if sep else f"{short}{suffix}")
+    short = hashlib.sha1(orig.encode()).hexdigest()[:20]
+    return p.with_name(f"{short}{sep}{rest}{suffix}")
 
 
 def download(slug, out):
@@ -72,7 +72,15 @@ def download(slug, out):
     proj = proj.split(":")[0]
     if ver is None:
         ver = inspect(f"{ws}/{proj}")["latest"]
-    d = get(f"{API}/{ws}/{proj}/{ver}/yolov8?api_key={key()}")
+    # Roboflow builds an export on first request. Until it is ready the reply
+    # has no "export" link (labelimg underground v1 on 3 Oct), so ask again.
+    for attempt in range(20):
+        d = get(f"{API}/{ws}/{proj}/{ver}/yolov8?api_key={key()}")
+        if "export" in d:
+            break
+        time.sleep(30)
+    else:
+        raise RuntimeError(f"no export link after 10 min: {str(d)[:200]}")
     link = d["export"]["link"]
     dest = Path(out) / f"{ws}__{proj}__v{ver}"
     with urllib.request.urlopen(link, timeout=600) as r:

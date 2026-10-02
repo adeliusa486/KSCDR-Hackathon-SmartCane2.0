@@ -203,6 +203,13 @@ def scan(src, classes, audit, src_map=None):
                 audit["group_regex_miss"].append(f"{src['name']}/{rel}")
                 continue
             g = m.group("g") if "g" in group_re.groupindex else m.group(0)
+            bucket = src.get("group_bucket")
+            if bucket:
+                # Numbered frames (MP_SEL_000002, 000003, ...) are often video:
+                # keep each run of `bucket` consecutive numbers in one group.
+                nm = re.match(r"^(.*?)(\d+)$", g)
+                if nm:
+                    g = f"{nm.group(1)}#{int(nm.group(2)) // bucket}"
         else:
             g = str(rel.with_suffix(""))
             stems.append((stem, dh))

@@ -19,7 +19,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-ORIG = re.compile(r"^(?P<orig>.+?)_(jpe?g|png|bmp|webp)\.rf\.[0-9a-f]+$", re.I)
+# Everything before ".rf." is the original photo. Most names carry the
+# original extension ("x_jpg.rf.<hash>"), some do not ("x_-Picture.rf.<hash>",
+# the stroller sets), so the extension is not required.
+ORIG = re.compile(r"^(?P<orig>.+?)\.rf\.[0-9a-f]+$", re.I)
 PREFER = {"valid": 0, "test": 1, "train": 2}
 
 

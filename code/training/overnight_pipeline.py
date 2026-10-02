@@ -74,17 +74,23 @@ def main():
     if redo.count("OK ") < 2:
         fail(f"MTSD re-download did not verify both files:\n{redo}")
     m = D / "raw/mapillary_mtsd"
-    for f in ("mtsd_fully_annotated_images.train.0.zip", "mtsd_fully_annotated_images.train.1.zip"):
-        log(f"unpack {f}")
-        zipfile.ZipFile(m / f).extractall(m)
-    run([PY, str(HERE / "convert_mtsd.py"), "--root", str(m), "--out", str(D / "mtsd_yolo")],
-        "convert MTSD", D / "mtsd_convert.log")
+    if (D / "mtsd_yolo/data.yaml").exists():
+        log("skip: MTSD already converted")
+    else:
+        for f in ("mtsd_fully_annotated_images.train.0.zip", "mtsd_fully_annotated_images.train.1.zip"):
+            log(f"unpack {f}")
+            zipfile.ZipFile(m / f).extractall(m)
+        run([PY, str(HERE / "convert_mtsd.py"), "--root", str(m), "--out", str(D / "mtsd_yolo")],
+            "convert MTSD", D / "mtsd_convert.log")
 
     # 2. Open Images: main fetch, then the 4 late classes
     wait_for("E:/smartcane-data/oiv7_fetch.log", "fetch exit=0", "Open Images main fetch")
-    run([PY, str(HERE / "fetch_openimages.py"), "--out", "E:/smartcane-data/oiv7_extra",
-         "--labels", "Coffee table,Nightstand,Chest of drawers,Wardrobe"],
-        "Open Images extra classes", D / "oiv7_extra_fetch.log")
+    if Path("E:/smartcane-data/oiv7_extra/dataset.yaml").exists():
+        log("skip: Open Images extra classes already fetched")
+    else:
+        run([PY, str(HERE / "fetch_openimages.py"), "--out", "E:/smartcane-data/oiv7_extra",
+             "--labels", "Coffee table,Nightstand,Chest of drawers,Wardrobe"],
+            "Open Images extra classes", D / "oiv7_extra_fetch.log")
 
     # 3. Roboflow: re-fetch failures with the fixed downloader
     wait_for(D / "roboflow_fetch.log", "failed:", "Roboflow downloads")
@@ -130,7 +136,8 @@ def main():
         sources.append({"name": short.replace("rf-", "rf_"), "dataset": short,
                         "path": str(D / "raw/roboflow" / f"{ws}__{proj}__v{v['version']}"),
                         "names_from": "data.yaml", "public": True,
-                        "group": r"^(?P<g>.+?)(_(jpe?g|png|bmp|webp)\.rf\.[0-9a-f]+)?$"})
+                        "group": r"^(?P<g>.+?)(_(jpe?g|png|bmp|webp))?(\.rf\.[0-9a-f]+)?$",
+                        "group_bucket": 50})
     (D / "sources_v1.yaml").write_text(yaml.safe_dump({"sources": sources}, sort_keys=False))
     if MERGED.exists():
         fail(f"{MERGED} already exists, refusing to overwrite evidence")
