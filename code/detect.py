@@ -175,6 +175,37 @@ def describe(dets, width, height, limit, hfov, corridor_deg):
     return " | ".join(parts) if parts else "clear"
 
 
+class Trace:
+    """One CSV row per frame with the time each stage finished.
+
+    Clocks: every *_ns column is time.monotonic_ns(). sensor_ts_ns is the
+    camera's own SensorTimestamp from the frame metadata, on the kernel clock
+    libcamera uses, and boottime_minus_mono_ns is the offset between
+    CLOCK_BOOTTIME and CLOCK_MONOTONIC at that moment. Which clock and which
+    instant (exposure start or readout) SensorTimestamp means is to be
+    confirmed on the Pi in Step 3.0. With both columns logged, the
+    photon-to-frame delay can be worked out either way.
+    """
+
+    COLUMNS = ("frame,sensor_ts_ns,boottime_minus_mono_ns,capture_ns,"
+               "frame_ready_ns,inference_end_ns,postprocess_end_ns,"
+               "report_ns,detections,exposure_us,analogue_gain")
+
+    def __init__(self, path):
+        self.f = open(path, "w", buffering=1 << 16)
+        self.f.write(self.COLUMNS + "\n")
+
+    def row(self, n, meta, t_cap, t_ready, t_inf, t_post, t_report, ndet):
+        meta = meta or {}
+        offset = time.clock_gettime_ns(time.CLOCK_BOOTTIME) - time.monotonic_ns()
+        self.f.write(f"{n},{meta.get('SensorTimestamp', '')},{offset},{t_cap},"
+                     f"{t_ready},{t_inf},{t_post},{t_report},{ndet},"
+                     f"{meta.get('ExposureTime', '')},{meta.get('AnalogueGain', '')}\n")
+
+    def close(self):
+        self.f.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description="Smart cane vision test: camera -> Hailo -> objects")
     ap.add_argument("--model", help="path to a .hef file (default: best one installed)")
@@ -200,6 +231,11 @@ def main():
                          "street scenes full of sky need this.")
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
+    ap.add_argument("--trace", metavar="CSV",
+                    help="write one timing row per frame (Phase 3 Step 3.0). "
+                         "Summarise with tools/trace_summary.py")
+    ap.add_argument("--frames", type=int, default=0,
+                    help="stop after this many frames, 0 = run until ctrl-c")
     args = ap.parse_args()
 
     try:
@@ -267,33 +303,52 @@ def main():
 
         print("running. ctrl-c to stop.\n")
 
+        trace = Trace(args.trace) if args.trace else None
         frames = 0
+        total = 0
         fps = 0.0
         t_fps = time.monotonic()
         t_report = 0.0
         try:
-            while True:
-                frame = picam2.capture_array("lores")
+            while not args.frames or total < args.frames:
+                # capture_request + make_array is what capture_array does
+                # inside. Done by hand so the frame's metadata (sensor
+                # timestamp) is available for the trace.
+                request = picam2.capture_request()
+                t_cap = time.monotonic_ns()
+                frame = request.make_array("lores")
+                meta = request.get_metadata() if trace else None
+                request.release()
+                t_ready = time.monotonic_ns()
                 raw = hailo.run(frame)
+                t_inf = time.monotonic_ns()
                 dets = extract_detections(raw, labels, args.width, args.height, args.conf)
                 dets = rank(dets, args.width, args.height, not args.all_classes)
+                t_post = time.monotonic_ns()
 
                 frames += 1
+                total += 1
                 now = time.monotonic()
                 if now - t_fps >= 1.0:
                     fps = frames / (now - t_fps)
                     frames = 0
                     t_fps = now
 
-                if now - t_report >= args.interval:
+                reported = now - t_report >= args.interval
+                if reported:
                     t_report = now
                     line = describe(dets, args.width, args.height, args.limit,
                                     args.hfov, args.corridor)
                     print(f"[{fps:5.1f} fps]  {line}")
+                if trace:
+                    trace.row(total, meta, t_cap, t_ready, t_inf, t_post,
+                              time.monotonic_ns() if reported else 0, len(dets))
         except KeyboardInterrupt:
             print("\nstopped.")
         finally:
             picam2.stop()
+            if trace:
+                trace.close()
 
 
 if __name__ == "__main__":
