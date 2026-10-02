@@ -1740,6 +1740,40 @@ downloads Mapillary Vistas + MTSD and the Hailo Dataflow Compiler 3.30.0 wheel
 (matches HailoRT 4.20 on the Pi). Then pseudo-label the gaps, train, compile.
 Hardware steps unchanged: USB-C supply, ToF 2 rewiring, tape-measure ToF 1.
 
+### 3 October 2026 (night): no Hailo compiler access, legitimate route found
+
+Adeel cannot register at the Hailo Developer Zone (work email required, his
+university email was refused too). Unofficial GitHub copies of the Dataflow
+Compiler were ruled out: licence breach, and an untrusted compiler would build
+the file that runs on the cane.
+
+**Route chosen instead (all official, no Hailo account):**
+
+1. **Ultralytics Platform managed Hailo export**: "no local Hailo account or
+   DFC installation is required", `hailo8l` target, custom class counts
+   supported (docs.ultralytics.com/integrations/hailo). Its output is
+   validated on **DFC 3.33 / HailoRT 4.23**. Pricing not checked yet.
+2. That HEF will not load on the Pi's **HailoRT 4.20**, and Raspberry Pi's
+   bookworm apt repo stops at 4.20 (checked 3 Oct). But **HailoRT and its PCIe
+   driver are open source (MIT) on GitHub**, branch `hailo8` for Hailo-8/8L,
+   tags `v4.23.0` in both `hailo-ai/hailort` and `hailo-ai/hailort-drivers`.
+   The driver repo's `download_firmware.sh` fetches the chip firmware from
+   Hailo's public S3. So the Pi can be upgraded to 4.23 from source. A tested
+   change with the SD image as rollback (DKMS broke once, 19 Sept).
+
+Adeel also wants **more than 150 classes** ("about 80 % of objects"). Agreed
+approach: measure, don't guess. Use exhaustively labelled street photos
+(Mapillary Vistas val) to measure what share of objects the list covers, add
+the most frequent missing kinds, and test-compile larger class counts on the
+Platform to find the Hailo-8L limit. Note for Adeel: covering 80 % of object
+kinds is not the same as naming 80 % correctly. More classes usually lowers
+per-class accuracy. Both get measured.
+
+Downloads running overnight: Open Images (E:\smartcane-data\oiv7), Mapillary
+Vistas v2.0 (browser, auto-moved to D:\smartcane-data\raw\mapillary_vistas),
+MTSD fully annotated (D:\smartcane-data\raw\mapillary_mtsd, md5-checked).
+Roboflow key saved as Windows user env var ROBOFLOW_API_KEY (not in git).
+
 ---
 
-*Last updated: 2 October 2026*
+*Last updated: 3 October 2026*
