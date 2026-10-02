@@ -72,3 +72,25 @@ investigate, fix, rerun the full set.
 
 Real input current and power. The PMIC sum misses the USB devices and the
 Hailo HAT. Step 1.3 measures input power with an inline USB-C meter.
+
+## Addendum, 2 Oct 2026 (late), before Part B: logs must survive a power cut
+
+Added after G7 (`failure_log.md`): the persistent journal sat in the
+log2ram tmpfs. Part B runs for about 4 h, and an under-voltage reset in that
+time must leave a readable log.
+
+Order: apply `code/tools/journal_persist.sh apply` and reboot right after
+the USB-C supply is fitted, before the first load run.
+
+Pass, fixed before testing:
+
+| # | Criterion | Pass if |
+|---|---|---|
+| J1 | `/var/log` on the SD card | `journal_persist.sh verify` exits 0 |
+| J2 | A notice-level line written 20 s before a power cut survives | `check` finds it, 3 of 3 cuts |
+| J3 | A crit-level line written just before a power cut survives | `check` finds it, 3 of 3 cuts |
+| J4 | The card survives the cuts | no ext4 errors in the next boot's kernel log, `fsck` clean on the next SD image |
+
+A power cut is pulling the USB-C plug with the system running. Three cuts
+on purpose is a small risk to the card, which is why the SD image from
+Step 1.1 exists.
