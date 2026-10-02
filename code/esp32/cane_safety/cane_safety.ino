@@ -278,7 +278,8 @@ void pollTof(Tof &t, int idx, uint32_t now) {
     t.ok = false;
     t.mm = -1;
     t.reinits++;
-    Serial.printf("E tof%d stopped answering, reinit #%u\n", idx + 1, t.reinits);
+    Serial.printf("E tof%d stopped answering, reinit #%lu\n", idx + 1,
+                  (unsigned long)t.reinits);
   }
 }
 
@@ -347,6 +348,16 @@ void countReset() {
 
 void handleCommand(const String &cmd) {
   if (cmd == "P") return;          // heartbeat only, see readSerial()
+#ifdef SAFETY_TEST_HOOKS
+  // Test builds only (arduino-cli compile --build-property
+  // "compiler.cpp.extra_flags=-DSAFETY_TEST_HOOKS"). Never in a cane a person
+  // uses: a stray X from the Pi would blind the cane for a reboot.
+  if (cmd == "X") {                // hang the loop: the watchdog must reboot us
+    Serial.println("I test: hanging loop, expect task-watchdog reset");
+    Serial.flush();
+    while (true) { }
+  }
+#endif
   if (cmd == "A0") {
     autoBuzz = false;
     autoOffUntil = millis() + AUTO_OFF_MAX_MS;
@@ -361,13 +372,14 @@ void handleCommand(const String &cmd) {
     for (int i = 0; i < 2; i++) startTof(tof[i], i);
   } else if (cmd == "S") {
     for (int i = 0; i < 2; i++)
-      Serial.printf("I tof%d %s ok=%d mm=%d reinits=%u\n", i + 1,
+      Serial.printf("I tof%d %s ok=%d mm=%d reinits=%lu\n", i + 1,
                     i == FWD ? "forward" : "down", tof[i].ok, tof[i].mm,
-                    tof[i].reinits);
+                    (unsigned long)tof[i].reinits);
     Serial.printf("I auto=%d ground=%d\n", autoBuzz, (int)baseline);
-    Serial.printf("I %s reset=%s boots=%u wdt=%u brownout=%u panic=%u "
+    Serial.printf("I %s reset=%s boots=%lu wdt=%lu brownout=%lu panic=%lu "
                   "uptime=%lus pi=%d\n", FW_VERSION, resetName(resetReason),
-                  boots, wdtResets, brownouts, panics,
+                  (unsigned long)boots, (unsigned long)wdtResets,
+                  (unsigned long)brownouts, (unsigned long)panics,
                   (unsigned long)(millis() / 1000), piAlive);
   } else if (cmd == "T") {
     for (int i = 0; i < 2; i++) {
@@ -440,8 +452,10 @@ void setup() {
   Serial.println("I cane_safety boot");
   countReset();
   Serial.printf("I version %s built %s %s\n", FW_VERSION, __DATE__, __TIME__);
-  Serial.printf("I reset %s boots=%u wdt=%u brownout=%u panic=%u\n",
-                resetName(resetReason), boots, wdtResets, brownouts, panics);
+  Serial.printf("I reset %s boots=%lu wdt=%lu brownout=%lu panic=%lu\n",
+                resetName(resetReason), (unsigned long)boots,
+                (unsigned long)wdtResets, (unsigned long)brownouts,
+                (unsigned long)panics);
 
   for (int i = 0; i < 2; i++) {
     digitalWrite(tof[i].xshut, HIGH);
