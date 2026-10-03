@@ -32,6 +32,11 @@ ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:C
 # --interval 0.3 with --confirm 3: an object is spoken ~0.6-0.9 s after it
 # appears, against 1.2-2.4 s with the old 1.2 / 2. Three agreeing reports
 # instead of two keeps one-frame false labels out.
+#
+# --fps 10 (was 15) to run on a 5 V / 3 A UPS or power bank (3 Oct 2026). The
+# Hailo runs once per frame, so a third fewer frames is a third less AI and
+# camera load. Reports still come every 0.3 s (3 frames each), and 100 ms
+# frames let the sensor collect more light in dim places.
 ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
     --interval 0.3 \
     --conf 0.25 \
@@ -42,7 +47,7 @@ ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
     --keepalive-after 20 \
     --retry-every 10 \
     --all-classes \
-    --fps 15 \
+    --fps 10 \
     --ev 0.7
 
 # Restart if the vision loop dies for any reason. A cane that goes silent
