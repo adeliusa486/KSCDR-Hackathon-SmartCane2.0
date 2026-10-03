@@ -1889,6 +1889,45 @@ cane or in the pipeline.
   Hailo firmware 4.23.0 HAILO8L, kernel 6.12.109+rpt-rpi-2712, ESP32 on
   `/dev/ttyUSB0`. Idle, so this says nothing about the supply under load.
 
+### 3 October 2026 (13:50 to 15:05): pseudo-labels checked, two bad kinds removed before training
+
+Adeel asked "is it working correctly". Checked results, not just the process.
+
+- **Files are correct.** All 46,516 label files changed by 13:55: 0
+  malformed lines, human labels never altered (human file is always an exact
+  prefix), every file has human + added lines exactly. A 3,000-file sample
+  later gave the same.
+- **Most added boxes are real objects** the sources left out (8 random
+  images drawn and looked at: buses, cars, traffic lights, trees, birds).
+  Median teacher confidence 0.693.
+- **Two kinds are wrong:**
+  - **Dashcam bonnet called "car"**: on MTSD photos the COCO teacher boxes the
+    recording car's bonnet or dashboard. Wide (w > 0.6) car boxes touching
+    the bottom edge: 2,419, and 8 of 9 random ones were the bonnet.
+  - **"stop sign" on non-stop signs**: 16 random ones were ~4 stop-sign
+    faces, ~5 backs of signs, ~7 plainly wrong (VW logo, "76" sign,
+    "PREMIER", backs of round signs, a European no-left-turn sign).
+- **Adeel chose: clean, then train.** `code/training/clean_pseudo.py`
+  (branch `prep/phase3-150-classes`, commit cda9a40) removes only boxes listed
+  in `pseudo_labels.csv`, matching from the end of each file so a human box
+  is never removed, logs them to `pseudo_removed.csv`. Unit test passes. Dry
+  run at 14:35: 2,419 bonnet + 539 stop sign, all found in the files.
+- **Hand-over mechanism**: `merged_v2\smartcane.yaml` renamed to
+  `smartcane.yaml.hold` at 15:01, so the old chain's `train.py` exits at once
+  with "no dataset descriptor" (before any run folder is made).
+  `pipeline_code\after_pseudo.ps1` (PID 7512, started through WMI so it is
+  not tied to any chat) waits for that, cleans, checks a second dry run
+  finds 0, restores the yaml and starts the same training
+  (`--model yolo11s.pt --epochs 40 --batch 12 --name smartcane152_v2`). It
+  does nothing if pseudo-labelling fails. Tested on fake folders: the test
+  caught a bug (PowerShell variables ignore case, `$code` overwrote `$Code`).
+- **Speed is falling**: 37 images/s at 13:04, 24 at 14:03, 20 by 15:01
+  (159,328 of 235,951 train). If 20/s holds, pseudo-labelling ends about
+  16:30 and training starts a few minutes later. GPU now draws up to 84 W
+  at ~2,520 MHz (was capped at 35 W), but swings 0 to 99 % busy: the
+  per-batch Python work between GPU calls is the limit now. Not changed
+  mid-run.
+
 ---
 
 *Last updated: 3 October 2026*
