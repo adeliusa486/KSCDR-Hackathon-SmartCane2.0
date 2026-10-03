@@ -1854,6 +1854,18 @@ auto-loads, firmware 4.23.0, Python 4.23.0, benchmark 58.42 FPS.
 **After any kernel upgrade the 4.23 module must be rebuilt**, or the cane has
 no NPU driver. Do not run `apt full-upgrade` without that in mind.
 
+### 3 October 2026 (13:05): training set v2 built, pseudo-labelling on GPU, handoff
+
+`merged_v2` built 09:30 to 12:38 after fixing the v1 data loss (polygon
+labels, export label names): all 152 classes have boxes, 235,951 train images.
+Pseudo-labelling first spent 22 min on Python's one-by-one backup of 263,857
+label files (86,523 done); stopped, finished with `robocopy /MT:32` in 24 s,
+resumed. pseudo_label.py now decodes once on 8 threads with FP16 real
+batches: GPU 73 %. Training (YOLO11s, 152 classes, 40 epochs, run
+`smartcane152_v2`) starts automatically after it, from a background job.
+
+Adeel moved to a new chat: `docs/handoff-prompt.md` has the full prompt.
+
 ---
 
 *Last updated: 3 October 2026*
