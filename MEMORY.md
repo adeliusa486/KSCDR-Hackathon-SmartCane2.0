@@ -1956,6 +1956,22 @@ at 16:32 (PID 62040, via WMI): cleanup, relabel, second dry runs must find
 0, then training. Pseudo-labelling at val 10,048 / 27,906 at 16:32, end
 expected ~16:50.
 
+**16:55 to 17:08: data steps done, first training launch died, relaunched.**
+Pseudo-labelling finished 16:55 (517,087 boxes added). The watcher then
+removed 3,756 bad boxes (bonnet + stop sign) and relabelled 573 MTSD stop
+signs. Second dry runs: 0 left for both. Training started 16:58 and **died
+silently at the label scan (~16:59) together with the watcher**: no Python
+error, no "train exited" line, nothing in the System or Application logs.
+Most likely cause (not proven, no quota event logged): processes started
+through WMI `Win32_Process.Create` run under the WMI provider host job,
+`MemoryPerHost` 512 MB, and training needs GBs. The relaunch holds 1.6 GB
+and lives. **Lesson: never start long or heavy jobs through WMI. Use Task
+Scheduler.** Relaunched 17:02 as scheduled task `SmartcaneTrainV2`
+(`pipeline_code	rain_v2.ps1`, battery stop off, no time limit, normal
+priority), after removing the empty partial run folder so the name stays
+`smartcane152_v2`. Failed log kept as `train_v2_wmi_died.log`. At 17:07 the
+label scan was 29 % (~285 images/s, 3,328 background images, 0 corrupt).
+
 ---
 
 *Last updated: 3 October 2026*
