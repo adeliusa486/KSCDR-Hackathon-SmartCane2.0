@@ -1928,6 +1928,12 @@ Adeel asked "is it working correctly". Checked results, not just the process.
   per-batch Python work between GPU calls is the limit now. Not changed
   mid-run.
 
+**15:10: Pi shut down cleanly** at Adeel's request (`sudo shutdown -h now`
+after checking the service was stopped and no install or build was running).
+It stopped answering ping 20 s later. The ESP32 is powered from the Pi, so it
+is off too. Not needed until a hardware step (USB-C supply, ToF 2 rewiring,
+tape-measure test) or until a converted model is ready to test.
+
 ---
 
 *Last updated: 3 October 2026*
