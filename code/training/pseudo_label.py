@@ -24,7 +24,10 @@ Rules:
 import argparse
 import csv
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import cv2
 
 import yaml
 
@@ -82,7 +85,7 @@ def main():
     ap.add_argument("--conf", type=float, default=0.5)
     ap.add_argument("--iou", type=float, default=0.5)
     ap.add_argument("--splits", default="train,val")
-    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--batch", type=int, default=32)
     args = ap.parse_args()
 
     from ultralytics import YOLO
@@ -107,14 +110,30 @@ def main():
     if log.tell() == 0:
         w.writerow(["split", "image", "class", "conf", "cx", "cy", "w", "h", "teacher"])
     total = 0
+    # Keep the GPU busy: decode each photo once, on 8 threads, while the GPU
+    # works on the previous batch, and give both teachers the same decoded
+    # batch in FP16. The first version passed file paths with Ultralytics'
+    # default batch size of 1 and made each teacher re-read every file.
+    decoder = ThreadPoolExecutor(8)
+    prefetch = ThreadPoolExecutor(1)
+    load = lambda chunk: list(decoder.map(lambda p: cv2.imread(str(p)), chunk))
     for split in splits:
         images = sorted((root / "images" / split).glob("*"))
-        for start in range(0, len(images), args.batch):
-            chunk = images[start:start + args.batch]
+        chunks = [images[i:i + args.batch] for i in range(0, len(images), args.batch)]
+        pending = prefetch.submit(load, chunks[0]) if chunks else None
+        for ci, chunk in enumerate(chunks):
+            start = ci * args.batch
+            arrays = pending.result()
+            if ci + 1 < len(chunks):
+                pending = prefetch.submit(load, chunks[ci + 1])
+            keep = [(p, a) for p, a in zip(chunk, arrays) if a is not None]
+            chunk, arrays = [p for p, _ in keep], [a for _, a in keep]
+            if not chunk:
+                continue
             proposals = {p: [] for p in chunk}
             for weights, model, tmap in teachers:
-                for p, r in zip(chunk, model.predict([str(p) for p in chunk], conf=args.conf,
-                                                     verbose=False, device=0)):
+                for p, r in zip(chunk, model.predict(arrays, conf=args.conf, half=True,
+                                                     batch=len(arrays), verbose=False, device=0)):
                     for cls, conf, box in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(),
                                               r.boxes.xywhn.tolist()):
                         if int(cls) in tmap:
