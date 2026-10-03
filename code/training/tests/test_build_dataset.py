@@ -65,6 +65,8 @@ def build(tmp):
     write(src / "stills", "graffiti.jpg", smooth_image(2001), "1 0.5 0.5 0.3 0.3\n")
     write(src / "stills", "badbox.jpg", smooth_image(2002), "0 1.7 0.5 0.3 0.3\n")
     write(src / "stills", "nolabel.jpg", smooth_image(2003), None)
+    # Roboflow polygon export: an outline instead of a box
+    write(src / "stills", "polygon.jpg", smooth_image(2004), "0 0.4 0.4 0.6 0.4 0.6 0.6 0.4 0.6\n")
     (src / "stills" / "images" / "corrupt.jpg").write_bytes(b"not a jpeg at all")
     # Public video with no group regex: a dark object moving across a fixed
     # scene. Neighbours differ by more than a near duplicate but still look
@@ -136,6 +138,10 @@ with tempfile.TemporaryDirectory() as t:
     check(any("clips" in w for w in audit["video_frame_warnings"]), "video without group regex warned")
     check(not any("stills" in w for w in audit["video_frame_warnings"]), "no false video warning on stills")
     check(audit["near_duplicates"] > 0, "near duplicates found")
+    poly = (tmp / "out" / "labels" / where["stills__polygon.jpg"] / "stills__polygon.txt").read_text().split()
+    check(poly[0] == str(idx["person"]) and [round(float(v), 4) for v in poly[1:]] == [0.5, 0.5, 0.2, 0.2],
+          f"polygon label becomes its bounding box ({poly})")
+    check(audit["polygons_converted"] == 1, "polygon conversion counted")
 
     again = run(tmp, tmp / "out")
     check(again.returncode != 0, "refuses to overwrite an existing build")

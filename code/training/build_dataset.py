@@ -66,9 +66,16 @@ VIDEO_ALIKE_BITS = 12    # neighbours this close look like video (unrelated
 
 
 def dhash(img):
-    """64-bit difference hash: robust to resizing and recompression."""
+    """64-bit difference hash: robust to resizing and recompression.
+
+    draft() lets the JPEG decoder work at 1/2 to 1/8 scale. The first full
+    build spent most of its 4 hours decoding 4000x3000 street photos at full
+    size just to shrink them to 9x8 here.
+    """
+    if img.format == "JPEG":
+        img.draft("L", (64, 64))
     g = img.convert("L").resize((9, 8), Image.BILINEAR)
-    px = list(g.getdata())
+    px = list(g.get_flattened_data() if hasattr(g, "get_flattened_data") else g.getdata())
     bits = 0
     for row in range(8):
         for col in range(8):
@@ -179,7 +186,19 @@ def scan(src, classes, audit, src_map=None):
                     continue
                 try:
                     cls = int(parts[0])
-                    box = [float(v) for v in parts[1:5]]
+                    vals = [float(v) for v in parts[1:]]
+                    if len(vals) >= 6 and len(vals) % 2 == 0:
+                        # A polygon ("class x1 y1 x2 y2 ..."), as Roboflow exports
+                        # sets labelled with outlines. Use its bounding box. The
+                        # first build rejected 51,105 such lines as malformed.
+                        xs, ys = vals[0::2], vals[1::2]
+                        x0, x1 = max(0.0, min(xs)), min(1.0, max(xs))
+                        y0, y1 = max(0.0, min(ys)), min(1.0, max(ys))
+                        box = [(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0]
+                        parts = [parts[0]] + [f"{v:.6f}" for v in box]
+                        audit["polygons_converted"] += 1
+                    else:
+                        box = vals[:4]
                     ok = len(parts) == 5 and all(0 <= v <= 1 for v in box) \
                         and box[2] > 0 and box[3] > 0
                 except ValueError:
@@ -286,7 +305,8 @@ def main():
     audit = {"corrupt_images": [], "bad_label_lines": [], "group_regex_miss": [],
              "video_frame_warnings": [], "missing_labels": Counter(),
              "empty_after_remap": Counter(), "dropped_classes": Counter(),
-             "exact_duplicates": 0, "near_duplicates": 0, "capped": {}}
+             "exact_duplicates": 0, "near_duplicates": 0, "capped": {},
+             "polygons_converted": 0}
     records = []
     for src in sources:
         records.extend(scan(src, classes, audit, src_map))

@@ -29,7 +29,7 @@ HERE = Path(__file__).resolve().parent
 PY = sys.executable
 D = Path("D:/smartcane-data")
 LOG = D / "pipeline.log"
-MERGED = D / "merged_v1"
+MERGED = D / "merged_v2"
 
 
 def log(msg):
@@ -144,12 +144,12 @@ def main():
                         "names_from": "data.yaml", "public": True,
                         "group": r"^(?P<g>.+?)(_(jpe?g|png|bmp|webp))?(\.rf\.[0-9a-f]+)?$",
                         "group_bucket": 50})
-    (D / "sources_v1.yaml").write_text(yaml.safe_dump({"sources": sources}, sort_keys=False))
+    (D / "sources_v2.yaml").write_text(yaml.safe_dump({"sources": sources}, sort_keys=False))
     if MERGED.exists():
         fail(f"{MERGED} already exists, refusing to overwrite evidence")
-    run([PY, str(HERE / "build_dataset.py"), "--sources", str(D / "sources_v1.yaml"),
+    run([PY, str(HERE / "build_dataset.py"), "--sources", str(D / "sources_v2.yaml"),
          "--out", str(MERGED), "--classes", str(HERE / "classes_v2.yaml"), "--copy"],
-        "build merged dataset", D / "build_v1.log")
+        "build merged dataset", D / "build_v2.log")
 
     # 6. every class must have data
     audit = json.loads((MERGED / "audit.json").read_text())
@@ -167,12 +167,12 @@ def main():
     # 7. fill unlabelled objects
     run([PY, str(HERE / "pseudo_label.py"), "--data", str(MERGED),
          "--teacher", "coco=yolo11m.pt", "--teacher", "oiv7=yolov8m-oiv7.pt"],
-        "pseudo-label train/val", D / "pseudo_v1.log")
+        "pseudo-label train/val", D / "pseudo_v2.log")
 
     # 8. train
     run([PY, str(HERE / "train.py"), "--data", str(MERGED / "smartcane.yaml"),
-         "--model", "yolo11s.pt", "--epochs", "40", "--batch", "12", "--name", "smartcane152_v1"],
-        "train YOLO11s, 152 classes, 40 epochs", D / "train_v1.log")
+         "--model", "yolo11s.pt", "--epochs", "40", "--batch", "12", "--name", "smartcane152_v2"],
+        "train YOLO11s, 152 classes, 40 epochs", D / "train_v2.log")
     log("=== pipeline finished: model trained")
 
 

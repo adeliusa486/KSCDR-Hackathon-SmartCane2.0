@@ -61,7 +61,7 @@ classes:
   - {name: trailer, say: trailer, group: vehicle, danger: medium, why: "parked, low tow bars at shin height", src: ["mapillary:object--vehicle--trailer"], confirm: true}
   # --- traffic control ------------------------------------------------------
   - {name: traffic light, say: traffic light, group: traffic, danger: high, why: "marks a crossing", src: ["coco:traffic light", "oiv7:Traffic light", "mapillary:object--traffic-light--general-upright", "mapillary:object--traffic-light--general-single", "mapillary:object--traffic-light--general-horizontal"]}
-  - {name: pedestrian signal, say: walk signal, group: traffic, danger: high, why: "the signal a pedestrian obeys", src: ["mapillary:object--traffic-light--pedestrians", "rf-risk:redlight", "rf-risk:greenlight", "rf-aid:Green Pedestrian Traffic Light", "rf-aid:Red Pedestrian Traffic Light"], confirm: true}
+  - {name: pedestrian signal, say: walk signal, group: traffic, danger: high, why: "the signal a pedestrian obeys", src: ["mapillary:object--traffic-light--pedestrians", "rf-risk:redlight", "rf-risk:greenlight", "rf-aid:Green PTL", "rf-aid:Red PTL"], confirm: true}
   - {name: crosswalk button, say: crossing button, group: traffic, danger: low, why: "the push button that starts the walk signal at US crossings", src: ["rf-starvision:crosswalk button"]}
   - {name: stop sign, say: stop sign, group: traffic, danger: medium, why: "marks an intersection", src: ["coco:stop sign", "oiv7:Stop sign"]}
   - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front", "mapillary:object--traffic-sign--back", "mapillary:object--traffic-sign--direction-front", "mapillary:object--traffic-sign--direction-back", "mapillary:object--traffic-sign--temporary-front", "mapillary:object--traffic-sign--temporary-back", "mapillary-mtsd:any-other-sign"]}
@@ -78,7 +78,7 @@ classes:
   - {name: construction sign, say: construction sign, group: sign, danger: medium, why: "sidewalk works ahead", src: ["mapillary-mtsd:warning--roadworks"], confirm: true}
   - {name: sidewalk closed sign, say: sidewalk closed sign, group: sign, danger: high, why: "the route ahead is blocked, cross elsewhere", src: ["rf-starvision:sidewalk closed"]}
   - {name: bus stop sign, say: bus stop sign, group: sign, danger: low, why: "finding the bus stop", src: ["mapillary-mtsd:information--bus-stop", "mapillary-mtsd:information--tram-bus-stop"], confirm: true}
-  - {name: exit sign, say: exit sign, group: sign, danger: low, why: "finding the way out of buildings", src: ["rf-exit:Straight Exit", "rf-exit:Right Exit", "rf-exit:Left Exit", "rf-exit:Left/Right Exit", "rf-starvision:Exit", "rf-underground:exit", "rf-underground:emergency_exits"], confirm: true}
+  - {name: exit sign, say: exit sign, group: sign, danger: low, why: "finding the way out of buildings", src: ["rf-exit:Straight Exit", "rf-exit:Right Exit", "rf-exit:Left Exit", "rf-exit:Left-Right Exit", "rf-starvision:Exit", "rf-underground:exit", "rf-underground:emergency_exits"], confirm: true}
   - {name: wet floor sign, say: wet floor sign, group: sign, danger: medium, why: "slip hazard in malls and offices", src: ["rf-wetfloor:Wet Floor Sign", "rf-starvision:wet floor sign"], confirm: true}
   # --- street furniture and barriers ----------------------------------------
   - {name: fire hydrant, say: fire hydrant, group: furniture, danger: medium, why: "knee-height sidewalk obstacle, very common in the US", src: ["coco:fire hydrant", "oiv7:Fire hydrant", "mapillary:object--fire-hydrant"]}
@@ -105,10 +105,10 @@ classes:
   # --- ground and path ------------------------------------------------------
   - {name: curb, say: curb, group: ground, danger: high, why: "the edge of the sidewalk", src: ["mapillary:construction--barrier--curb"], confirm: true, region: true}
   - {name: curb ramp, say: curb ramp, group: ground, danger: medium, why: "the safe way down to the crossing", src: ["mapillary:construction--flat--curb-cut"], confirm: true}
-  - {name: stairs, say: stairs, group: ground, danger: high, why: "falls", src: ["oiv7:Stairs", "roboflow:stairs"]}
+  - {name: stairs, say: stairs, group: ground, danger: high, why: "falls", src: ["oiv7:Stairs", "rf-starvision:stair"]}
   - {name: escalator, say: escalator, group: ground, danger: high, why: "malls and stations", src: ["rf-starvision:escalator", "rf-underground:escalator"], confirm: true}
   - {name: ramp, say: ramp, group: ground, danger: medium, why: "slope change, accessible entrances", src: ["rf-risk:slope"], confirm: true}
-  - {name: pothole, say: pothole, group: ground, danger: high, why: "trip and ankle injury", src: ["mapillary:object--pothole", "rdd:D40", "rf-risk:pothole", "rf-bump2:Pothole", "rf-starvision:pothole"], confirm: true}
+  - {name: pothole, say: pothole, group: ground, danger: high, why: "trip and ankle injury", src: ["mapillary:object--pothole", "rdd:D40", "rf-risk:pothole", "rf-bump2:Pothole"], confirm: true}
   - {name: manhole, say: manhole cover, group: ground, danger: high, why: "open or loose covers", src: ["mapillary:object--manhole", "roboflow:manhole"], confirm: true}
   - {name: storm drain, say: storm drain, group: ground, danger: high, why: "grates and inlets at the curb", src: ["mapillary:object--catch-basin"], confirm: true}
   - {name: sidewalk crack, say: crack, group: ground, danger: medium, why: "trip hazard", src: ["rdd:D00", "rdd:D10", "rdd:D20", "rf-risk:crack"], confirm: true}
@@ -123,7 +123,7 @@ classes:
   - {name: window, say: window, group: building, danger: low, why: "orientation, low sills", src: ["oiv7:Window"]}
   - {name: building, say: building, group: building, danger: low, why: "orientation", src: ["oiv7:Building", "oiv7:House", "oiv7:Office building", "oiv7:Skyscraper", "mapillary:construction--structure--building"]}
   - {name: elevator, say: elevator, group: building, danger: low, why: "finding the lift", src: ["rf-starvision:elevator", "rf-risk:elevator"], confirm: true}
-  - {name: atm, say: A T M, group: building, danger: low, why: "finding cash machines", src: ["rf-atm:atm"], confirm: true}
+  - {name: atm, say: A T M, group: building, danger: low, why: "finding cash machines", src: ["rf-atm:zatm"], confirm: true}
   # --- nature ---------------------------------------------------------------
   - {name: tree, say: tree, group: nature, danger: medium, why: "trunks and low branches", src: ["oiv7:Tree"]}
   - {name: palm tree, say: palm tree, group: nature, danger: medium, why: "line Gulf streets and plazas", src: ["oiv7:Palm tree"]}
