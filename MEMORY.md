@@ -2127,6 +2127,45 @@ Check to run with the cane in hand (live capture): ToF 2 steady around
 1,300-1,500 mm = good. Constant ~1,100 mm whatever the floor = seeing the
 cane, tilt further. Frequent -1 = too far, tilt back to ~12 deg.
 
+
+### 3 October 2026 (21:57 to 22:05): low-power profile for a 5 V / 3 A supply
+
+Adeel: the UPS is 5 V / 3 A, or a 10,000 mAh power bank for the demo. Run
+the camera and AI HAT on it. (The Pi was still on whatever fed it at 21:05,
+the laptop USB-C by the last log, `max_current` 3000. Not confirmed.)
+
+**Applied (backups `config.txt.bak-2026-10-03`,
+`smartcane.service.bak-2026-10-03`):**
+- CPU capped at **1.8 GHz**: `arm_freq=1800` in `/boot/firmware/config.txt`
+  (from next boot) and `scaling_max_freq` 1800000 now. detect.py uses ~10-13 %
+  of a core, so the cap costs nothing measurable.
+- Camera **10 fps** (was 15) in `smartcane.service` (repo + Pi). The Hailo
+  runs once per frame, so a third less AI load. Reports still every 0.3 s.
+- Service started (`smartcane.service` active, detect.py running).
+
+**Measured (`~/soak/lowpower_2026-10-03`, idle 30 s + service, abort on UV):**
+SoC rails 1.8-2.0 W idle, 1.9-3.3 W with the service (rails only, no Hailo,
+camera or USB). 1 Hz EXT5V 4.85-4.97 V. **One under-voltage event 13 s after
+the service started** (22:00:38, normalised 22:00:40), the moment detect.py
+opened the camera and Hailo. Wi-Fi ping lost for that second. Soak aborted
+as designed and restarted the service at 22:01:43. **No further events** in
+the steady state afterwards. No Hailo disconnect. The average load is far
+below 15 W. The fault is a sub-second dip at start-up peaks, so the supply
+path (supply response, cable, GPIO-pin feed) is the problem, not capacity.
+
+**Hailo driver WARNING is old, not power**: `rwsem.h:80 find_vma` from
+`hailo_vdma_buffer_map` comes in a burst of ~120 at every Hailo start, every
+boot since the 4.23 driver (258 / 263 / 506 per boot). Kernel tainted W. No
+disconnects. Belongs with the 4.23 driver on kernel 6.12. Watch, not urgent.
+
+Earbuds flapped (AUDIO DEAD auto_null twice, reconnected in 1 s each) at
+22:02.
+
+**Next:** run a 15 min soak on the real battery (power bank USB-C PD 5 V
+3 A, short 3 A USB-C to USB-C cable, into the Pi's USB-C port). If the UPS
+only feeds the 5 V pin, use 2 x 5 V (pins 2, 4) + 2 x GND (6, 14) with short
+thick wires. Dupont jumpers drop a few tenths of a volt at 2 A peaks.
+
 ---
 
 *Last updated: 3 October 2026*
