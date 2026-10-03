@@ -426,7 +426,7 @@ def sync_buzz(phrases, fwd_mm):
 
 HAZARD_PHRASES = {
     "drop": "Careful, drop ahead",   # hole, open drain, step down, kerb edge
-    "step": "Step up ahead",         # kerb, step up, low object at the tip
+    "step": "Step up ahead",         # kerb, step up (never an obstacle)
 }
 
 

@@ -25,7 +25,7 @@
 //                   fwd/down in mm, -1 = nothing in range; base = learned
 //                   ground distance in mm, -1 = not learned yet
 //                 H drop <mm> <base>                ground fell away: hole, drain, step down
-//                 H step <mm> <base>                ground came up: kerb, step up, low object
+//                 H step <mm> <base>                ground came up: kerb, step up
 //                 E <text>                          error
 //   Pi -> ESP32   A0 / A1                           auto vibration off / on
 //                 B<duty>,<ms>                      one buzz, duty 0-100 %
@@ -44,23 +44,36 @@ const int PIN_MOTOR = 13;
 const int PWM_HZ = 200;            // inaudible, coin motors respond well here
 const int PWM_BITS = 8;
 
-// Forward obstacle bands, in mm. The forward sensor runs in long-range mode
-// (about 2 m indoors, much less in direct sun), the down sensor in default
-// mode (about 1.2 m, more precise), since the ground is always close.
+// Forward obstacle bands, in mm. Both sensors run in long-range mode (about
+// 2 m indoors, much less in direct sun). The down sensor needs it too: mounted
+// at ~110 cm on a 124 cm cane (Adeel, 3 Oct 2026) the ground is 1.1 m or more
+// away, at the edge of default mode's ~1.2 m, so it often saw nothing, never
+// learned the ground and never alarmed.
 const int CLOSE_MM = 400;          // nearer than this: solid buzz
 const int FAR_MM = 1500;           // further than this: no obstacle buzz
 
 // Ground watching. The down sensor learns how far away the ground normally is
 // and alarms on a sudden change. Thresholds are a first guess for a cane held
 // at a normal angle and must be tuned on a real pavement.
+//
+// The down sensor reports the GROUND only, never obstacles: those are ToF 1's
+// job (Adeel, 3 Oct 2026). Anything nearer than GROUND_RATIO of the ground
+// distance is standing in the beam (a person, wall, pole), not a rise in the
+// ground: at 1.1 m that is anything taller than ~30 cm, while kerbs and stair
+// steps are 10-20 cm. A rise while ToF 1 sees something ahead is also taken
+// to be that obstacle. Drops are never ignored.
 const int DROP_MM = 150;           // ground this much further away = drop
 const int STEP_MM = 120;           // ground this much closer = step up
+const float GROUND_RATIO = 0.7;
 const int CONFIRM_READS = 2;       // on top of the median-of-3, so ~4 raw
                                    // readings (~130 ms) reject one-off noise
 const uint32_t RELEARN_MS = 2000;  // a "change" that lasts this long is the
                                    // new normal (grip changed), not a hole
+const uint32_t BLOCKED_RELEARN_MS = 5000;  // same, for "something in the beam"
+const uint32_t PREV_BASE_MS = 10000;  // going back to the ground known before a
+                                      // relearn, within this long, is silent
 const uint32_t HAZARD_HOLDOFF_MS = 2500;
-const int HAZARD_PULSES = 2;       // ground alarm: 2 long hard pulses (Adeel, 3 Oct)
+const uint32_t HAZARD_MS = 500;    // ground alarm: ONE long hard pulse (Adeel, 3 Oct)
 const float BASE_ALPHA = 0.05;     // how fast the baseline follows slow drift
 
 const uint32_t STALE_MS = 300;     // no new reading for this long = sensor dead
@@ -91,6 +104,9 @@ int learnBuf[10];
 int learnCount = 0;
 int dropStreak = 0, stepStreak = 0;
 uint32_t offBandSince = 0;
+uint32_t blockedSince = 0;
+float prevBase = -1;               // ground before the last relearn
+uint32_t prevBaseUntil = 0;
 uint32_t lastHazardMs = 0;
 
 // ---- motor ---------------------------------------------------------------
@@ -109,14 +125,10 @@ void motor(int dutyPct) {
 // the nearer, the stronger and faster, on a smooth scale from FAR_MM (60 %
 // duty, 100 ms on / 600 ms off) to CLOSE_MM, then a solid buzz. It was three
 // fixed steps until 3 Oct 2026. The ground alarm is deliberately different,
-// two long hard pulses, so a hole never feels like "something in front of you".
+// one long hard pulse, so a hole never feels like "something in front of you".
 void updateMotor(uint32_t now) {
   if (now < manualUntil) return;
-  if (now < hazardUntil) {
-    uint32_t t = (hazardUntil - now);
-    motor((t % 450) > 150 ? 100 : 0);   // 300 on / 150 off
-    return;
-  }
+  if (now < hazardUntil) { motor(100); return; }
   Tof &f = tof[FWD];
   int mm = (f.ok && f.mm >= 0) ? f.mm : -1;
   if (!autoBuzz || mm < 0 || mm >= FAR_MM) { motor(0); return; }
@@ -136,8 +148,16 @@ void buzzBlocking(int duty, int ms) {
 void hazard(const char *kind, int mm, uint32_t now) {
   if (now - lastHazardMs < HAZARD_HOLDOFF_MS) return;
   lastHazardMs = now;
-  if (autoBuzz) hazardUntil = now + HAZARD_PULSES * 450;
+  if (autoBuzz) hazardUntil = now + HAZARD_MS;
   Serial.printf("H %s %d %d\n", kind, mm, (int)baseline);
+}
+
+void relearn(const char *why, uint32_t now) {
+  if (baseline >= 0) { prevBase = baseline; prevBaseUntil = now + PREV_BASE_MS; }
+  baseline = -1; learnCount = 0;
+  offBandSince = blockedSince = 0;
+  dropStreak = stepStreak = 0;
+  Serial.printf("I %s, relearning\n", why);
 }
 
 // Called once per fresh down reading.
@@ -161,6 +181,28 @@ void watchGround(int mm, uint32_t now) {
   bool drop = (mm < 0) || (mm > baseline + DROP_MM);
   bool step = (mm >= 0) && (mm < baseline - STEP_MM);
 
+  // Back to the ground known before the last relearn (the cane was held over a
+  // drop for 2 s, then lifted back): the user already got the alarm for it.
+  if ((drop || step) && prevBase >= 0 && now < prevBaseUntil && mm >= 0 &&
+      fabsf(mm - prevBase) < STEP_MM) {
+    baseline = prevBase; prevBase = -1;
+    dropStreak = stepStreak = 0; offBandSince = blockedSince = 0;
+    Serial.printf("I ground back to %d mm\n", (int)baseline);
+    return;
+  }
+
+  // Not the ground: something standing in the beam. No alarm, no learning.
+  Tof &f = tof[FWD];
+  bool fwdSees = f.ok && f.mm >= 0 && f.mm < FAR_MM;
+  if (step && (mm < baseline * GROUND_RATIO || fwdSees)) {
+    dropStreak = stepStreak = 0;
+    offBandSince = 0;
+    if (!blockedSince) blockedSince = now;
+    if (now - blockedSince > BLOCKED_RELEARN_MS) relearn("ground hidden for 5 s", now);
+    return;
+  }
+  blockedSince = 0;
+
   dropStreak = drop ? dropStreak + 1 : 0;
   stepStreak = step ? stepStreak + 1 : 0;
   if (dropStreak == CONFIRM_READS) hazard("drop", mm, now);
@@ -168,13 +210,9 @@ void watchGround(int mm, uint32_t now) {
 
   if (drop || step) {
     if (!offBandSince) offBandSince = now;
-    if (now - offBandSince > RELEARN_MS) {
-      // Lasted too long to be a hole the user is about to step into. The cane
-      // angle changed, so start learning the ground again.
-      baseline = -1; learnCount = 0; offBandSince = 0;
-      dropStreak = stepStreak = 0;
-      Serial.println("I ground changed for 2 s, relearning");
-    }
+    // Lasted too long to be a hole the user is about to step into. The cane
+    // angle changed, so start learning the ground again.
+    if (now - offBandSince > RELEARN_MS) relearn("ground changed for 2 s", now);
   } else {
     offBandSince = 0;
     baseline += BASE_ALPHA * (mm - baseline);   // follow slow drift only
@@ -212,14 +250,13 @@ bool startTof(Tof &t, int idx) {
     t.ok = false;
     return false;
   }
-  if (idx == FWD) {
-    // Long-range mode, per the VL53L0X datasheet / Pololu example: lower the
-    // return-signal limit and lengthen the laser pulses. About 2 m instead of
-    // 1.2 m, at the cost of more noise, which the median filter absorbs.
-    t.dev.setSignalRateLimit(0.1);
-    t.dev.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-    t.dev.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-  }
+  // Long-range mode on both, per the VL53L0X datasheet / Pololu example:
+  // lower the return-signal limit and lengthen the laser pulses. About 2 m
+  // instead of 1.2 m, at the cost of more noise, which the median filter
+  // absorbs.
+  t.dev.setSignalRateLimit(0.1);
+  t.dev.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+  t.dev.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
   t.dev.setMeasurementTimingBudget(33000);
   t.dev.startContinuous();
   t.raw[0] = t.raw[1] = t.raw[2] = -1;
@@ -271,6 +308,7 @@ String line;
 void setRoles(int fwd) {
   FWD = fwd; DOWN = 1 - fwd;
   baseline = -1; learnCount = 0;   // the down sensor changed, relearn
+  prevBase = -1;
   Serial.printf("I roles: forward=tof%d down=tof%d\n", FWD + 1, DOWN + 1);
 }
 
@@ -280,8 +318,6 @@ void handleCommand(const String &cmd) {
   else if (cmd == "R1" || cmd == "R2") {
     setRoles(cmd == "R1" ? 0 : 1);
     prefs.putUChar("fwd", FWD);
-    // Long-range mode belongs to whichever sensor is now forward.
-    for (int i = 0; i < 2; i++) startTof(tof[i], i);
   } else if (cmd == "S") {
     for (int i = 0; i < 2; i++)
       Serial.printf("I tof%d %s ok=%d mm=%d reinits=%u\n", i + 1,

@@ -2060,6 +2060,49 @@ Phase 4 haptics work, done at his direct instruction):
   firmware must take these changes before it is flashed.
 - Note: the boot "alive" signal is also two pulses (150 ms, shorter).
 
+
+### 3 October 2026 (21:35 to 21:45): ToF 2 at 110 cm, one pulse, ground only
+
+Adeel: both ToF sensors will sit **~110 cm up a 124 cm cane** (standard
+length). ToF 2 "did not vibrate as you said". Asked: ToF 2 vibrates **once**
+for a pothole or any ground change, **never for obstacles**. ToF 1 unchanged.
+
+**Most likely reason it stayed silent (from the code, not yet seen on the
+cane):** ToF 2 ran in default mode (~1.2 m at best, less on dark ground). At
+110 cm the ground is at or past that range, so readings were "nothing in
+range", the ground was never learned (needs 10 real readings), and no alarm
+can fire before it is learned. Bench check before the change: down 66 mm,
+ground learned, 0 H lines (the sensors were on the bench, not on the cane).
+
+**Firmware changes** (`cane_safety.ino`):
+- **Both sensors in long-range mode** (~2 m indoors). `R1`/`R2` no longer
+  restart the sensors to move long-range mode.
+- **Ground alarm = one 500 ms pulse at 100 %** (was 2 x 300 ms). 2.5 s
+  hold-off unchanged, so sweeping back over the same hole within 2.5 s gives
+  no second pulse. Sweeping over it again later does pulse again.
+- **ToF 2 ignores obstacles**: a "rise" nearer than 0.7 x ground distance (at
+  1.1 m: taller than ~30 cm) or any rise while ToF 1 sees something within
+  1.5 m is treated as something standing in the beam: no alarm, no learning.
+  Blocked 5 s = relearn. Drops are never ignored. Known gap: a real kerb
+  while ToF 1 sees something ahead gets no ToF 2 pulse (ToF 1 is buzzing).
+- **No second pulse when the cane comes back**: after a 2 s relearn (held
+  over a drop), returning to the old ground within 10 s restores it silently
+  (`I ground back to N mm`).
+- Pi `speak_detect.py`: comment only. It speaks hazards without its own buzz.
+
+Compiled on the Pi (320,827 bytes, 24 %), flashed with
+`~/smartcane/tools/flash_2026-10-03b.sh` (running app verified against
+`build_2026-10-03` first, which stays the rollback copy). New app in
+`~/smartcane/esp32/build_2026-10-03b/`. Verified on chip, boot 0.4 s, both
+IDs `EE AA 10`, ground learned 62 mm on the bench.
+
+**Not yet tested**: anything at 110 cm. Need a capture with the cane held at
+the real height (is the ground in range, how noisy, does a kerb edge give one
+pulse). Mount note for Adeel: ToF 2 must point at the ground ahead of the tip,
+not along the shaft, or the beam hits the cane itself. At 1.1 m the beam spot
+is ~50 cm wide, so holes much smaller than that may not show. The
+`prep/step1.5-esp32-safety` firmware must take these changes too.
+
 ---
 
 *Last updated: 3 October 2026*
