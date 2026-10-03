@@ -83,8 +83,16 @@ def download(slug, out):
         raise RuntimeError(f"no export link after 10 min: {str(d)[:200]}")
     link = d["export"]["link"]
     dest = Path(out) / f"{ws}__{proj}__v{ver}"
-    with urllib.request.urlopen(link, timeout=600) as r:
-        z = zipfile.ZipFile(io.BytesIO(r.read()))
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(link, timeout=600) as r:
+                z = zipfile.ZipFile(io.BytesIO(r.read()))
+            break
+        except (OSError, zipfile.BadZipFile) as e:   # connection reset, truncated zip
+            if attempt == 3:
+                raise
+            print(f"{slug}: download attempt {attempt} failed ({e}), retrying", flush=True)
+            time.sleep(30 * attempt)
     for m in z.infolist():
         if m.is_dir():
             continue

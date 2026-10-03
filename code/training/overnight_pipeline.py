@@ -99,9 +99,10 @@ def main():
         ws, proj = v["project"].split("/")
         dest = D / "raw/roboflow" / f"{ws}__{proj}__v{v['version']}"
         n = sum(1 for _ in dest.rglob("*.jpg")) if dest.exists() else 0
-        if n == 0 or f"{short}: FAILED" in (D / "roboflow_fetch.log").read_text(errors="ignore").replace("\0", ""):
-            if dest.exists():
-                shutil.rmtree(dest)
+        # Only what is actually missing on disk. (Reading the first run's log
+        # here deleted and re-fetched sets that were already fine, 3 Oct.)
+        if n == 0 and dest.exists():
+            shutil.rmtree(dest)
     run([PY, str(HERE / "fetch_all_roboflow.py")], "Roboflow re-fetch", D / "roboflow_refetch.log")
     if "failed: none" not in (D / "roboflow_refetch.log").read_text(errors="ignore"):
         fail("a Roboflow set still fails: " + (D / "roboflow_refetch.log").read_text()[-800:])
