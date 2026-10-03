@@ -2182,6 +2182,8 @@ thick wires. Dupont jumpers drop a few tenths of a volt at 2 A peaks.
   `train_v2.ps1`, it starts from scratch. Remaining ~39 epochs is ~3 days at
   this speed.
 - Nothing else was running.
+- **22:15: Adeel asked to stop training now.** Task `SmartcaneTrainV2` stopped,
+  all python processes ended, last.pt (21:30, epoch 1) intact. Resume as above.
 
 ---
 
