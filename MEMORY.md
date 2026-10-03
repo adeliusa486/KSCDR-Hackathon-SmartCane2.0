@@ -1866,6 +1866,29 @@ batches: GPU 73 %. Training (YOLO11s, 152 classes, 40 epochs, run
 
 Adeel moved to a new chat: `docs/handoff-prompt.md` has the full prompt.
 
+### 3 October 2026 (13:05): new chat, status check only
+
+Read the handoff, plan, phase drafts and research. Nothing changed on the
+cane or in the pipeline.
+
+- **Pseudo-labelling running** (PID 86780, started 13:01:05, the copy in
+  `pipeline_code` matches commit 5b7ac95). Measured 37 images/s (4,480 at
+  13:03:14, 6,560 at 13:04:10) over 263,857 images (235,951 train + 27,906
+  val). If the speed holds it finishes around 15:00. Training then starts on
+  its own: the old chat's PowerShell command chains `train.py ... --name
+  smartcane152_v2` after a successful pseudo-label exit (read from that
+  chat's transcript). `yolo11s.pt` is not on disk, Ultralytics downloads it.
+- **Laptop limits the GPU**: on AC, but power limit 35 W (board max 110 W),
+  SM clock 1530 of 3105 MHz, Windows plan Balanced. The vendor power mode
+  likely sets this. Performance mode would speed up both jobs (not measured).
+  Sleep and hibernate are off on AC and battery, so the run will not pause.
+- **Risk**: the job is a child of the old chat's shell. Closing that VS Code
+  window or chat may kill it.
+- **Cane (read-only check, 13:04)**: up 5 h 07 min, `throttled=0x0`, 0
+  under-voltage events this boot, `smartcane.service` stopped (enabled),
+  Hailo firmware 4.23.0 HAILO8L, kernel 6.12.109+rpt-rpi-2712, ESP32 on
+  `/dev/ttyUSB0`. Idle, so this says nothing about the supply under load.
+
 ---
 
 *Last updated: 3 October 2026*
