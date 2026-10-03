@@ -2027,6 +2027,39 @@ fault. This is a 20 s check, not Step 1.4's pass test (1 hour continuous,
 wire-move, motor, disconnect and reconnect tests), and Step 1.2 is still
 blocked, so by the plan's rule Step 1.4 has not formally started.
 
+
+### 3 October 2026 (21:10 to 21:25): camera dark, new vibration patterns flashed
+
+**"Camera not detecting"**: hardware fine (imx708 listed, Hailo fw 4.23.0
+identifies). It was silent because `smartcane.service` was stopped (by me,
+for the weak supply). A direct check: picamera2 metadata **0.9 lux**,
+exposure 66.7 ms and gain 16 both at maximum, FocusFoM 7, photo almost
+black. detect.py 30 s: no detections. The room was dark or the lens covered.
+The service log of this boot also showed "distance sensors not responding"
+(ESP32 resets with the Pi and the reader never reopens: G4, Step 1.5).
+
+**Haptic change requested by Adeel** (out of the plan's order: this is
+Phase 4 haptics work, done at his direct instruction):
+- ESP32 firmware: ground alarm (ToF 2) **2 long pulses** (300 on / 150 off)
+  instead of 3. Forward obstacle buzz (ToF 1 only) **smooth scale**: 60 %
+  duty, 100 ms on / 600 ms off at 1.5 m, to 100 % solid at 0.4 m (was three
+  steps). `S` now reports `motor=<duty>`.
+- `speak_detect.py`: the sentence-start buzz takes its strength only from
+  ToF 1 (`tof_buzz`: B60,150 at 1.5 m up to B100,400 at 0.4 m); objects ToF 1
+  is not measuring get a fixed light `B60,150`. Unit-checked on the laptop.
+- Flashed via `~/smartcane/tools/flash_2026-10-03.sh`: verify-flash of the
+  running app against `~/smartcane/esp32/build` (rollback copy) passed, new
+  app written to 0x10000 and verified on chip, boot 0.8 s, both IDs
+  `EE AA 10`. New build in `~/smartcane/esp32/build_2026-10-03/`. Old
+  speak_detect backed up as `speak_detect.py.bak-2026-10-03`.
+- `tools/haptic_check.py`: reads the commanded duty at 20 Hz. Smoke test:
+  ToF 1 at ~108 mm -> 100 % solid, correct.
+- **Not yet tested**: the distance scale and the 2 pulses with a hand / a
+  lifted cane, whether Adeel feels them, and speech + buzz end to end (needs
+  the service, light, and the weak supply). The `prep/step1.5-esp32-safety`
+  firmware must take these changes before it is flashed.
+- Note: the boot "alive" signal is also two pulses (150 ms, shorter).
+
 ---
 
 *Last updated: 3 October 2026*
