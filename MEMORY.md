@@ -1972,6 +1972,35 @@ priority), after removing the empty partial run folder so the name stays
 `smartcane152_v2`. Failed log kept as `train_v2_wmi_died.log`. At 17:07 the
 label scan was 29 % (~285 images/s, 3,328 background images, 0 corrupt).
 
+**17:36 to 19:42: training far slower than estimated, three restarts.**
+Measured, not the old 1.5-day guess:
+
+| Setting | CPU perf | images/s | 40 epochs |
+|---|---|---|---|
+| batch 12, MuSGD, Balanced fan mode | 50-59 % | 19.6 | ~5.5 days |
+| batch 12, MuSGD, MyASUS Performance (Adeel set it) | 88 % | 36 | ~3 days |
+| batch 24, MuSGD, Performance | ~43 % | ~21 | ~5 days |
+| batch 24, SGD, Performance (running) | ~42 % | ~27 | ~4-4.5 days |
+
+- **Bottleneck: the main training process is single-core bound** (1.0 core,
+  8 dataloader workers mostly idle, GPU 3-60 % busy at 14-45 W). py-spy
+  (installed in `C:\mlenv`): ~35 % model forward, ~30 % optimizer step.
+  Ultralytics 8.4.155 picks **MuSGD** for `optimizer=auto` on long runs; its
+  Newton-Schulz step is many tiny GPU calls.
+- **The laptop (ASUS Zenbook UX6404VV, i9-13900H) holds the CPU at ~43 % of
+  base speed under sustained load**, even with MyASUS on Performance (Adeel
+  confirmed) and Windows Best performance (tried, no change, reverted to
+  Balanced). 78 C, no ACPI passive limit. The 88 % reading at 19:05 did not
+  last. Batch 24 gave no gain per unit of CPU speed because the optimizer
+  cost is per image. Nominal batch 64 (accumulation) either way.
+- Adeel approved batch 24 and SGD (not fewer epochs). `train.py` gained
+  `--optimizer`. Run `smartcane152_v2` restarted 19:32 (scheduled task
+  `SmartcaneTrainV2`). Stopped runs kept: `smartcane152_v2_b12_stopped`,
+  `smartcane152_v2_b24_musgd_stopped`, with their logs.
+- Slip: the first batch-24 restart ran the old script because the repo was on
+  `main`, not the branch with `train_v2.ps1`. Stopped within 5 s (exit -1),
+  no run folder made. Check deployed files after copying.
+
 ---
 
 *Last updated: 3 October 2026*
