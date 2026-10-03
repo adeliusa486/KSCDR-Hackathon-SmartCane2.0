@@ -2001,6 +2001,32 @@ Measured, not the old 1.5-day guess:
   `main`, not the branch with `train_v2.ps1`. Stopped within 5 s (exit -1),
   no run folder made. Check deployed files after copying.
 
+
+### 3 October 2026 (21:05): ToF 2 rewired by Adeel, first check passes
+
+Pi powered back on by Adeel, now **from the laptop's USB-C port**. The Pi
+reads `max_current` 3000 mA from it (`usb_max_current_enable=0`), so USB
+peripherals share 600 mA. **2 under-voltage events in the first 90 s**
+(23.7 s and 86.3 s, `throttled=0x50000`) with `smartcane.service` starting
+at boot, EXT5V 4.978 V at idle afterwards. A laptop port is not a fix for
+Step 1.2: it still needs the 5 V / 5 A USB-C PD supply. Service stopped
+again (it is enabled and starts at every boot).
+
+ToF 2 after rewiring (service stopped, `esp32_capture.py`):
+
+| Check | Result |
+|---|---|
+| `T` scan + ID | bus1 0x29, tof1 `EE AA 10`; bus2 0x29, **tof2 `EE AA 10`** (absent before) |
+| `S` status | tof1 forward ok=1, tof2 down ok=1, reinits=0 both, ground learned 87 mm |
+| 20 s, 400 D lines at 20.0 Hz | forward 400/400 ok, 113.2 mm mean, stdev 0.97, 110-116; **down 400/400 ok, 86.9 mm mean, stdev 1.17, 84-91** |
+
+One `E unknown command` with garbage bytes on the first capture (the `T`
+was mangled, `S` right after it was fine, `T` alone on a rerun was fine).
+Same family as the port-open problems logged for Step 1.5, not a sensor
+fault. This is a 20 s check, not Step 1.4's pass test (1 hour continuous,
+wire-move, motor, disconnect and reconnect tests), and Step 1.2 is still
+blocked, so by the plan's rule Step 1.4 has not formally started.
+
 ---
 
 *Last updated: 3 October 2026*
