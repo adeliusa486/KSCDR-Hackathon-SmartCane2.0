@@ -1941,6 +1941,21 @@ clearly right, 1 clearly wrong (an archer's bow called umbrella), 3 doubtful
 (loose papers called book, a dark chair, a blurred far person). No model
 accuracy exists yet: that comes from training.
 
+**16:00 to 16:35: MTSD stop signs were labelled "traffic sign".** Human stop
+sign boxes in merged_v2: 983 train + 113 val, all from COCO and Open Images.
+MTSD has 824 usable stop signs (727 train + 97 val, 731 photos), but
+`classes_v2.yaml` had no MTSD source for stop sign, so `convert_mtsd.py`
+folded them into "traffic sign": two answers for one object. Adeel chose to
+fix before training. `relabel_mtsd_stop.py` (commit on
+`prep/phase3-150-classes`) changes the matching traffic sign line (IoU >= 0.9
+with the MTSD box) to stop sign, logs to `mtsd_stop_relabel.csv`. Dry run:
+573 to change in 899 photos, 466 too small to have been kept. Unit test and
+a fake-folder run of the full watcher pass. `classes_v2.yaml` now lists
+`mapillary-mtsd:regulatory--stop` (check_classes 152/152). Watcher replaced
+at 16:32 (PID 62040, via WMI): cleanup, relabel, second dry runs must find
+0, then training. Pseudo-labelling at val 10,048 / 27,906 at 16:32, end
+expected ~16:50.
+
 ---
 
 *Last updated: 3 October 2026*
