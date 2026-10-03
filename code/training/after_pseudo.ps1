@@ -55,6 +55,18 @@ if ($rc -ne 0 -or $check -notmatch "would be removed: 0 in 0 files") {
 }
 Log "done: clean_pseudo, $((Get-Content "$D\clean_v2.log" | Select-String 'label lines').Line)"
 
+Log "start: relabel MTSD stop signs (traffic sign -> stop sign)"
+& $Py -u relabel_mtsd_stop.py --data $Data --mtsd "$D\raw\mapillary_mtsd" --apply *> "$D\relabel_v2.log"
+if ($LASTEXITCODE -ne 0) { Log "watcher: STOPPED, relabel_mtsd_stop exited $LASTEXITCODE"; exit 1 }
+& $Py -u relabel_mtsd_stop.py --data $Data --mtsd "$D\raw\mapillary_mtsd" *> "$D\relabel_v2_check.log"
+$rc = $LASTEXITCODE
+$check = Get-Content "$D\relabel_v2_check.log" -Raw
+if ($rc -ne 0 -or $check -notmatch "to change: 0") {
+    Log "watcher: STOPPED, a second relabel dry run still finds boxes to change (relabel_v2_check.log)"
+    exit 1
+}
+Log "done: relabel, $((Get-Content "$D\relabel_v2.log" | Select-String 'changed').Line)"
+
 Move-Item "$Data\smartcane.yaml.hold" "$Data\smartcane.yaml"
 Set-Location $D
 Log "start: train YOLO11s, 152 classes, 40 epochs (GPU), started by the watcher"
