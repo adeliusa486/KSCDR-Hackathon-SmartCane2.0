@@ -2103,6 +2103,30 @@ not along the shaft, or the beam hits the cane itself. At 1.1 m the beam spot
 is ~50 cm wide, so holes much smaller than that may not show. The
 `prep/step1.5-esp32-safety` firmware must take these changes too.
 
+
+### 3 October 2026 (21:50): mount angles recommended (geometry, not measured)
+
+Adeel's mount: 127 cm cane, ToF 2 at 110 cm up the shaft looking down at
+the road ahead, ToF 1 at ~115 cm aligned with the camera. Asked for the
+angles. Assumed a normal walking grip: cane ~40 deg from vertical (range
+30-50). At 40 deg ToF 2 sits 84 cm above the ground, ToF 1 88 cm.
+
+| Sensor | Recommended aim (fixed on the shaft) | Result at 40 deg grip |
+|---|---|---|
+| ToF 2 | top face of the shaft, **15 deg further forward than the shaft line** | beam ~147 cm, lands ~50 cm past the tip, spot ~65 cm wide |
+| ToF 1 + camera | **55 deg up from the shaft line** (5 deg above level when walking) | at 1.5 m the cone covers 68-135 cm height, ground never in the cone |
+
+Why 15 deg: the 25 deg cone (12.5 deg half angle) must clear the shaft and
+the white tip, or ToF 2 reads the cane (constant ~110 cm) and learns that as
+"ground". 10 deg is inside the cone edge. 20 deg reaches 1.7 m, past what the
+VL53L0X reliably gets from grey pavement. 147 cm is already near its limit
+outdoors. The firmware learns whatever ground distance it sees, so the exact
+number does not matter, only that it is steady and in range.
+
+Check to run with the cane in hand (live capture): ToF 2 steady around
+1,300-1,500 mm = good. Constant ~1,100 mm whatever the floor = seeing the
+cane, tilt further. Frequent -1 = too far, tilt back to ~12 deg.
+
 ---
 
 *Last updated: 3 October 2026*
