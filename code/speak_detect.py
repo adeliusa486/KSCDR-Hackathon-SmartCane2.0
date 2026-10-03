@@ -398,22 +398,30 @@ def watchdog(link, speaker, keepalive_after, stop):
 
 
 # Buzz sent to the ESP32 the moment a sentence starts, so the user feels and
-# hears the same object at once. Same urgency ladder as the ESP32's own
-# obstacle feel: closer = stronger and longer.
-SYNC_BUZZ = {"close": "B100,400", "near": "B85,250", "far": "B60,150"}
-BAND_ORDER = {"close": 0, "near": 1, "far": 2}
+# hears the same object at once. Only ToF 1 (forward) sets the strength, on
+# the same range as the ESP32's own obstacle feel (CLOSE_MM / FAR_MM in
+# cane_safety.ino): the nearer, the stronger and longer. A camera guess is not
+# a measured distance, so it never makes the buzz stronger (Adeel, 3 Oct 2026).
+BUZZ_CLOSE_MM, BUZZ_FAR_MM = 400, 1500
+LIGHT_BUZZ = "B60,150"   # named, but not measured by ToF 1
 
 
-def nearest_band(phrases, fwd_mm):
-    """Most urgent distance band among the phrases about to be spoken. Things
-    ahead use the measured ToF distance, others the camera's estimate."""
-    bands = []
-    for p in phrases:
-        _, direction, dist, _ = split_phrase(p)
-        bands.append(distance_band(fwd_mm)
-                     if direction == "ahead" and fwd_mm is not None else dist)
-    bands = [b for b in bands if b in BAND_ORDER]
-    return min(bands, key=BAND_ORDER.get) if bands else None
+def tof_buzz(mm):
+    """Buzz for a forward ToF distance, on a smooth scale: 60 % for 150 ms at
+    1.5 m and beyond, up to 100 % for 400 ms at 0.4 m and nearer."""
+    c = min(1.0, max(0.0, (BUZZ_FAR_MM - mm) / (BUZZ_FAR_MM - BUZZ_CLOSE_MM)))
+    return f"B{round(60 + 40 * c)},{round(150 + 250 * c)}"
+
+
+def sync_buzz(phrases, fwd_mm):
+    """Buzz for a sentence about to be spoken. Something named 'ahead' with a
+    ToF 1 distance: scaled by that distance. Anything else (left, right, or no
+    ToF reading): one fixed light buzz. Nothing to say: no buzz."""
+    if not phrases:
+        return None
+    if fwd_mm is not None and any(split_phrase(p)[1] == "ahead" for p in phrases):
+        return tof_buzz(fwd_mm)
+    return LIGHT_BUZZ
 
 
 HAZARD_PHRASES = {
@@ -477,7 +485,7 @@ class SensorWatch:
             # glass, a pole, a wall, anything outside the model's classes.
             if (mm is not None and mm < self.obstacle_mm
                     and time.time() - self.camera_ahead_at > 2.5):
-                cmd = SYNC_BUZZ[distance_band(mm)]
+                cmd = tof_buzz(mm)
                 self.speaker.say(f"obstacle ahead, {spoken_distance(mm)}",
                                  key=f"tof-obstacle {distance_band(mm)}",
                                  on_start=lambda c=cmd: self.link.send(c))
@@ -640,7 +648,7 @@ def main():
 
             on_start = None
             if esp is not None:
-                cmd = SYNC_BUZZ.get(nearest_band(phrases[:args.max_objects], fwd_mm))
+                cmd = sync_buzz(phrases[:args.max_objects], fwd_mm)
                 if cmd:
                     on_start = lambda c=cmd: esp.send(c)
             speaker.say(". ".join(spoken), key=" | ".join(keys),

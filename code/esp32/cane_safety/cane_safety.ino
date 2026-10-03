@@ -30,7 +30,7 @@
 //   Pi -> ESP32   A0 / A1                           auto vibration off / on
 //                 B<duty>,<ms>                      one buzz, duty 0-100 %
 //                 R1 / R2                           sensor roles, saved
-//                 S                                 status report
+//                 S                                 status report (incl. motor duty)
 
 #include <algorithm>
 #include <Wire.h>
@@ -47,9 +47,8 @@ const int PWM_BITS = 8;
 // Forward obstacle bands, in mm. The forward sensor runs in long-range mode
 // (about 2 m indoors, much less in direct sun), the down sensor in default
 // mode (about 1.2 m, more precise), since the ground is always close.
-const int CLOSE_MM = 400;
-const int NEAR_MM = 800;
-const int FAR_MM = 1500;
+const int CLOSE_MM = 400;          // nearer than this: solid buzz
+const int FAR_MM = 1500;           // further than this: no obstacle buzz
 
 // Ground watching. The down sensor learns how far away the ground normally is
 // and alarms on a sudden change. Thresholds are a first guess for a cane held
@@ -61,6 +60,7 @@ const int CONFIRM_READS = 2;       // on top of the median-of-3, so ~4 raw
 const uint32_t RELEARN_MS = 2000;  // a "change" that lasts this long is the
                                    // new normal (grip changed), not a hole
 const uint32_t HAZARD_HOLDOFF_MS = 2500;
+const int HAZARD_PULSES = 2;       // ground alarm: 2 long hard pulses (Adeel, 3 Oct)
 const float BASE_ALPHA = 0.05;     // how fast the baseline follows slow drift
 
 const uint32_t STALE_MS = 300;     // no new reading for this long = sensor dead
@@ -98,13 +98,18 @@ uint32_t lastHazardMs = 0;
 uint32_t manualUntil = 0;   // a manual buzz from the Pi overrides auto
 uint32_t hazardUntil = 0;   // the ground alarm overrides obstacle buzzing
 
+int motorDuty = 0;                 // last duty written, reported by S
+
 void motor(int dutyPct) {
+  motorDuty = dutyPct;
   ledcWrite(PIN_MOTOR, (dutyPct * 255) / 100);
 }
 
-// Obstacle feel is parking-sensor style: closer = stronger and faster, close =
-// solid buzz. The ground alarm is deliberately different, three long hard
-// pulses, so a hole never feels like "something in front of you".
+// Obstacle feel is parking-sensor style, from the forward sensor (ToF 1) only:
+// the nearer, the stronger and faster, on a smooth scale from FAR_MM (60 %
+// duty, 100 ms on / 600 ms off) to CLOSE_MM, then a solid buzz. It was three
+// fixed steps until 3 Oct 2026. The ground alarm is deliberately different,
+// two long hard pulses, so a hole never feels like "something in front of you".
 void updateMotor(uint32_t now) {
   if (now < manualUntil) return;
   if (now < hazardUntil) {
@@ -117,9 +122,10 @@ void updateMotor(uint32_t now) {
   if (!autoBuzz || mm < 0 || mm >= FAR_MM) { motor(0); return; }
   if (mm < CLOSE_MM) { motor(100); return; }
 
-  int duty, onMs, offMs;
-  if (mm < NEAR_MM) { duty = 85; onMs = 120; offMs = 180; }
-  else              { duty = 60; onMs = 100; offMs = 600; }
+  float c = float(FAR_MM - mm) / (FAR_MM - CLOSE_MM);   // 0 far .. 1 close
+  int duty = 60 + int(40 * c);
+  int onMs = 100;
+  int offMs = 60 + int(540 * (1 - c));
   motor((now % (onMs + offMs)) < (uint32_t)onMs ? duty : 0);
 }
 
@@ -130,7 +136,7 @@ void buzzBlocking(int duty, int ms) {
 void hazard(const char *kind, int mm, uint32_t now) {
   if (now - lastHazardMs < HAZARD_HOLDOFF_MS) return;
   lastHazardMs = now;
-  if (autoBuzz) hazardUntil = now + 3 * 450;
+  if (autoBuzz) hazardUntil = now + HAZARD_PULSES * 450;
   Serial.printf("H %s %d %d\n", kind, mm, (int)baseline);
 }
 
@@ -281,7 +287,7 @@ void handleCommand(const String &cmd) {
       Serial.printf("I tof%d %s ok=%d mm=%d reinits=%u\n", i + 1,
                     i == FWD ? "forward" : "down", tof[i].ok, tof[i].mm,
                     tof[i].reinits);
-    Serial.printf("I auto=%d ground=%d\n", autoBuzz, (int)baseline);
+    Serial.printf("I auto=%d ground=%d motor=%d\n", autoBuzz, (int)baseline, motorDuty);
   } else if (cmd == "T") {
     // Wiring test. A sensor can ACK its address (power and the bus are
     // there) yet return garbage data (a marginal SDA/SCL contact). The ID
