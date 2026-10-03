@@ -1827,6 +1827,33 @@ Expected: training starts around 9-10 a.m. on 3 Oct, about 1.5 days to finish.
 Not done without Adeel: no change to the cane (HailoRT 4.23 upgrade, firmware),
 no Ultralytics Platform sign-up (cost unknown).
 
+### 3 October 2026 (morning): HailoRT 4.23.0 installed on the cane (Adeel approved)
+
+Built from Hailo's open-source repos (hailort + hailort-drivers, tag v4.23.0)
+on the Pi with `code/tools/hailort_build.sh`: 14 min, 2 cores, 0 under-voltage.
+The Python binding is a separate CMake project: build it with
+`LIBHAILORT_PATH` and `HAILORT_INCLUDE_DIR` set **as environment variables**
+for `setup.py bdist_wheel`, or the packaging step fails (it runs its own cmake).
+`hailort_service` was not built (needs gRPC, an hour of CPU on the weak supply)
+and is not needed: the cane runs one vision process. The 4.20
+`hailort.service` is disabled.
+
+Installed with `hailort_install.sh` (tests + automatic rollback): driver in
+`/lib/modules/<kernel>/extra/` (DKMS 4.20 module removed), firmware 4.23 with
+the 4.20 copy kept as `hailo8_fw.bin.4.20`, `libhailort.so.4.23.0` and
+`hailortcli` in `/usr/local`, `hailo_platform` 4.23.0 via pip --no-deps.
+Rollback: `hailort_rollback.sh` (reinstalls apt 4.20). 4.20 files also in
+`backups/hailo420_files.tgz`.
+
+Results: identify = firmware 4.23.0 HAILO8L. Current `yolov8s_h8l.hef`
+benchmark 58.74 FPS / 12.98 ms (58.17 / 13.14 on 4.20). detect.py 71 report
+lines in 30 s (81 on 4.20, within start-up variation, watch it). **1
+under-voltage event during the tests** (UPS supply). After a reboot: driver
+auto-loads, firmware 4.23.0, Python 4.23.0, benchmark 58.42 FPS.
+
+**After any kernel upgrade the 4.23 module must be rebuilt**, or the cane has
+no NPU driver. Do not run `apt full-upgrade` without that in mind.
+
 ---
 
 *Last updated: 3 October 2026*
