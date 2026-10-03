@@ -2166,6 +2166,23 @@ Earbuds flapped (AUDIO DEAD auto_null twice, reconnected in 1 s each) at
 only feeds the 5 V pin, use 2 x 5 V (pins 2, 4) + 2 x GND (6, 14) with short
 thick wires. Dupont jumpers drop a few tenths of a volt at 2 A peaks.
 
+
+### 3 October 2026 (22:10): end of session, Pi and PC shut down
+
+- **Pi shut down cleanly** (service stopped, sync, `shutdown -h now`, off
+  ping within 5 s). ESP32 is off with it. Everything from today is on the
+  Pi: firmware `build_2026-10-03b`, 1.8 GHz cap, 10 fps unit. The service is
+  enabled and starts at the next power-on.
+- **Training stopped by the PC shutdown** (Adeel's choice). Run
+  `smartcane152_v2`: epoch 1 of 40 done 21:30 (6,696 s, ~1.9 h per epoch,
+  mAP50 0.386, mAP50-95 0.258 after 1 epoch), checkpoint
+  `D:\smartcane-data\runs\detect\smartcane152_v2\weights\last.pt`. ~40 min of
+  epoch 2 lost. **To continue: `pipeline_code\train_v2_resume.ps1`** (new,
+  not in git; header has the Task Scheduler commands). Do not rerun
+  `train_v2.ps1`, it starts from scratch. Remaining ~39 epochs is ~3 days at
+  this speed.
+- Nothing else was running.
+
 ---
 
 *Last updated: 3 October 2026*
