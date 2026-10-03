@@ -1934,6 +1934,13 @@ It stopped answering ping 20 s later. The ESP32 is powered from the Pi, so it
 is off too. Not needed until a hardware step (USB-C supply, ToF 2 rewiring,
 tape-measure test) or until a converted model is ready to test.
 
+**15:18 progress check**: 177,792 of 235,951 train images at 18.6 images/s
+(val, 27,906, still to do). Estimated end ~16:35, then cleaning and
+training. Spot check of 20 random added boxes on Open Images photos: 16
+clearly right, 1 clearly wrong (an archer's bow called umbrella), 3 doubtful
+(loose papers called book, a dark chair, a blurred far person). No model
+accuracy exists yet: that comes from training.
+
 ---
 
 *Last updated: 3 October 2026*
