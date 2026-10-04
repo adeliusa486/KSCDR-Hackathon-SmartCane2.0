@@ -2185,6 +2185,31 @@ thick wires. Dupont jumpers drop a few tenths of a volt at 2 A peaks.
 - **22:15: Adeel asked to stop training now.** Task `SmartcaneTrainV2` stopped,
   all python processes ended, last.pt (21:30, epoch 1) intact. Resume as above.
 
+
+### 4 October 2026: v2 training fell, v3 2-day fine-tune with watchdog
+
+v2 resumed 10:31 (first resume used batch 12: Ultralytics takes batch from
+the command line on resume, `train_v2_resume.ps1` now passes `--batch 24
+--optimizer SGD`). mAP50 by epoch: 0.386, 0.398, 0.360, **0.225** (epoch 4,
+right after warm-up ended at lr0 0.01). Adeel: done within 2 days, avoid bad
+results, model must stay small for the cane.
+
+**v3 (started 18:20, task `SmartcaneTrainV3`, `pipeline_code	rain_v3.ps1`):**
+YOLO11s from v2 `best.pt` (epoch 2), SGD batch 24, lr0 0.002 cosine to 5 %,
+warm-up 0.5 epoch, close_mosaic 4, patience 8, Ultralytics `time` 45.25 h
+(deadline 6 Oct 16:20). Watchdog every 5 min: after 3+ epochs, last < 80 %
+and previous < 90 % of the run's best mAP50 -> stop, retry from that best.pt
+with half the lr (max 3 attempts, never past the deadline). train.py gained
+`--lr0 --lrf --cos-lr --warmup-epochs --close-mosaic --patience --time`
+(backup `train.py.bak-2026-10-04`). Progress is in
+`train_smartcane152_v3.log` (stdout), not the .err.log. Laptop sleep and
+hibernate on AC set to never. First line 18:3x: epoch 1, 2.7 it/s, ~1 h
+per epoch shown at start (v2 epochs took ~2 h).
+
+Pretrained alternatives re-checked for Adeel: no ready model covers street
+hazards and runs on the Hailo-8L (COCO 80 / OIV7 600 / Objects365 / single
+hazard models / open-vocabulary). v3 is already transfer learning from COCO.
+
 ---
 
 *Last updated: 3 October 2026*
