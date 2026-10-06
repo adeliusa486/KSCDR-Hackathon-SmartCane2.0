@@ -9,6 +9,7 @@
 //   ToF 1   VCC 3V3, GND, SDA D21, SCL D22, XSHUT D26   (I2C bus 0, Wire)
 //   ToF 2   VCC 3V3, GND, SDA D18, SCL D19, XSHUT D27   (I2C bus 1, Wire1)
 //   Motor   IN D13, VCC VIN (5V), GND
+//   Assistant button   D33 to GND (internal pull-up, pressed = LOW)
 //
 // Each sensor has its own I2C bus, so both stay at the default address 0x29
 // and no readdressing is needed. XSHUT is used only to hard-reset a sensor
@@ -27,6 +28,8 @@
 //                 H drop <mm> <base>                ground fell away: hole, drain, step down
 //                 H step <mm> <base>                ground came up: kerb, step up
 //                 E <text>                          error
+//                 K down / K up                     assistant button pressed / released
+//                                                   (the Pi times short vs long press)
 //   Pi -> ESP32   A0 / A1                           auto vibration off / on
 //                 B<duty>,<ms>                      one buzz, duty 0-100 %
 //                 R1 / R2                           sensor roles, saved
@@ -40,6 +43,8 @@
 const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
 const int PIN_MOTOR = 13;
+const int PIN_BUTTON = 33;         // assistant button to GND
+const int BUTTON_DEBOUNCE_MS = 30;
 
 const int PWM_HZ = 200;            // inaudible, coin motors respond well here
 const int PWM_BITS = 8;
@@ -363,12 +368,28 @@ void readSerial() {
   }
 }
 
+// ---- assistant button ----------------------------------------------------
+
+// Reports edges only. A press shorter than the debounce time is ignored, so
+// contact bounce and cable noise never reach the Pi.
+void pollButton(uint32_t now) {
+  static bool stable = false, last = false;
+  static uint32_t changedAt = 0;
+  bool pressed = digitalRead(PIN_BUTTON) == LOW;
+  if (pressed != last) { last = pressed; changedAt = now; }
+  if (pressed != stable && now - changedAt >= BUTTON_DEBOUNCE_MS) {
+    stable = pressed;
+    Serial.println(stable ? "K down" : "K up");
+  }
+}
+
 // ---- main ----------------------------------------------------------------
 
 void setup() {
   Serial.begin(115200);
   ledcAttach(PIN_MOTOR, PWM_HZ, PWM_BITS);
   motor(0);
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
 
   prefs.begin("cane", false);
   setRoles(prefs.getUChar("fwd", 0));
@@ -399,6 +420,7 @@ void loop() {
   uint32_t now = millis();
 
   readSerial();
+  pollButton(now);
   for (int i = 0; i < 2; i++) pollTof(tof[i], i, now);
 
   if (tof[DOWN].fresh) {

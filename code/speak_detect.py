@@ -5,8 +5,9 @@ Wraps detect.py, reads its printed reports, and speaks them through the
 default audio sink (Bluetooth headset while developing, wired bone-conduction
 headset in the product).
 
-Deliberately does NOT modify detect.py. It runs it as a subprocess so the
-vision path and the speech path can be tested and replaced independently.
+Runs detect.py as a subprocess so the vision path and the speech path can be
+tested and replaced independently. The only coupling is SIGUSR1, which asks
+detect.py for a camera snapshot for the AI assistant (assistant.py).
 
 Four things matter more than the words themselves:
 
@@ -31,6 +32,7 @@ import argparse
 import math
 import os
 import re
+import signal
 import struct
 import subprocess
 import sys
@@ -47,9 +49,14 @@ REPORT = re.compile(r"^\[\s*[\d.]+\s*fps\]\s*(.*)$")
 # Things worth interrupting someone's day for, most urgent first. Anything not
 # in this list is still spoken, just ranked below these.
 PRIORITY = [
-    "car", "bus", "truck", "motorcycle", "train", "bicycle",
-    "person", "dog", "cow", "horse",
-    "traffic light", "stop sign", "fire hydrant", "bench", "pole",
+    # drop-offs and holes first: a fall is the worst outcome
+    "open hole", "stairs", "pothole", "manhole", "curb", "rail track",
+    "car", "bus", "truck", "van", "taxi", "motorcycle", "train", "bicycle",
+    "e-scooter", "cyclist", "motorcyclist",
+    "person", "child", "dog", "cow", "horse",
+    "traffic cone", "barrier", "bollard", "pole", "utility pole",
+    "traffic light", "pedestrian signal", "crosswalk", "stop sign",
+    "fire hydrant", "bench",
 ]
 
 # COCO classes a walking person can actually be harmed by or needs to find.
@@ -68,6 +75,24 @@ RELEVANT = {
     # carried objects worth finding
     "backpack", "handbag", "suitcase", "umbrella", "bottle", "cup",
     "cell phone", "laptop", "book", "clock",
+    # smartcane152 model (6 Oct 2026): the street hazards and landmarks it
+    # was trained for. Without these they would all be called "obstacle".
+    "child", "cyclist", "motorcyclist", "wheelchair", "stroller", "goat",
+    "camel", "van", "taxi", "ambulance", "e-scooter", "skateboard",
+    "golf cart", "shopping cart", "trailer",
+    "pedestrian signal", "crosswalk button", "traffic sign", "crosswalk",
+    "street light", "utility pole", "pole", "yield sign", "do not enter sign",
+    "one way sign", "pedestrian crossing sign", "speed limit sign",
+    "construction sign", "sidewalk closed sign", "bus stop sign", "exit sign",
+    "wet floor sign", "trash can", "bike rack", "mailbox", "utility box",
+    "fountain", "potted plant", "barrel", "traffic cone", "bollard",
+    "sidewalk sign", "kiosk", "barrier", "fence", "ladder", "tent", "pillar",
+    "curb", "curb ramp", "stairs", "escalator", "ramp", "pothole", "manhole",
+    "storm drain", "sidewalk crack", "speed bump", "rail track",
+    "tactile paving", "open hole", "swimming pool",
+    "door", "elevator", "atm", "tree", "palm tree", "table", "desk",
+    "stool", "cabinet", "box", "plastic bag", "glasses", "keyboard", "mouse",
+    "remote", "knife",
 }
 
 # A sink named like this means PulseAudio has no real output device and is
@@ -321,7 +346,8 @@ class Speaker:
                         on_start()
                     except Exception as e:
                         print(f"  on_start failed: {e}", file=sys.stderr)
-                if run(["paplay", wav], timeout=15):
+                # 30 s, not 15: an assistant answer runs up to ~15 s of speech.
+                if run(["paplay", wav], timeout=30):
                     self.last_sound = time.time()
         finally:
             # Always release, whatever happened. A stuck lock here would make
@@ -371,6 +397,20 @@ class Speaker:
         print(f"  SPEAKING: {text}")
         threading.Thread(target=self._play, args=(text, on_start),
                          daemon=True).start()
+
+    def say_blocking(self, text, wait=6.0):
+        """Speak now and return when done. For the assistant, whose answer
+        must not be dropped just because a detection phrase is playing.
+        Detection phrases that arrive meanwhile are dropped as usual."""
+        if self.dry_run:
+            print(f"  WOULD SAY: {text}")
+            return
+        if not self.link.alive():
+            self.link.try_reconnect()
+            return
+        if self.busy.acquire(timeout=wait):
+            print(f"  SPEAKING (assistant): {text}")
+            self._play(text)
 
     def _say_when_free(self, text):
         if self.busy.acquire(timeout=2.0):
@@ -522,6 +562,10 @@ def main():
                     help="speak every COCO class, not just the ones a walking "
                          "person needs")
     ap.add_argument("--all-classes", action="store_true")
+    ap.add_argument("--model", help=".hef forwarded to detect.py "
+                    "(default: detect.py picks the best installed one)")
+    ap.add_argument("--labels", help="class names file forwarded to detect.py, "
+                    "one per line, same order as the model")
     ap.add_argument("--fps", type=int, default=15,
                     help="camera fps, forwarded to detect.py. Lower = "
                          "longer exposure = far better in dim light.")
@@ -593,10 +637,40 @@ def main():
            "--fps", str(args.fps), "--ev", str(args.ev)]
     if args.all_classes:
         cmd.append("--all-classes")
+    if args.model:
+        cmd += ["--model", args.model]
+    if args.labels:
+        cmd += ["--labels", args.labels]
 
     print("starting vision...")
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True, bufsize=1)
+
+    # AI assistant on the ESP32 button. Needs the ESP32 (that is where the
+    # button is wired) and internet. Without either the cane works as before.
+    latest = {"body": ""}
+    if esp is not None:
+        from assistant import Assistant
+
+        def snapshot(timeout=2.0):
+            path = "/dev/shm/cane_snapshot.jpg"
+            before = os.path.getmtime(path) if os.path.exists(path) else 0
+            proc.send_signal(signal.SIGUSR1)
+            end = time.time() + timeout
+            while time.time() < end:
+                if os.path.exists(path) and os.path.getmtime(path) > before:
+                    with open(path, "rb") as fh:
+                        return fh.read()
+                time.sleep(0.05)
+            return None
+
+        def context():
+            return re.sub(r"\s*@[\d.]+", "", latest["body"]) or "nothing"
+
+        helper = Assistant(snapshot, context, speaker.say_blocking, args.bt_mac)
+        esp.on_button = helper.on_button
+        print("assistant button ready (press = describe, double press = "
+              "read text, hold = ask)")
 
     said_ready = False
     try:
@@ -604,6 +678,7 @@ def main():
             m = REPORT.match(line.strip())
             if not m:
                 continue
+            latest["body"] = m.group(1).strip()
             if not said_ready:
                 if haptic is not None:
                     haptic.buzz("ready")

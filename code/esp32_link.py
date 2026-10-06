@@ -38,6 +38,7 @@ class Esp32Link:
         self.ser.reset_input_buffer()
         self.on_line = on_line
         self.on_hazard = on_hazard     # called as on_hazard("drop"|"step", mm)
+        self.on_button = None          # called as on_button(pressed: bool)
         self.fwd_mm = None             # forward obstacle distance, None = nothing
         self.down_mm = None            # distance to the ground
         self.ground_mm = None          # learned normal ground distance
@@ -70,6 +71,11 @@ class Esp32Link:
                             self.on_hazard(parts[1], int(parts[2]))
                         except Exception as e:
                             print(f"hazard callback failed: {e}")
+                elif line in ("K down", "K up") and self.on_button:
+                    try:
+                        self.on_button(line == "K down")
+                    except Exception as e:
+                        print(f"button callback failed: {e}")
                 if self.on_line:
                     self.on_line(line)
 

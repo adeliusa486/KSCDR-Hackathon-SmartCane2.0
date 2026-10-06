@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""Smart cane - simulation tests for the blind-user scenarios.
+
+Runs without the camera, the Hailo, the ESP32 or audio: detections, sensor
+lines and button presses are simulated, speech is captured as text. So it runs
+on the Pi (where it matters) and on a PC.
+
+    cd ~/smartcane && python3 -m unittest tests/test_cane.py -v
+
+What it covers, in user terms:
+  - every hazard the 152-class model knows is spoken by name, not "obstacle"
+  - drop-offs (holes, stairs) are announced before cars, cars before benches
+  - one-frame ghosts are never spoken, a real object is within 3 reports
+  - an uncertain detection is still announced as "obstacle", never dropped
+  - the ToF distance replaces the camera guess only for things straight ahead
+  - ground drop / step warnings from the ESP32 are spoken urgently
+  - the cane warns out loud when the distance sensors die
+  - assistant button: press = describe, double = read text, hold = ask,
+    and every failure (no internet, no key, no mic, no camera) says something
+"""
+import os
+import pty
+import sys
+import threading
+import time
+import tty
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
+import assistant                                    # noqa: E402
+import speak_detect as sd                           # noqa: E402
+
+LABELS = os.path.join(os.path.dirname(HERE), "smartcane152.txt")
+if not os.path.exists(LABELS):
+    LABELS = r"D:\smartcane-data\hailo\smartcane152.txt"
+
+# What a blind pedestrian must hear by name. Losing any of these to
+# "obstacle" removes the reason the model was retrained.
+MUST_NAME = [
+    "stairs", "curb", "pothole", "open hole", "manhole", "rail track",
+    "crosswalk", "traffic light", "pedestrian signal", "traffic cone",
+    "barrier", "bollard", "pole", "car", "bus", "truck", "bicycle",
+    "e-scooter", "person", "child", "dog", "bench", "door", "escalator",
+    "bus stop sign", "wet floor sign", "construction sign",
+]
+
+
+class FakeLink:
+    def __init__(self, alive=True):
+        self._alive = alive
+        self.attempts = 0
+
+    def alive(self):
+        return self._alive
+
+    def try_reconnect(self):
+        self.attempts += 1
+
+
+def speaker(alive=True):
+    s = sd.Speaker("en-us", 165, 4.0, FakeLink(alive), False, dry_run=True)
+    s.heard = []
+    orig = print
+
+    def capture(*a, **k):
+        msg = " ".join(str(x) for x in a)
+        if msg.strip().startswith("WOULD SAY:"):
+            s.heard.append(msg.split("WOULD SAY:", 1)[1].strip())
+    sd.print = capture          # Speaker prints what it would say in dry run
+    s._restore = lambda: setattr(sd, "print", orig)
+    return s
+
+
+class Model152(unittest.TestCase):
+    def test_labels_file_has_152_unique_classes(self):
+        with open(LABELS) as fh:
+            names = [l.strip() for l in fh if l.strip()]
+        self.assertEqual(len(names), 152)
+        self.assertEqual(len(set(names)), 152)
+
+    def test_every_safety_class_exists_in_model(self):
+        with open(LABELS) as fh:
+            names = {l.strip() for l in fh}
+        missing = [c for c in MUST_NAME if c not in names]
+        self.assertEqual(missing, [], f"not in the model: {missing}")
+
+    def test_every_safety_class_is_spoken_by_name(self):
+        for cls in MUST_NAME:
+            out = sd.resolve([f"{cls} ahead, near @0.80"], sd.RELEVANT, 0.35)
+            self.assertEqual(out, [f"{cls} ahead, near"], cls)
+
+    def test_all_152_classes_are_named_or_deliberately_filtered(self):
+        with open(LABELS) as fh:
+            names = [l.strip() for l in fh if l.strip()]
+        unnamed = [n for n in names if n not in sd.RELEVANT]
+        # Household clutter may stay unnamed (spoken as "obstacle"), but no
+        # outdoor hazard may.
+        hazards = set(MUST_NAME)
+        self.assertFalse(hazards & set(unnamed), hazards & set(unnamed))
+
+
+class Urgency(unittest.TestCase):
+    def test_drop_offs_before_vehicles_before_furniture(self):
+        phrases = ["bench left, near", "car right, far", "stairs ahead, close",
+                   "person ahead, near", "open hole ahead, near"]
+        phrases.sort(key=sd.rank)
+        self.assertEqual([sd.class_of(p) for p in phrases],
+                         ["open hole", "stairs", "car", "person", "bench"])
+
+    def test_two_word_classes_parse(self):
+        self.assertEqual(sd.split_phrase("traffic cone left, near @0.61"),
+                         ("traffic cone", "left", "near", 0.61))
+
+
+class Flicker(unittest.TestCase):
+    def test_one_frame_ghost_is_never_spoken(self):
+        c = sd.Confirmer(3)
+        self.assertEqual(c.update(["dog ahead, near"]), [])
+        for _ in range(5):
+            self.assertEqual(c.update([]), [])
+
+    def test_real_object_spoken_on_third_report(self):
+        c = sd.Confirmer(3)
+        self.assertEqual(c.update(["stairs ahead, near"]), [])
+        self.assertEqual(c.update(["stairs ahead, near"]), [])
+        self.assertEqual(c.update(["stairs ahead, near"]), ["stairs ahead, near"])
+
+    def test_single_dropout_is_forgiven(self):
+        c = sd.Confirmer(3)
+        for _ in range(3):
+            c.update(["car left, far"])
+        c.update([])                                  # one missed frame
+        self.assertEqual(c.update(["car left, far"]), ["car left, far"])
+
+
+class NeverSilent(unittest.TestCase):
+    def test_uncertain_detection_becomes_obstacle(self):
+        out = sd.resolve(["stairs ahead, near @0.28"], sd.RELEVANT, 0.35)
+        self.assertEqual(out, ["obstacle ahead, near"])
+
+    def test_unknown_class_becomes_obstacle(self):
+        out = sd.resolve(["toothbrush left, close @0.9"], sd.RELEVANT, 0.35)
+        self.assertEqual(out, ["obstacle left, close"])
+
+    def test_clutter_collapses_to_one_obstacle(self):
+        out = sd.resolve(["toothbrush left, near @0.3", "spoon left, near @0.3"],
+                         sd.RELEVANT, 0.35)
+        self.assertEqual(out, ["obstacle left, near"])
+
+
+class Distance(unittest.TestCase):
+    def test_tof_replaces_camera_guess_only_ahead(self):
+        spoken, _ = sd.with_tof(["pole ahead, far", "car left, near"], 640)
+        self.assertEqual(spoken, ["pole ahead, 60 centimetres", "car left, near"])
+
+    def test_spoken_distances(self):
+        self.assertEqual(sd.spoken_distance(999), "1 metre")
+        self.assertEqual(sd.spoken_distance(1240), "1.2 metres")
+        self.assertEqual(sd.spoken_distance(30), "10 centimetres")
+
+    def test_closer_object_is_repeated_despite_timer(self):
+        _, far = sd.with_tof(["person ahead, far"], 1100)
+        _, close = sd.with_tof(["person ahead, far"], 400)
+        self.assertNotEqual(far, close)
+
+    def test_buzz_stronger_when_closer(self):
+        self.assertEqual(sd.tof_buzz(2000), "B60,150")
+        self.assertEqual(sd.tof_buzz(300), "B100,400")
+        self.assertEqual(sd.sync_buzz(["car left, far"], 500), sd.LIGHT_BUZZ)
+        self.assertIsNone(sd.sync_buzz([], 500))
+
+
+class Esp32Serial(unittest.TestCase):
+    """Real Esp32Link on a pseudo-terminal, fed the firmware's exact lines."""
+
+    def setUp(self):
+        try:
+            import serial  # noqa: F401
+        except ImportError:
+            self.skipTest("pyserial not installed")
+        if os.name != "posix":
+            self.skipTest("needs a pty (run on the Pi)")
+        from esp32_link import Esp32Link
+        self.master, slave = pty.openpty()
+        tty.setraw(slave)
+        self.link = Esp32Link(os.ttyname(slave))
+
+    def tearDown(self):
+        if hasattr(self, "link"):
+            self.link.close()
+
+    def feed(self, *lines):
+        for l in lines:
+            os.write(self.master, (l + "\n").encode())
+        time.sleep(0.4)
+
+    def test_distance_report(self):
+        self.feed("D 1000 640 1350 1 1 1300")
+        self.assertEqual((self.link.fwd_mm, self.link.fwd_ok), (640, True))
+
+    def test_ground_drop_and_button(self):
+        got = []
+        self.link.on_hazard = lambda k, mm: got.append((k, mm))
+        self.link.on_button = lambda p: got.append(("button", p))
+        self.feed("H drop 1650 1300", "K down", "K up", "I ground learned 1300")
+        self.assertEqual(got, [("drop", 1650), ("button", True), ("button", False)])
+
+    def test_hazard_warning_is_spoken(self):
+        s = speaker()
+        try:
+            w = sd.SensorWatch(self.link, s, 1000, threading.Event())
+            self.feed("H drop 1650 1300", "H step 1100 1300")
+            time.sleep(2.5)                        # urgent path waits for lock
+            self.assertIn("Careful, drop ahead", s.heard)
+            self.assertIn("Step up ahead", s.heard)
+            del w
+        finally:
+            s._restore()
+
+    def test_dead_sensor_link_is_announced(self):
+        s = speaker()
+        stop = threading.Event()
+        try:
+            w = sd.SensorWatch(self.link, s, 1000, stop)
+            threading.Thread(target=w.run, daemon=True).start()
+            time.sleep(2.6)                        # no D lines at all
+            stop.set()
+            self.assertIn("Warning, distance sensors not responding", s.heard)
+        finally:
+            s._restore()
+
+
+class AssistantButton(unittest.TestCase):
+    """Button timing and every failure path, with Gemini and the mic faked."""
+
+    class Mic:
+        def __init__(self, ok=True, seconds=2.0):
+            self.ok, self.seconds = ok, seconds
+
+        def start(self):
+            if self.ok:
+                with open(assistant.QUESTION_WAV, "wb") as fh:
+                    fh.write(b"\0" * int(32000 * self.seconds))
+            return self.ok
+
+        def stop(self):
+            pass
+
+    def make(self, mic=None, jpeg=b"\xff\xd8fake", reply=None, error=None,
+             key="k"):
+        self.said, self.prompts = [], []
+        a = assistant.Assistant(lambda: jpeg, lambda: "car left",
+                                self.said.append, "00:00:00:00:00:00",
+                                mic=mic or self.Mic())
+
+        def fake(k, prompt, j, wav, ctx):
+            self.prompts.append((prompt, wav is not None))
+            if error:
+                raise RuntimeError(error)
+            return reply or "A clear pavement ahead."
+        self._orig = (assistant.gemini, assistant.load_key, assistant.ocr_offline)
+        assistant.gemini = fake
+        assistant.load_key = lambda: key
+        assistant.ocr_offline = lambda j: "Offline reading. EXIT"
+        return a
+
+    def tearDown(self):
+        assistant.gemini, assistant.load_key, assistant.ocr_offline = self._orig
+
+    def press(self, a, hold):
+        a.on_button(True)
+        time.sleep(hold)
+        a.on_button(False)
+
+    def settle(self, a, t=1.5):
+        time.sleep(t)
+        a.busy.acquire(timeout=5)
+        a.busy.release()
+
+    def test_short_press_describes(self):
+        a = self.make()
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
+        self.assertEqual(self.said, ["Looking", "A clear pavement ahead."])
+
+    def test_double_press_reads_text(self):
+        a = self.make(reply="Exit")
+        self.press(a, 0.1)
+        time.sleep(0.15)
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.READ, False)])
+        self.assertEqual(self.said, ["Reading", "Exit"])
+
+    def test_hold_asks_with_audio(self):
+        a = self.make(reply="It is a bus stop.")
+        self.press(a, 1.2)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.ASK, True)])
+        self.assertEqual(self.said[-1], "It is a bus stop.")
+
+    def test_hold_with_no_mic_still_describes(self):
+        a = self.make(mic=self.Mic(ok=False))
+        self.press(a, 1.0)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
+        self.assertIn("I could not hear a question, describing instead", self.said)
+
+    def test_too_short_question_is_not_sent_as_audio(self):
+        a = self.make(mic=self.Mic(seconds=0.1))
+        self.press(a, 0.8)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
+
+    def test_no_internet_is_spoken(self):
+        a = self.make(error="no internet, assistant unavailable")
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "no internet, assistant unavailable")
+
+    def test_read_text_offline_falls_back_to_ocr(self):
+        a = self.make(error="no internet, assistant unavailable")
+        self.press(a, 0.1); time.sleep(0.15); self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "Offline reading. EXIT")
+
+    def test_busy_service_retries_once(self):
+        a = self.make(error="assistant busy, try again")
+        self.press(a, 0.1)
+        self.settle(a, 4.0)
+        self.assertEqual(len(self.prompts), 2)
+        self.assertIn("Still looking", self.said)
+
+    def test_no_key_is_spoken(self):
+        a = self.make(key="")
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "Assistant key missing")
+
+    def test_camera_failure_is_spoken(self):
+        a = self.make(jpeg=None)
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "Camera not ready")
+
+    def test_presses_during_an_answer_are_ignored(self):
+        a = self.make()
+        a.busy.acquire()
+        try:
+            self.press(a, 0.1)
+            time.sleep(0.8)
+        finally:
+            a.busy.release()
+        self.assertEqual(self.prompts, [])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -22,6 +22,7 @@ import argparse
 import glob
 import math
 import os
+import signal
 import sys
 import time
 from collections import namedtuple
@@ -40,12 +41,27 @@ MODEL_PREFERENCE = [
 # Classes that matter to someone walking. Everything else is noise on the street.
 # Order is roughly by how urgently it should be announced.
 PRIORITY = [
+    # smartcane152 drop-offs first: a fall is the worst outcome. Unknown to
+    # the COCO models, so harmless there.
+    "open hole", "stairs", "pothole", "manhole", "curb", "rail track",
+    "traffic cone", "barrier", "bollard",
     "person", "car", "motorcycle", "bus", "truck", "bicycle", "train",
     "dog", "cow", "horse", "traffic light", "stop sign", "bench", "chair",
     "potted plant", "fire hydrant", "backpack", "suitcase",
 ]
 
 Detection = namedtuple("Detection", "label score x0 y0 x1 y1")
+
+# SIGUSR1 asks for one full-resolution JPEG of the current view, for the AI
+# assistant. It lands in RAM (/dev/shm), not on the SD card. Written to a temp
+# name and renamed, so a reader never sees half a file.
+SNAPSHOT = "/dev/shm/cane_snapshot.jpg"
+_snapshot_wanted = False
+
+
+def _want_snapshot(signum, frame):
+    global _snapshot_wanted
+    _snapshot_wanted = True
 
 
 def pick_model(explicit):
@@ -265,6 +281,8 @@ def main():
         if args.preview:
             picam2.start_preview()
 
+        global _snapshot_wanted
+        signal.signal(signal.SIGUSR1, _want_snapshot)
         print("running. ctrl-c to stop.\n")
 
         frames = 0
@@ -273,6 +291,13 @@ def main():
         t_report = 0.0
         try:
             while True:
+                if _snapshot_wanted:
+                    _snapshot_wanted = False
+                    try:
+                        picam2.capture_file(SNAPSHOT + ".tmp", name="main", format="jpeg")
+                        os.replace(SNAPSHOT + ".tmp", SNAPSHOT)
+                    except Exception as exc:
+                        print(f"snapshot failed: {exc}", file=sys.stderr)
                 frame = picam2.capture_array("lores")
                 raw = hailo.run(frame)
                 dets = extract_detections(raw, labels, args.width, args.height, args.conf)

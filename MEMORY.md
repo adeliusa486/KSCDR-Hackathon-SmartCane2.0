@@ -2210,6 +2210,88 @@ Pretrained alternatives re-checked for Adeel: no ready model covers street
 hazards and runs on the Hailo-8L (COCO 80 / OIV7 600 / Objects365 / single
 hazard models / open-vocabulary). v3 is already transfer learning from COCO.
 
+
+### 6 October 2026: v3 done, Hailo compile, AI assistant (Gemini) live
+
+**v3 result:** 25 epochs (restarted once at epoch 13 from best.pt). Best
+epoch 24: mAP50 **0.536**, mAP50-95 0.376, precision 0.65, recall 0.49 on
+27,906 val images (v2 best 0.398). Per-class numbers not measured yet.
+
+**Hailo compile (PC, WSL Ubuntu):** DFC 3.34.0 in `~/hailo_dfc` (Python 3.10
+via uv, `tensorflow[and-cuda]==2.18.0` added so TF sees the RTX 4060). DFC
+5.4.0 wheel deleted: 5.x is Hailo-10H only. Files in `D:\smartcane-data\hailo\`:
+`smartcane152_v3.pt/.onnx` (opset 11, 640), `_parsed.har`, `nms_config.json`,
+`smartcane152_v3.alls`, `smartcane152.txt` (152 labels). End nodes
+`/model.23/cv2|cv3.{0,1,2}.2/Conv` -> conv51/54, 62/65, 77/80, same as the
+model zoo yolov11s. **On-chip NMS fails for meta_arch yolov8 on hailo8l**
+(UnsupportedMetaArchError), so NMS is `engine=cpu` (HailoRT on the Pi, same
+by-class output detect.py reads). optimization_level 2, 1,024 calibration
+images (val, plain 640 resize, matches the Pi's lores stream). QFT ~12 s/step,
+4 x 128 steps. Output will be `smartcane152_v3_h8l.hef`. **Risk:** DFC 3.34
+may target HailoRT newer than the Pi's 4.23. Check the HEF loads before use.
+
+**Pi IP:** first scan found nothing at .51 (Pi was booting). It came up at
+192.168.3.51 as usual. 192.168.3.9 has SSH too but is an old device
+(diffie-hellman-group1 only), not the Pi.
+
+**AI assistant (Adeel: online only, free, Gemini):**
+- `code/assistant.py` (new): short press = describe, hold = ask (records the
+  earbud mic in headset profile while held, max 10 s, audio goes straight to
+  Gemini). Models tried in order `gemini-flash-lite-latest`,
+  `gemini-flash-latest`, `gemini-3.8-flash`, each with thinkingLevel minimal
+  first. Flash-Lite ~2-10 s, Flash 20-30 s and often 503 today.
+  `gemini-2.5-flash` is closed to new keys. One retry on 503.
+- Key on the Pi only: `~/.config/smartcane/gemini_key` (600). Never in git.
+- `detect.py`: SIGUSR1 -> full-res JPEG at `/dev/shm/cane_snapshot.jpg`.
+- `esp32_link.py`: `on_button(pressed)` for `K down` / `K up`.
+- `speak_detect.py`: wires the assistant, `--model` / `--labels` passthrough,
+  `say_blocking()`, paplay timeout 30 s, PRIORITY now drop-offs first.
+- Firmware `build_2026-10-06`: button D33 to GND, INPUT_PULLUP, 30 ms
+  debounce, sends `K down` / `K up`. Flashed, runs.
+- Pi backup of the old files: `~/smartcane/backup_2026-10-06/`.
+- Verified: live snapshot -> Gemini -> reply ("too dark", lens was covered).
+  **Not verified:** physical button (wiring unknown), earbud mic (earbuds
+  were off, br-connection-page-timeout).
+
+**22:31 HEF built and live.** `smartcane152_v3_h8l.hef` 25.7 MB, 5 contexts,
+NMS by class (152 x 30), score th 0.2. **Loads on HailoRT 4.23** (no runtime
+upgrade needed). `hailortcli benchmark` 38.7 FPS (old yolov8s 58). Service
+now passes `--model ~/smartcane/models/smartcane152_v3_h8l.hef --labels
+~/smartcane/models/smartcane152.txt`. Live camera 30 s: steady 10.0 fps.
+Remove those two lines to return to COCO.
+
+**Bug found and fixed before it shipped:** `RELEVANT` in speak_detect.py
+held only COCO names, so with the new model stairs, curbs, potholes, open
+holes, crosswalks etc. would all have been spoken as "obstacle". Added the
+new street classes; detect.py PRIORITY gets drop-offs first.
+
+**Text reading (OCR):** double press. Gemini reads a blurred bus-stop sign
+word-perfect in 2.0 s. Offline fallback is Tesseract 5.3 (already on the Pi),
+0.5 s, misread 10 as 40 on the blurred test sign.
+
+**Tests:** `code/tests/test_cane.py`, 31 simulated scenarios (names for 27
+safety classes, urgency order, flicker, obstacle fallback, ToF distance,
+real Esp32Link on a pty with H drop/step and K down/up, sensor-dead warning,
+every assistant path and failure). **31/31 pass on the Pi.**
+
+**Real-photo hazard test** (`code/tools/hazard_eval.py`, 408 val photos,
+2,964 objects, Hailo on the Pi, 30 ms per photo, single frame):
+named 57 %, noticed (named or "obstacle") 68 %. Strong: wet floor sign,
+e-scooter, dog, car, person, traffic light (80-95 % noticed), stairs 79 %,
+pothole 76 %, open hole 76 %. Weak: pole 34 %, crosswalk 35 %, curb 35 %,
+rail track 35 %, bollard 39 %, barrier 42 %. Poles, bollards and barriers
+are what the forward ToF catches; curbs and drops are what the down ToF
+catches. Child usually named "person" (15 % named, 92 % noticed). Construction
+and bus stop signs rarely named (4 % / 0 %): double press reads them.
+**Open question:** `--confirm 3` needs 3 reports in a row with the same
+class, which hurts weak classes. Test lowering to 2 on a walk.
+
+**Power:** `get_throttled` 0x50000 after the benchmark (under-voltage and
+throttling happened since boot, 0x0 earlier). Demo needs the 27 W supply.
+**Camera** saw only darkness all evening (lens covered or facing a dark
+surface). SD: 32 GB card, 13 GB used, 15 GB free; cane code 150 MB, Hailo
+models 205 MB + 26 MB new HEF; `~/hazard_eval` 161 MB (test photos, can go).
+
 ---
 
-*Last updated: 3 October 2026*
+*Last updated: 6 October 2026*
