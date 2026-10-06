@@ -19,11 +19,9 @@ What it covers, in user terms:
     and every failure (no internet, no key, no mic, no camera) says something
 """
 import os
-import pty
 import sys
 import threading
 import time
-import tty
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -182,6 +180,8 @@ class Esp32Serial(unittest.TestCase):
             self.skipTest("pyserial not installed")
         if os.name != "posix":
             self.skipTest("needs a pty (run on the Pi)")
+        import pty
+        import tty
         from esp32_link import Esp32Link
         self.master, slave = pty.openpty()
         tty.setraw(slave)
@@ -355,6 +355,54 @@ class AssistantButton(unittest.TestCase):
         finally:
             a.busy.release()
         self.assertEqual(self.prompts, [])
+
+
+class DemoDashboard(unittest.TestCase):
+    """The laptop dashboard shows what the cane says and serves all 3 URLs."""
+
+    def test_spoken_words_reach_dashboard(self):
+        import demo_server
+        s = speaker()
+        try:
+            d = demo_server.DemoServer(0, os.path.join(assistant.SHM, "x.jpg"))
+            s.on_speak = d.spoken
+            s.say("stairs ahead, near")
+            s.say_blocking("Bus stop 42")
+            said = d.state()["said"]
+            self.assertEqual([(x["text"], x["kind"]) for x in said],
+                             [("stairs ahead, near", "speech"),
+                              ("Bus stop 42", "assistant")])
+        finally:
+            s._restore()
+
+    def test_page_stream_and_events_are_served(self):
+        import json
+        import socket
+        import urllib.request
+        import demo_server
+        from PIL import Image
+        view = os.path.join(assistant.SHM, "cane_view_test.jpg")
+        Image.new("RGB", (64, 36), (40, 40, 40)).save(view)
+        with open(os.path.splitext(view)[0] + ".json", "w") as fh:
+            json.dump({"fps": 10, "infer_ms": 30, "dets": []}, fh)
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        httpd = demo_server.DemoServer(port, view, model="m.hef", n_classes=152).start()
+        try:
+            base = f"http://127.0.0.1:{port}"
+            page = urllib.request.urlopen(base + "/", timeout=5).read()
+            self.assertIn(b"Smart Cane", page)
+            with urllib.request.urlopen(base + "/stream.mjpg", timeout=5) as r:
+                # Part header (~70 bytes) then the JPEG's start marker. The
+                # stream never ends, so read a fixed small amount.
+                self.assertIn(b"\xff\xd8", r.read(120))
+            with urllib.request.urlopen(base + "/events", timeout=5) as r:
+                line = r.readline().decode()
+            state = json.loads(line[len("data: "):])
+            self.assertEqual((state["classes"], state["vision"]["fps"]), (152, 10))
+        finally:
+            httpd.shutdown()
 
 
 if __name__ == "__main__":

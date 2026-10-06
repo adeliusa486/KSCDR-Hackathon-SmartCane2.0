@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Cane Live</title>
+<style>
+  :root {
+    --bg: #07090d; --panel: #10141b; --line: #1d2430; --text: #e8edf4;
+    --dim: #8792a2; --accent: #32d7e6; --ok: #30d158; --warn: #ff9f0a;
+    --bad: #ff3b30; --drop: #ff3b30; --vehicle: #ff9500; --living: #ffd60a;
+    --obstacle: #bf5af2; --object: #32d7e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 20% -10%, #0e1a24 0%, var(--bg) 60%);
+    color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: .3px; }
+  .logo svg { width: 28px; height: 28px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+          color: var(--bad); letter-spacing: 1.5px; margin-left: 4px; }
+  .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); animation: pulse 1.4s infinite; }
+  .live.off { color: var(--dim); } .live.off i { background: var(--dim); animation: none; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .pills { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+          padding: 5px 12px; font-size: 13px; color: var(--dim); white-space: nowrap; }
+  .pill b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px;
+         padding: 18px 22px 12px; min-height: 0; }
+  .stage { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .video { position: relative; border-radius: 14px; overflow: hidden; background: #000;
+           border: 1px solid var(--line); aspect-ratio: 16/9; max-height: 100%; }
+  .video img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .video .paused { position: absolute; inset: 0; display: none; place-items: center;
+                   color: var(--dim); font-size: 18px; background: rgba(0,0,0,.6); }
+  .video.stale .paused { display: grid; }
+  .alert { position: absolute; left: 0; right: 0; top: 0; padding: 14px 20px; font-size: 26px;
+           font-weight: 800; letter-spacing: .5px; background: linear-gradient(90deg, var(--bad), #c4161c);
+           transform: translateY(-110%); transition: transform .25s; display: flex; gap: 12px; align-items: center; }
+  .alert.show { transform: none; animation: flash .5s 4 alternate; }
+  @keyframes flash { to { filter: brightness(1.35); } }
+  .caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+             max-width: 86%; background: rgba(0,0,0,.72); backdrop-filter: blur(6px);
+             padding: 10px 18px; border-radius: 12px; font-size: 22px; font-weight: 600;
+             opacity: 0; transition: opacity .3s; text-align: center; }
+  .caption.show { opacity: 1; }
+  .caption small { display: block; font-size: 12px; color: var(--accent); letter-spacing: 1.5px;
+                   font-weight: 700; margin-bottom: 2px; }
+
+  .zones { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .zone { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 10px 14px; min-height: 64px; transition: border-color .2s, background .2s; }
+  .zone h4 { font-size: 11px; letter-spacing: 1.6px; color: var(--dim); margin-bottom: 4px; }
+  .zone div { font-size: 16px; font-weight: 600; }
+  .zone.hot { border-color: var(--warn); background: #1b1408; }
+  .zone.danger { border-color: var(--bad); background: #1f0b0b; }
+
+  aside { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .card h3 { font-size: 11px; letter-spacing: 1.6px; color: var(--dim); margin-bottom: 8px; font-weight: 700; }
+  .dist { display: flex; align-items: baseline; gap: 8px; }
+  .dist .num { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .dist .unit { color: var(--dim); font-size: 16px; }
+  .gauge { height: 10px; border-radius: 6px; margin-top: 10px; background: #1a212c; overflow: hidden; position: relative; }
+  .gauge i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 6px; transition: width .2s, background .2s; }
+  .ground { display: flex; align-items: center; justify-content: space-between; margin-top: 12px;
+            padding-top: 12px; border-top: 1px solid var(--line); }
+  .badge { font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 999px; }
+  .badge.ok { background: #0f2a18; color: var(--ok); } .badge.bad { background: #2c0c0c; color: var(--bad); }
+  .badge.na { background: #1a212c; color: var(--dim); }
+
+  .says { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .says ul { list-style: none; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+  .says li { padding: 8px 10px; border-radius: 10px; background: #151b24; border-left: 3px solid var(--accent);
+             animation: in .35s ease-out; }
+  .says li.hazard { border-left-color: var(--bad); background: #1f0e0e; }
+  .says li.assistant { border-left-color: var(--obstacle); background: #19121f; }
+  .says li time { display: block; font-size: 11px; color: var(--dim); }
+  .says li:nth-child(n+2) { opacity: .75; } .says li:nth-child(n+4) { opacity: .5; }
+  @keyframes in { from { transform: translateY(-8px); opacity: 0; } }
+  .empty { color: var(--dim); font-size: 14px; }
+
+  .dets { display: flex; flex-direction: column; gap: 7px; }
+  .det { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+  .det .dot { width: 10px; height: 10px; border-radius: 3px; }
+  .det .bar { grid-column: 2 / 4; height: 4px; background: #1a212c; border-radius: 3px; overflow: hidden; margin-top: -3px; }
+  .det .bar i { display: block; height: 100%; }
+  .det span { color: var(--dim); font-variant-numeric: tabular-nums; }
+
+  footer { display: flex; gap: 18px; padding: 8px 22px 14px; color: var(--dim); font-size: 12px; flex-wrap: wrap; }
+  footer i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  @media (max-width: 1000px) {
+    body { overflow: auto; } main { grid-template-columns: 1fr; }
+    .pills { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none" stroke="#32d7e6" stroke-width="2.4" stroke-linecap="round">
+      <path d="M11 4c4 0 6 2 6 5v19"/><path d="M17 28l4-1"/><circle cx="24" cy="10" r="2.2" fill="#32d7e6" stroke="none"/>
+      <path d="M27 6a7 7 0 0 1 0 8" opacity=".7"/><path d="M29.5 3.5a11 11 0 0 1 0 13" opacity=".4"/>
+    </svg>
+    Smart Cane <span class="live off" id="live"><i></i>LIVE</span>
+  </div>
+  <div class="pills">
+    <div class="pill">AI chip <b>Hailo-8L</b></div>
+    <div class="pill">Knows <b id="classes">-</b> objects</div>
+    <div class="pill">Camera <b id="fps">-</b> fps</div>
+    <div class="pill">AI time <b id="ms">-</b> ms</div>
+    <div class="pill">Temp <b id="temp">-</b></div>
+  </div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="video" id="video">
+      <img id="cam" src="/stream.mjpg" alt="Live view from the cane camera with detected objects outlined">
+      <div class="alert" id="alert">&#9888; <span id="alertText">Drop ahead</span></div>
+      <div class="caption" id="caption"><small>CANE SAYS</small><span id="captionText"></span></div>
+      <div class="paused">Camera paused</div>
+    </div>
+    <div class="zones">
+      <div class="zone" id="z-left"><h4>LEFT</h4><div>clear</div></div>
+      <div class="zone" id="z-ahead"><h4>AHEAD</h4><div>clear</div></div>
+      <div class="zone" id="z-right"><h4>RIGHT</h4><div>clear</div></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h3>DISTANCE AHEAD &middot; LASER SENSOR</h3>
+      <div class="dist"><span class="num" id="dist">--</span><span class="unit" id="distUnit"></span></div>
+      <div class="gauge"><i id="gauge"></i></div>
+      <div class="ground">
+        <span>Ground in front of tip</span><span class="badge na" id="ground">no sensor</span>
+      </div>
+    </div>
+    <div class="card says">
+      <h3>WHAT THE CANE SAYS</h3>
+      <ul id="said"><li class="empty" style="border:0;background:none">Waiting for the first words&hellip;</li></ul>
+    </div>
+    <div class="card">
+      <h3>SEEING NOW</h3>
+      <div class="dets" id="dets"><div class="empty">Nothing in view</div></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <span><i style="background:var(--drop)"></i>Drop-off / step</span>
+  <span><i style="background:var(--vehicle)"></i>Vehicle</span>
+  <span><i style="background:var(--living)"></i>Person / animal</span>
+  <span><i style="background:var(--obstacle)"></i>Obstacle</span>
+  <span><i style="background:var(--object)"></i>Other object</span>
+  <span style="margin-left:auto">Everything runs on the cane. No cloud needed for detection.</span>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const COLORS = { drop: "var(--drop)", vehicle: "var(--vehicle)", living: "var(--living)",
+                 obstacle: "var(--obstacle)", object: "var(--object)" };
+let lastSaid = 0, alertTimer = null, captionTimer = null;
+
+// The MJPEG stream drops if the Pi restarts the service. Reconnect quietly.
+$("cam").onerror = () => setTimeout(() => { $("cam").src = "/stream.mjpg?" + Date.now(); }, 1000);
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function render(s) {
+  const v = s.vision || {};
+  $("live").classList.toggle("off", s.vision_age > 2);
+  $("video").classList.toggle("stale", s.vision_age > 2);
+  $("fps").textContent = v.fps ?? "-";
+  $("ms").textContent = v.infer_ms ? Math.round(v.infer_ms) : "-";
+  $("temp").textContent = s.temp ? s.temp + "°C" : "-";
+  $("classes").textContent = s.classes || "-";
+
+  // Zones
+  const z = { left: [], ahead: [], right: [] };
+  (v.dets || []).forEach(d => z[d.zone] && z[d.zone].push(d));
+  for (const k of Object.keys(z)) {
+    const el = $("z-" + k);
+    el.querySelector("div").textContent = z[k].length
+      ? [...new Set(z[k].map(d => d.label))].slice(0, 3).join(", ") : "clear";
+    el.classList.toggle("danger", z[k].some(d => d.kind === "drop" || d.near === "close"));
+    el.classList.toggle("hot", z[k].length > 0);
+  }
+
+  // Detections list
+  const dets = (v.dets || []).slice(0, 6);
+  $("dets").innerHTML = dets.length ? dets.map(d => `
+    <div class="det"><i class="dot" style="background:${COLORS[d.kind]}"></i>
+      <div>${esc(d.label)} <span>&middot; ${d.zone}, ${d.near}</span></div>
+      <span>${Math.round(d.score * 100)}%</span>
+      <div class="bar"><i style="width:${Math.round(d.score * 100)}%;background:${COLORS[d.kind]}"></i></div>
+    </div>`).join("") : '<div class="empty">Nothing in view</div>';
+
+  // Distance sensors
+  const sn = s.sensors;
+  if (!sn) {
+    $("dist").textContent = "--"; $("distUnit").textContent = "";
+    $("ground").className = "badge na"; $("ground").textContent = "no sensor";
+  } else {
+    const mm = sn.fwd_mm;
+    if (mm == null) { $("dist").textContent = "clear"; $("distUnit").textContent = "> 2 m"; }
+    else if (mm < 1000) { $("dist").textContent = Math.round(mm / 10); $("distUnit").textContent = "cm"; }
+    else { $("dist").textContent = (mm / 1000).toFixed(2); $("distUnit").textContent = "m"; }
+    const pct = mm == null ? 0 : Math.max(0, Math.min(100, (2000 - mm) / 16));
+    $("gauge").style.width = pct + "%";
+    $("gauge").style.background = mm != null && mm < 400 ? "var(--bad)" : mm != null && mm < 1000 ? "var(--warn)" : "var(--ok)";
+    const g = $("ground");
+    if (!sn.alive) { g.className = "badge bad"; g.textContent = "sensors offline"; }
+    else if (!sn.down_ok) { g.className = "badge na"; g.textContent = "no reading"; }
+    else if (sn.ground_mm && sn.down_mm > sn.ground_mm + 150) { g.className = "badge bad"; g.textContent = "DROP"; }
+    else if (sn.ground_mm && sn.down_mm < sn.ground_mm - 120) { g.className = "badge bad"; g.textContent = "STEP UP"; }
+    else { g.className = "badge ok"; g.textContent = sn.ground_mm ? "level" : "learning"; }
+  }
+
+  // Speech transcript, newest first
+  const said = s.said || [];
+  if (said.length && said[said.length - 1].id !== lastSaid) {
+    const fresh = said.filter(x => x.id > lastSaid);
+    lastSaid = said[said.length - 1].id;
+    $("said").innerHTML = said.slice().reverse().slice(0, 7).map(x => {
+      const cls = /drop|step|careful|warning/i.test(x.text) ? "hazard" : x.kind === "assistant" ? "assistant" : "";
+      const t = new Date(x.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return `<li class="${cls}"><time>${t}${x.kind === "assistant" ? " &middot; AI assistant" : ""}</time>${esc(x.text)}</li>`;
+    }).join("");
+    const newest = fresh[fresh.length - 1];
+    if (newest) {
+      $("captionText").textContent = newest.text;
+      $("caption").classList.add("show");
+      clearTimeout(captionTimer);
+      captionTimer = setTimeout(() => $("caption").classList.remove("show"), 3500);
+      if (/drop|step up|careful/i.test(newest.text)) {
+        $("alertText").textContent = newest.text;
+        $("alert").classList.add("show");
+        clearTimeout(alertTimer);
+        alertTimer = setTimeout(() => $("alert").classList.remove("show"), 3000);
+      }
+    }
+  }
+}
+
+const es = new EventSource("/events");
+es.onmessage = e => { try { render(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+es.onerror = () => $("live").classList.add("off");
+</script>
+</body>
+</html>

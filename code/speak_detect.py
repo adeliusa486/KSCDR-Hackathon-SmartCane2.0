@@ -333,6 +333,14 @@ class Speaker:
         self.busy = threading.Lock()
         self.last_said = {}
         self.last_sound = time.time()
+        self.on_speak = None     # demo dashboard: called as on_speak(text, kind)
+
+    def _note(self, text, kind="speech"):
+        if self.on_speak is not None:
+            try:
+                self.on_speak(text, kind)
+            except Exception:
+                pass
 
     def _play(self, text, on_start=None):
         try:
@@ -369,6 +377,7 @@ class Speaker:
                 return
             self.last_said[key] = now
             print(f"  WOULD SAY: {text}")
+            self._note(text)
             if on_start is not None:
                 on_start()
             return
@@ -395,6 +404,7 @@ class Speaker:
             return
         self.last_said[key] = now
         print(f"  SPEAKING: {text}")
+        self._note(text)
         threading.Thread(target=self._play, args=(text, on_start),
                          daemon=True).start()
 
@@ -404,17 +414,20 @@ class Speaker:
         Detection phrases that arrive meanwhile are dropped as usual."""
         if self.dry_run:
             print(f"  WOULD SAY: {text}")
+            self._note(text, "assistant")
             return
         if not self.link.alive():
             self.link.try_reconnect()
             return
         if self.busy.acquire(timeout=wait):
             print(f"  SPEAKING (assistant): {text}")
+            self._note(text, "assistant")
             self._play(text)
 
     def _say_when_free(self, text):
         if self.busy.acquire(timeout=2.0):
             print(f"  SPEAKING (urgent): {text}")
+            self._note(text, "hazard")
             self._play(text)
         else:
             print(f"  (urgent dropped, speech stuck) {text}", file=sys.stderr)
@@ -566,6 +579,9 @@ def main():
                     "(default: detect.py picks the best installed one)")
     ap.add_argument("--labels", help="class names file forwarded to detect.py, "
                     "one per line, same order as the model")
+    ap.add_argument("--demo-port", type=int, default=0,
+                    help="serve the live laptop dashboard on this port "
+                         "(e.g. 8080). 0 = off")
     ap.add_argument("--fps", type=int, default=15,
                     help="camera fps, forwarded to detect.py. Lower = "
                          "longer exposure = far better in dim light.")
@@ -641,6 +657,23 @@ def main():
         cmd += ["--model", args.model]
     if args.labels:
         cmd += ["--labels", args.labels]
+
+    # Live dashboard for a laptop (investor demo). Off unless --demo-port.
+    if args.demo_port:
+        from demo_server import DemoServer
+        view = "/dev/shm/cane_view.jpg"
+        cmd += ["--stream-file", view]
+        n = 0
+        if args.labels and os.path.exists(args.labels):
+            with open(args.labels) as fh:
+                n = sum(1 for l in fh if l.strip())
+        demo = DemoServer(args.demo_port, view, esp, args.model, n)
+        try:
+            demo.start()
+            speaker.on_speak = demo.spoken
+            print(f"demo dashboard on http://{os.uname().nodename}.local:{args.demo_port}")
+        except OSError as e:
+            print(f"demo dashboard unavailable ({e}), cane runs normally")
 
     print("starting vision...")
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,

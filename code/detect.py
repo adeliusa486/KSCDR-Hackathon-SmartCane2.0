@@ -202,6 +202,10 @@ def main():
     ap.add_argument("--all-classes", action="store_true",
                     help="report every COCO class, not just the walking-relevant ones")
     ap.add_argument("--preview", action="store_true", help="show a window with boxes")
+    ap.add_argument("--stream-file", metavar="JPEG",
+                    help="demo mode: write every frame, boxes drawn, to this "
+                         "JPEG (plus a .json of the detections next to it) "
+                         "for the laptop dashboard. Off by default, zero cost.")
     ap.add_argument("--hfov", type=float, default=120.0,
                     help="camera horizontal field of view in degrees "
                          "(Arducam B0310 / IMX708 with the stock M12 lens is 120)")
@@ -283,6 +287,11 @@ def main():
 
         global _snapshot_wanted
         signal.signal(signal.SIGUSR1, _want_snapshot)
+        viewer = None
+        if args.stream_file:
+            from demo_view import Viewer
+            viewer = Viewer(args.stream_file, args.width, args.height,
+                            args.hfov, args.corridor, zone, nearness)
         print("running. ctrl-c to stop.\n")
 
         frames = 0
@@ -298,10 +307,28 @@ def main():
                         os.replace(SNAPSHOT + ".tmp", SNAPSHOT)
                     except Exception as exc:
                         print(f"snapshot failed: {exc}", file=sys.stderr)
-                frame = picam2.capture_array("lores")
+                if viewer is not None:
+                    # Both streams from one request, so the boxes drawn on
+                    # the main frame belong to exactly this picture.
+                    req = picam2.capture_request()
+                    try:
+                        frame = req.make_array("lores")
+                        view = req.make_array("main")
+                    finally:
+                        req.release()
+                else:
+                    frame = picam2.capture_array("lores")
+                t_inf = time.perf_counter()
                 raw = hailo.run(frame)
+                infer_ms = 1000 * (time.perf_counter() - t_inf)
                 dets = extract_detections(raw, labels, args.width, args.height, args.conf)
                 dets = rank(dets, args.width, args.height, not args.all_classes)
+                if viewer is not None:
+                    # The demo view must never be able to stop the cane.
+                    try:
+                        viewer.write(view, dets, fps, infer_ms)
+                    except Exception as exc:
+                        print(f"demo view failed: {exc}", file=sys.stderr)
 
                 frames += 1
                 now = time.monotonic()

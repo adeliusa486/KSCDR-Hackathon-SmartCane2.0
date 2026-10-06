@@ -25,6 +25,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -45,7 +46,9 @@ API = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateConten
 LONG_PRESS_S = 0.6
 DOUBLE_PRESS_S = 0.45    # a 2nd short press within this = read text
 MAX_RECORD_S = 10
-QUESTION_WAV = "/dev/shm/cane_question.wav"
+# RAM disk on the Pi, so recordings never wear the SD card. Temp dir elsewhere.
+SHM = "/dev/shm" if os.path.isdir("/dev/shm") else tempfile.gettempdir()
+QUESTION_WAV = os.path.join(SHM, "cane_question.wav")
 
 SYSTEM = (
     "You are the voice of a smart white cane used by a blind person. The photo "
@@ -137,7 +140,7 @@ def gemini(key, prompt, jpeg=None, wav=None, context="", timeout=15):
 def ocr_offline(jpeg, timeout=20):
     """Read text without internet, with Tesseract on the Pi's CPU. Rougher
     than Gemini (signs at an angle, low light), but it never needs a network."""
-    path = "/dev/shm/cane_ocr.jpg"
+    path = os.path.join(SHM, "cane_ocr.jpg")
     try:
         with open(path, "wb") as fh:
             fh.write(jpeg)

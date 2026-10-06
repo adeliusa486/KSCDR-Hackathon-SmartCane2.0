@@ -2292,6 +2292,28 @@ throttling happened since boot, 0x0 earlier). Demo needs the 27 W supply.
 surface). SD: 32 GB card, 13 GB used, 15 GB free; cane code 150 MB, Hailo
 models 205 MB + 26 MB new HEF; `~/hazard_eval` 161 MB (test photos, can go).
 
+### 6 October 2026 (late, Pi off): investor demo dashboard
+
+Pi shut down 23:3x at Adeel's request (assembly into the 3D-printed body
+tomorrow, then test). Built offline, **not yet run on the Pi**:
+- `code/demo_view.py`: with `detect.py --stream-file`, draws boxes (red
+  drop-off, orange vehicle, yellow person/animal, purple obstacle, cyan
+  other) and the ahead-corridor lines on a 960x540 copy of the main frame,
+  writes `/dev/shm/cane_view.jpg` + `.json` each frame. Wrapped in try, so it
+  can never stop detection.
+- `code/demo_server.py` + `code/demo_dashboard.html`: `speak_detect.py
+  --demo-port 8080` serves `/` (dashboard), `/stream.mjpg`, `/events` (SSE, 4/s:
+  detections, fps, Hailo ms, ToF, ground state, temp, transcript). Stdlib
+  only, no internet. Speaker.on_speak feeds the transcript (speech / hazard /
+  assistant). Service file now has `--demo-port 8080`.
+- Verified on the PC with fake detections and a real street photo
+  (screenshot good). Tests: 33 (2 new dashboard), all pass on the PC
+  (4 pty tests skip there, they passed on the Pi).
+- **Tomorrow:** deploy, check the CPU cost (~20 ms per frame estimated) and
+  temperature with the dashboard on, open http://smartcane.local:8080.
+  At the venue, Pi and laptop on the same phone hotspot (add its SSID to
+  the Pi beforehand with nmcli).
+
 ---
 
 *Last updated: 6 October 2026*
