@@ -10,6 +10,7 @@
 //   ToF 2   VCC 3V3, GND, SDA D18, SCL D19, XSHUT D27   (I2C bus 1, Wire1)
 //   Motor   IN D13, VCC VIN (5V), GND
 //   Assistant button   D33 to GND (internal pull-up, pressed = LOW)
+//   Second button      D32 to GND (internal pull-up, pressed = LOW)
 //
 // Each sensor has its own I2C bus, so both stay at the default address 0x29
 // and no readdressing is needed. XSHUT is used only to hard-reset a sensor
@@ -29,11 +30,13 @@
 //                 H step <mm> <base>                ground came up: kerb, step up
 //                 E <text>                          error
 //                 K down / K up                     assistant button pressed / released
+//                 J down / J up                     second button pressed / released
 //                                                   (the Pi times short vs long press)
 //   Pi -> ESP32   A0 / A1                           auto vibration off / on
 //                 B<duty>,<ms>                      one buzz, duty 0-100 %
 //                 R1 / R2                           sensor roles, saved
 //                 S                                 status report (incl. motor duty)
+//                 P                                 raw button pin levels (wiring check)
 
 #include <algorithm>
 #include <Wire.h>
@@ -44,6 +47,7 @@ const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
 const int PIN_MOTOR = 13;
 const int PIN_BUTTON = 33;         // assistant button to GND
+const int PIN_BUTTON2 = 32;        // second button to GND
 const int BUTTON_DEBOUNCE_MS = 30;
 
 const int PWM_HZ = 200;            // inaudible, coin motors respond well here
@@ -329,6 +333,10 @@ void handleCommand(const String &cmd) {
                     i == FWD ? "forward" : "down", tof[i].ok, tof[i].mm,
                     tof[i].reinits);
     Serial.printf("I auto=%d ground=%d motor=%d\n", autoBuzz, (int)baseline, motorDuty);
+  } else if (cmd == "P") {
+    // 1 = released (pull-up), 0 = pressed or shorted to GND.
+    Serial.printf("I pins D33=%d D32=%d\n", digitalRead(PIN_BUTTON),
+                  digitalRead(PIN_BUTTON2));
   } else if (cmd == "T") {
     // Wiring test. A sensor can ACK its address (power and the bus are
     // there) yet return garbage data (a marginal SDA/SCL contact). The ID
@@ -372,14 +380,17 @@ void readSerial() {
 
 // Reports edges only. A press shorter than the debounce time is ignored, so
 // contact bounce and cable noise never reach the Pi.
+struct Button { int pin; char tag; bool stable, last; uint32_t changedAt; };
+Button buttons[] = {{PIN_BUTTON, 'K'}, {PIN_BUTTON2, 'J'}};
+
 void pollButton(uint32_t now) {
-  static bool stable = false, last = false;
-  static uint32_t changedAt = 0;
-  bool pressed = digitalRead(PIN_BUTTON) == LOW;
-  if (pressed != last) { last = pressed; changedAt = now; }
-  if (pressed != stable && now - changedAt >= BUTTON_DEBOUNCE_MS) {
-    stable = pressed;
-    Serial.println(stable ? "K down" : "K up");
+  for (auto &b : buttons) {
+    bool pressed = digitalRead(b.pin) == LOW;
+    if (pressed != b.last) { b.last = pressed; b.changedAt = now; }
+    if (pressed != b.stable && now - b.changedAt >= BUTTON_DEBOUNCE_MS) {
+      b.stable = pressed;
+      Serial.printf("%c %s\n", b.tag, b.stable ? "down" : "up");
+    }
   }
 }
 
@@ -390,6 +401,7 @@ void setup() {
   ledcAttach(PIN_MOTOR, PWM_HZ, PWM_BITS);
   motor(0);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_BUTTON2, INPUT_PULLUP);
 
   prefs.begin("cane", false);
   setRoles(prefs.getUChar("fwd", 0));

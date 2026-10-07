@@ -675,9 +675,24 @@ def main():
         except OSError as e:
             print(f"demo dashboard unavailable ({e}), cane runs normally")
 
-    print("starting vision...")
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, text=True, bufsize=1)
+    vision_cmd = cmd
+
+    # Every class of the loaded model may be named, not only the COCO walking
+    # list. The 152-class model was trained for the cane, so its indoor
+    # classes (sink, window, lamp...) are wanted too.
+    relevant = set(RELEVANT)
+    if args.labels and os.path.exists(args.labels):
+        with open(args.labels) as fh:
+            relevant |= {l.strip() for l in fh if l.strip()}
+
+    def start_vision():
+        print("starting vision...")
+        return subprocess.Popen(vision_cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, text=True, bufsize=1)
+
+    # In a dict so the assistant's snapshot signals the current detect.py,
+    # also after a restart.
+    vision = {"proc": start_vision()}
 
     # AI assistant on the ESP32 button. Needs the ESP32 (that is where the
     # button is wired) and internet. Without either the cane works as before.
@@ -688,7 +703,10 @@ def main():
         def snapshot(timeout=2.0):
             path = "/dev/shm/cane_snapshot.jpg"
             before = os.path.getmtime(path) if os.path.exists(path) else 0
-            proc.send_signal(signal.SIGUSR1)
+            try:
+                vision["proc"].send_signal(signal.SIGUSR1)
+            except OSError:
+                return None
             end = time.time() + timeout
             while time.time() < end:
                 if os.path.exists(path) and os.path.getmtime(path) > before:
@@ -702,70 +720,90 @@ def main():
 
         helper = Assistant(snapshot, context, speaker.say_blocking, args.bt_mac)
         esp.on_button = helper.on_button
+        esp.on_button2 = helper.on_button2
         print("assistant button ready (press = describe, double press = "
-              "read text, hold = ask)")
+              "read text, hold = ask); second button = read text")
 
+    # If detect.py dies (camera missing, loose ribbon) the cane keeps running:
+    # ESP32 alerts, vibration, buttons and Bluetooth stay up, and vision is
+    # retried every 10 s. Before, the whole program exited and systemd
+    # restarted it, which re-paired the earbuds and dropped button presses.
     said_ready = False
+    warned_camera = False
     try:
-        for line in proc.stdout:
-            m = REPORT.match(line.strip())
-            if not m:
-                continue
-            latest["body"] = m.group(1).strip()
-            if not said_ready:
+        while not stop.is_set():
+            proc = vision["proc"]
+            for line in proc.stdout:
+                m = REPORT.match(line.strip())
+                if not m:
+                    continue
+                warned_camera = False
+                latest["body"] = m.group(1).strip()
+                if not said_ready:
+                    if haptic is not None:
+                        haptic.buzz("ready")
+                    speaker.say("Smart cane ready")
+                    said_ready = True
+                    continue
+                body = m.group(1).strip()
+                phrases = [] if (not body or body == "clear") else \
+                    [p.strip() for p in body.split("|") if p.strip()]
+
+                if not args.no_filter:
+                    phrases = resolve(phrases, relevant, args.name_conf)
+
+                # Flicker suppression runs on every report, including empty ones,
+                # so streaks decay when an object genuinely leaves the frame.
+                phrases = confirmer.update(phrases)
+                if not phrases:
+                    continue
+
+                phrases.sort(key=rank)
+
+                fwd_mm = None
+                if esp is not None and esp.alive() and esp.fwd_ok:
+                    fwd_mm = esp.fwd_mm
+                if watch is not None and any(
+                        split_phrase(p)[1] == "ahead" for p in phrases):
+                    watch.camera_ahead_at = time.time()
+                spoken, keys = with_tof(phrases[:args.max_objects], fwd_mm)
+
+                # Buzz BEFORE speaking, not after. Vibration reaches the user in
+                # about 200 ms, a spoken sentence takes well over a second. The
+                # feel says "something is there, and how urgent", the words that
+                # follow say what it is. Urgency is taken from the closest thing in
+                # view, not the first one named.
                 if haptic is not None:
-                    haptic.buzz("ready")
-                speaker.say("Smart cane ready")
-                said_ready = True
-                continue
-            body = m.group(1).strip()
-            phrases = [] if (not body or body == "clear") else \
-                [p.strip() for p in body.split("|") if p.strip()]
+                    order = {"close": 0, "near": 1, "far": 2}
+                    nearest = min(
+                        (split_phrase(p)[2] for p in phrases),
+                        key=lambda d: order.get(d, 3), default=None)
+                    if nearest in order:
+                        haptic.for_distance(nearest)
 
-            if not args.no_filter:
-                phrases = resolve(phrases, RELEVANT, args.name_conf)
-
-            # Flicker suppression runs on every report, including empty ones,
-            # so streaks decay when an object genuinely leaves the frame.
-            phrases = confirmer.update(phrases)
-            if not phrases:
-                continue
-
-            phrases.sort(key=rank)
-
-            fwd_mm = None
-            if esp is not None and esp.alive() and esp.fwd_ok:
-                fwd_mm = esp.fwd_mm
-            if watch is not None and any(
-                    split_phrase(p)[1] == "ahead" for p in phrases):
-                watch.camera_ahead_at = time.time()
-            spoken, keys = with_tof(phrases[:args.max_objects], fwd_mm)
-
-            # Buzz BEFORE speaking, not after. Vibration reaches the user in
-            # about 200 ms, a spoken sentence takes well over a second. The
-            # feel says "something is there, and how urgent", the words that
-            # follow say what it is. Urgency is taken from the closest thing in
-            # view, not the first one named.
-            if haptic is not None:
-                order = {"close": 0, "near": 1, "far": 2}
-                nearest = min(
-                    (split_phrase(p)[2] for p in phrases),
-                    key=lambda d: order.get(d, 3), default=None)
-                if nearest in order:
-                    haptic.for_distance(nearest)
-
-            on_start = None
-            if esp is not None:
-                cmd = sync_buzz(phrases[:args.max_objects], fwd_mm)
-                if cmd:
-                    on_start = lambda c=cmd: esp.send(c)
-            speaker.say(". ".join(spoken), key=" | ".join(keys),
-                        on_start=on_start)
+                on_start = None
+                if esp is not None:
+                    cmd = sync_buzz(phrases[:args.max_objects], fwd_mm)
+                    if cmd:
+                        on_start = lambda c=cmd: esp.send(c)
+                speaker.say(". ".join(spoken), key=" | ".join(keys),
+                            on_start=on_start)
+            proc.wait()
+            if stop.is_set():
+                break
+            print(f"vision stopped (exit {proc.returncode}), retrying in 10 s")
+            if not warned_camera:
+                speaker.say("Camera not working. Distance sensors still on",
+                            key="camera dead")
+                warned_camera = True
+            stop.wait(10)
+            if not stop.is_set():
+                vision["proc"] = start_vision()
     except KeyboardInterrupt:
         pass
     finally:
         stop.set()
-        proc.terminate()
+        vision["proc"].terminate()
         if esp is not None:
             esp.close()
         if haptic is not None:

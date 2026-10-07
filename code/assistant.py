@@ -256,6 +256,11 @@ class Assistant:
             self.pending = threading.Timer(DOUBLE_PRESS_S, self._single)
             self.pending.start()
 
+    def on_button2(self, pressed):
+        """Second button: read text on press."""
+        if pressed and not self.busy.locked():
+            self._go("read")
+
     def _single(self):
         self.pending = None
         self._go("describe")
