@@ -2430,6 +2430,61 @@ E: 175 -> 281 GB. The training venv must be recreated in `envs\venv`
 `E:\Work\new smart cane 2.0` is now a stale copy without backups: delete it
 after VS Code is reopened at `D:\smart cane 2.0`.
 
+### 8 October 2026 (afternoon): one-button assistant, live dashboard over the internet, website
+
+**Button 2 = the assistant (D33 to GND, the only button).** Short press:
+online, Gemini describes the scene, one buzz, listens 5 s for a question
+(answered from a fresh photo). Offline: the cane's own detector summary, then
+Tesseract reads any text. Hold 1 s: read text (Gemini online, Tesseract
+offline). Internet checked on every press. Verified on the cane with the
+earbuds off (earbud mic still untested).
+
+**Why the public dashboard "did not work":** through a Cloudflare quick
+tunnel the long-lived streams were held back. Measured from the laptop:
+/events 0 bytes in 6 s, /stream.mjpg in 256 KB blocks, while single requests
+(/state.json, /frame.jpg) passed in about 1 s. Same streams on the LAN: 35 KB
+and 560 KB in 5 s. Fix: the dashboard now polls /state.json 4 times a second
+and /frame.jpg on two staggered lanes. A synthetic-data probe server confirmed
+it is the tunnel, not the cane's server.
+
+**Dashboard always on.** `--demo-port 8080` is now in the service. The view
+is drawn only while a request arrived in the last 5 s (demo_server touches
+/dev/shm/cane_view.jpg.watch, demo_view.Viewer.due() checks it): detect.py
+10 % of a core unwatched, 30 % watched. With no token file the cane creates
+one (0600) and never serves the camera open. cloudflared 2026.10.0 installed
+on the Pi. `tools/go_live.sh` waits until the new address answers (DNS takes
+15 to 30 s, once more than 60 s) and keeps cloudflared's log in
+~/.cache/smartcane/cloudflared.log.
+
+**Verified through the public tunnel:** /health ok, 403 without or with a
+wrong token, and the GitHub Pages live.html showed LIVE with camera, three
+chairs with bearings (one ~3.9 m), ground 1.87 m vs 1.88 m learned. The
+speech panel stayed empty because the earbuds were off (sink auto_null).
+Every tunnel was closed after its test. Headless Edge screenshots fire at the
+load event, before the first state arrives through a tunnel: wrap the page
+in a frame whose load is delayed to capture real data.
+
+**Recording:** 30 s, 100 frames, Adeel holding the cane at a room scene
+(chairs, a wall unit labelled "tv", a wall labelled "bathtub" in 14 frames).
+In `web/replay/`, played by live.html when no cane is connected; `?at=15`
+starts at 15 s. Cane held up, so the down ToF saw ~1.9 m and said "drop
+ahead" several times. Re-record at walking angle in a clearer scene.
+
+**Website and CI/CD:** GitHub Pages enabled (source: GitHub Actions) at
+https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/ with live.html.
+CI (62 tests, training tests, firmware compile, website build) and the Pages
+deploy both pass. README rewritten with the live dashboard links and the four
+charts. At Adeel's request: no "build it yourself" on the website or README,
+nothing on the website or repo suggests it was made with an AI tool, the
+AI-chat prompt files (handoff-prompt.md, smart-cane-prompt.md, phase-prompts/)
+untracked and kept locally only (they remain in older commits), and the
+exploded view taken off the README, website and hardware.md until Adeel
+supplies a new image (prompt given to him).
+
+**Open:** licence is still MIT while Adeel wants nobody else to build the
+cane (his decision), docs/hardware.md and software.md still hold the full
+assembly and setup steps, re-record the demo, earbud mic test.
+
 ---
 
 *Last updated: 8 October 2026*
