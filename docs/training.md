@@ -75,8 +75,10 @@ Re-validated on 8 October 2026 with `code/training/val_per_class.py` on all 27,9
 To reproduce v3 (Windows, CUDA):
 
 ```powershell
-python -m venv venv; .\venv\Scripts\pip install ultralytics==8.4.155 torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
-.\venv\Scripts\python code\training\train.py --data path\to\merged_v2\smartcane.yaml `
+python -m venv envs\venv
+.\envs\venv\Scripts\pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+.\envs\venv\Scripts\pip install ultralytics==8.4.155
+.\envs\venv\Scripts\python code\training\train.py --data path\to\merged_v2\smartcane.yaml `
     --model path\to\v2_best.pt --epochs 100 --batch 24 --optimizer SGD `
     --lr0 0.002 --lrf 0.05 --cos-lr --warmup-epochs 0.5 --close-mosaic 4 --patience 8 --time 45.25 `
     --name smartcane152_v3
