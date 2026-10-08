@@ -59,21 +59,24 @@ class Viewer:
         self.hfov, self.corridor = hfov, corridor
         self.zone, self.nearness = zone, nearness
         self.font = _font(18)
-        self.sx, self.sy = OUT_W / width, OUT_H / height
+        # A camera mounted on its side gives an upright portrait picture.
+        self.out = (OUT_W, OUT_H) if width >= height else (OUT_H, OUT_W)
+        self.sx, self.sy = self.out[0] / width, self.out[1] / height
         # Edges of the 'ahead' walking corridor, drawn as two faint lines so
         # the audience sees why something is called left, ahead or right.
         import math
         half = math.tan(math.radians(hfov / 2))
         off = math.tan(math.radians(corridor)) / (2 * half)
-        self.lanes = [OUT_W * (0.5 - off), OUT_W * (0.5 + off)]
+        self.lanes = [self.out[0] * (0.5 - off), self.out[0] * (0.5 + off)]
 
     def write(self, frame, dets, fps, infer_ms):
         # picamera2 XRGB8888 arrives as B, G, R, X bytes.
-        img = Image.fromarray(frame[:, :, [2, 1, 0]]).resize((OUT_W, OUT_H),
+        img = Image.fromarray(frame[:, :, [2, 1, 0]]).resize(self.out,
                                                             Image.BILINEAR)
+        out_h = self.out[1]
         d = ImageDraw.Draw(img, "RGBA")
         for x in self.lanes:
-            d.line([(x, OUT_H * 0.35), (x, OUT_H)], fill=(255, 255, 255, 70), width=2)
+            d.line([(x, out_h * 0.35), (x, out_h)], fill=(255, 255, 255, 70), width=2)
         out = []
         for det in dets[:8]:
             col, kind = colour(det.label)

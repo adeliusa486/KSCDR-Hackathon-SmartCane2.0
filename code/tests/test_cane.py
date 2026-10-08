@@ -151,23 +151,124 @@ class NeverSilent(unittest.TestCase):
 class Distance(unittest.TestCase):
     def test_tof_replaces_camera_guess_only_ahead(self):
         spoken, _ = sd.with_tof(["pole ahead, far", "car left, near"], 640)
-        self.assertEqual(spoken, ["pole ahead, 60 centimetres", "car left, near"])
+        self.assertEqual(spoken, ["pole ahead, 0.6 meters", "car left, near"])
 
-    def test_spoken_distances(self):
-        self.assertEqual(sd.spoken_distance(999), "1 metre")
-        self.assertEqual(sd.spoken_distance(1240), "1.2 metres")
-        self.assertEqual(sd.spoken_distance(30), "10 centimetres")
+    def test_spoken_distances_are_in_meters(self):
+        self.assertEqual(sd.spoken_distance(999), "1 meter")
+        self.assertEqual(sd.spoken_distance(1240), "1.2 meters")
+        self.assertEqual(sd.spoken_distance(640), "0.6 meters")
+        self.assertEqual(sd.spoken_distance(30), "0.1 meters")
+
+    def test_camera_estimate_spoken_as_about_meters(self):
+        spoken, _ = sd.with_tof(["chair left, near 2.4m", "table right, far 4.1m"], None)
+        self.assertEqual(spoken, ["chair left, about 2.5 meters",
+                                  "table right, about 4 meters"])
+
+    def test_tof_not_given_to_object_it_is_not_measuring(self):
+        # Camera says the person is ~4 m away, the ToF beam hits something at
+        # 0.8 m: that is not the person.
+        spoken, _ = sd.with_tof(["person ahead, far 4.0m"], 800)
+        self.assertEqual(spoken, ["person ahead, about 4 meters"])
+        spoken, _ = sd.with_tof(["person ahead, near 1.4m"], 1250)
+        self.assertEqual(spoken, ["person ahead, 1.2 meters"])
 
     def test_closer_object_is_repeated_despite_timer(self):
         _, far = sd.with_tof(["person ahead, far"], 1100)
         _, close = sd.with_tof(["person ahead, far"], 400)
         self.assertNotEqual(far, close)
 
+    def test_small_estimate_changes_do_not_repeat(self):
+        _, a = sd.with_tof(["chair left, near 3.1m"], None)
+        _, b = sd.with_tof(["chair left, near 3.4m"], None)
+        self.assertEqual(a, b)
+
     def test_buzz_stronger_when_closer(self):
-        self.assertEqual(sd.tof_buzz(2000), "B60,150")
-        self.assertEqual(sd.tof_buzz(300), "B100,400")
+        self.assertEqual(sd.tof_buzz(2000), "B80,200")
+        self.assertEqual(sd.tof_buzz(300), "B100,450")
         self.assertEqual(sd.sync_buzz(["car left, far"], 500), sd.LIGHT_BUZZ)
         self.assertIsNone(sd.sync_buzz([], 500))
+
+
+class MoreObjects(unittest.TestCase):
+    """In a room the cane must move on from the person to the furniture."""
+
+    def test_identical_sentences_said_once(self):
+        ph = ["person right, close", "person right, close", "chair left, near"]
+        spoken, keys = sd.with_tof(ph, None)
+        got = sd.pick_fresh(ph, spoken, keys, lambda k: True, 2)
+        self.assertEqual([s for _, s, _ in got],
+                         ["person right, close", "chair left, near"])
+
+    def test_recently_said_object_makes_room_for_the_next(self):
+        s = speaker()
+        try:
+            ph = ["person ahead, near 2.0m", "chair left, near 2.4m",
+                  "table right, near 2.2m"]
+            for _ in range(2):
+                spoken, keys = sd.with_tof(ph, None)
+                got = sd.pick_fresh(ph, spoken, keys, s.fresh, 2)
+                s.say(". ".join(x for _, x, _ in got), part_keys=[k for _, _, k in got])
+            self.assertEqual(s.heard, [
+                "person ahead, about 2 meters. chair left, about 2.5 meters",
+                "table right, about 2 meters"])
+        finally:
+            s._restore()
+
+
+class Geometry(unittest.TestCase):
+    """detect.py's picture handling, without a camera."""
+
+    def setUp(self):
+        try:
+            import numpy  # noqa: F401
+            import detect
+        except ImportError as e:
+            self.skipTest(f"needs numpy and PIL ({e})")
+        self.d = detect
+
+    def test_real_fov_of_the_cropped_sensor_mode(self):
+        self.assertAlmostEqual(self.d.effective_hfov(120, 3072, 4608), 98.2, places=1)
+
+    def test_letterbox_maps_boxes_back(self):
+        import numpy as np
+        f = np.zeros((360, 640, 3), np.uint8)
+        inp, region = self.d.prepare(f, 640, 640)
+        self.assertEqual(inp.shape, (640, 640, 3))
+        self.assertEqual(int(inp[0, 0, 0]), self.d.PAD_VALUE)
+        # a box over the middle of the picture, in input coordinates
+        raw = [[np.array([(140 + 90) / 640, 0.25, (140 + 270) / 640, 0.75, 0.9])]]
+        (det,) = self.d.extract_detections(raw, ["chair"], 1280, 720, 0.25, region)
+        self.assertEqual((round(det.x0), round(det.y0), round(det.x1), round(det.y1)),
+                         (320, 180, 960, 540))
+
+    def test_rotate_90_turns_clockwise(self):
+        import numpy as np
+        f = np.zeros((360, 640, 3), np.uint8)
+        f[100:200, 300:400] = 255
+        inp, _ = self.d.prepare(f, 640, 640, rotate=90)
+        ys, xs = np.where(inp[:, :, 0] == 255)
+        self.assertEqual((ys.min(), ys.max(), xs.min(), xs.max()), (300, 399, 300, 399))
+
+    def test_ahead_when_box_crosses_the_centre_line(self):
+        self.assertEqual(self.d.zone(500, 1000, 1280, 98, 15), "ahead")
+        self.assertEqual(self.d.zone(900, 1100, 1280, 98, 15), "right")
+        self.assertEqual(self.d.zone(100, 300, 1280, 98, 15), "left")
+
+    def test_distance_estimate_and_cut_off_boxes(self):
+        D = self.d.Detection
+        person = D("person", 0.9, 600, 200, 700, 600)        # 400 px tall
+        self.assertAlmostEqual(self.d.estimate_m(person, 1280, 720, 98.2), 2.29, places=2)
+        cut = D("person", 0.9, 600, 0, 700, 600)              # head out of frame
+        self.assertIsNone(self.d.estimate_m(cut, 1280, 720, 98.2))
+        self.assertIsNone(self.d.estimate_m(D("pole", 0.9, 0, 100, 10, 300), 1280, 720, 98.2))
+        self.assertEqual(self.d.describe([person], 1280, 720, 4, 98.2, 15),
+                         "person ahead, close 2.3m @0.90")
+
+    def test_one_object_one_name(self):
+        D = self.d.Detection
+        kept = self.d.dedupe([D("desk", 0.6, 5, 5, 100, 100), D("table", 0.8, 0, 0, 100, 100),
+                              D("chair", 0.7, 200, 0, 300, 100)])
+        self.assertEqual([k.label for k in kept], ["table", "chair"])
 
 
 class Esp32Serial(unittest.TestCase):
@@ -225,11 +326,34 @@ class Esp32Serial(unittest.TestCase):
         try:
             w = sd.SensorWatch(self.link, s, 1000, stop)
             threading.Thread(target=w.run, daemon=True).start()
-            time.sleep(2.6)                        # no D lines at all
+            time.sleep(3.6)                        # no D lines, past start-up grace
             stop.set()
             self.assertIn("Warning, distance sensors not responding", s.heard)
         finally:
             s._restore()
+
+    def test_no_warning_during_start_up(self):
+        s = speaker()
+        stop = threading.Event()
+        try:
+            w = sd.SensorWatch(self.link, s, 1000, stop)
+            threading.Thread(target=w.run, daemon=True).start()
+            time.sleep(0.5)
+            self.feed("D 1000 640 1350 1 1 1300")
+            for _ in range(8):                     # keep the link alive 2 s
+                self.feed("D 1000 640 1350 1 1 1300")
+            stop.set()
+            self.assertNotIn("Warning, distance sensors not responding", s.heard)
+        finally:
+            s._restore()
+
+    def test_silent_port_is_reopened(self):
+        self.link.SILENT_REOPEN_S = 0.5
+        self.link.REOPEN_EVERY_S = 0.5
+        time.sleep(1.5)                            # nothing arrives
+        self.assertGreaterEqual(self.link.reopens, 1)
+        self.feed("D 1000 640 1350 1 1 1300")      # and it still reads after
+        self.assertEqual(self.link.fwd_mm, 640)
 
 
 class AssistantButton(unittest.TestCase):

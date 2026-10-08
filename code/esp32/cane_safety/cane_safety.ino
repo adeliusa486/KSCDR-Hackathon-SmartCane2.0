@@ -32,16 +32,27 @@
 //                 K down / K up                     assistant button pressed / released
 //                 J down / J up                     second button pressed / released
 //                                                   (the Pi times short vs long press)
+//                 Q <tof> <mm> <status>             raw reading, only while Q1 is on
 //   Pi -> ESP32   A0 / A1                           auto vibration off / on
 //                 B<duty>,<ms>                      one buzz, duty 0-100 %
 //                 R1 / R2                           sensor roles, saved
-//                 S                                 status report (incl. motor duty)
+//                 S                                 status report (incl. motor duty,
+//                                                   offsets, range status counts)
 //                 P                                 raw button pin levels (wiring check)
+//                 C<tof>,<mm>                       calibrate: a flat target is <mm>
+//                                                   from ToF <tof> (1 or 2). Averages
+//                                                   30 readings, saves the offset
+//                 C<tof>,0                          clear that offset
+//                 F1 / F0                           reject / keep readings the sensor
+//                                                   itself flags as wrong, saved
+//                 Q1 / Q0                           raw reading stream on / off
 
 #include <algorithm>
 #include <Wire.h>
 #include <VL53L0X.h>
 #include <Preferences.h>
+
+const char *FW_VERSION = "2026-10-08";
 
 const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
@@ -52,6 +63,11 @@ const int BUTTON_DEBOUNCE_MS = 30;
 
 const int PWM_HZ = 200;            // inaudible, coin motors respond well here
 const int PWM_BITS = 8;
+// A coin motor needs tens of ms at full voltage to spin up. Short pulses at
+// 60 % (the old far-obstacle feel) ended before it got going, which Adeel felt
+// as "nearly negligible" (8 Oct 2026). Every buzz from rest now starts with
+// this much full power, then drops to the asked duty.
+const int KICK_MS = 40;
 
 // Forward obstacle bands, in mm. Both sensors run in long-range mode (about
 // 2 m indoors, much less in direct sun). The down sensor needs it too: mounted
@@ -97,14 +113,29 @@ struct Tof {
   int mm = -1;                     // filtered: median of the last 3 readings
   int raw[3] = {-1, -1, -1};
   int rawIdx = 0;
+  int offset = 0;                  // mm added to every reading (C command)
   uint32_t lastReadMs = 0;
   uint32_t reinits = 0;
+  uint32_t status[16] = {0};       // count of each device range status
 };
 
 Tof tof[2];
 int FWD = 0, DOWN = 1;             // indexes into tof[], set by R1/R2
 bool autoBuzz = true;
+bool rejectBad = true;             // F1: drop readings flagged as wrong
+bool rawStream = false;            // Q1: print every raw reading
 Preferences prefs;
+
+// The VL53L0X tags each reading with a device range status, bits 6:3 of
+// RESULT_RANGE_STATUS. The Pololu library ignores it and returns a number
+// anyway. ST's own driver turns 1-3 into "hardware fail" and 6 and 9 into
+// "phase fail": the number is wrong, often wrapped around, so a far wall can
+// read as something 30 cm away. Those are rejected (taken as nothing in
+// range). Weak-signal (4) and minimum-range (8, 10) readings are kept until
+// field data shows what they do; `S` prints how often each status occurs.
+bool badStatus(int s) {
+  return s == 1 || s == 2 || s == 3 || s == 6 || s == 9;
+}
 
 // ---- ground model ---------------------------------------------------------
 
@@ -123,18 +154,33 @@ uint32_t lastHazardMs = 0;
 uint32_t manualUntil = 0;   // a manual buzz from the Pi overrides auto
 uint32_t hazardUntil = 0;   // the ground alarm overrides obstacle buzzing
 
-int motorDuty = 0;                 // last duty written, reported by S
+int motorDuty = 0;                 // asked duty, reported by S
+int motorOut = -1;                 // duty actually on the pin
+uint32_t kickUntil = 0;
+
+// Writes the pin: full power during the kick, then the asked duty. Called on
+// every change and every loop, so a kick also ends inside a manual buzz.
+void motorTick(uint32_t now) {
+  int out = (motorDuty > 0 && now < kickUntil) ? 100 : motorDuty;
+  if (out != motorOut) {
+    motorOut = out;
+    ledcWrite(PIN_MOTOR, (out * 255) / 100);
+  }
+}
 
 void motor(int dutyPct) {
+  uint32_t now = millis();
+  if (dutyPct > 0 && motorDuty == 0) kickUntil = now + KICK_MS;
   motorDuty = dutyPct;
-  ledcWrite(PIN_MOTOR, (dutyPct * 255) / 100);
+  motorTick(now);
 }
 
 // Obstacle feel is parking-sensor style, from the forward sensor (ToF 1) only:
-// the nearer, the stronger and faster, on a smooth scale from FAR_MM (60 %
-// duty, 100 ms on / 600 ms off) to CLOSE_MM, then a solid buzz. It was three
-// fixed steps until 3 Oct 2026. The ground alarm is deliberately different,
-// one long hard pulse, so a hole never feels like "something in front of you".
+// the nearer, the stronger and faster, on a smooth scale from FAR_MM (80 %
+// duty, 150 ms on / 600 ms off) to CLOSE_MM, then a solid buzz. It was three
+// fixed steps until 3 Oct 2026, and 60 % / 100 ms at the far end until 8 Oct.
+// The ground alarm is deliberately different, one long hard pulse, so a hole
+// never feels like "something in front of you".
 void updateMotor(uint32_t now) {
   if (now < manualUntil) return;
   if (now < hazardUntil) { motor(100); return; }
@@ -144,8 +190,8 @@ void updateMotor(uint32_t now) {
   if (mm < CLOSE_MM) { motor(100); return; }
 
   float c = float(FAR_MM - mm) / (FAR_MM - CLOSE_MM);   // 0 far .. 1 close
-  int duty = 60 + int(40 * c);
-  int onMs = 100;
+  int duty = 80 + int(20 * c);
+  int onMs = 150;
   int offMs = 60 + int(540 * (1 - c));
   motor((now % (onMs + offMs)) < (uint32_t)onMs ? duty : 0);
 }
@@ -291,9 +337,17 @@ void pollTof(Tof &t, int idx, uint32_t now) {
   if (!t.ok) return;
   uint8_t status = t.dev.readReg(VL53L0X::RESULT_INTERRUPT_STATUS);
   if (t.dev.last_status == 0 && (status & 0x07)) {
+    // Latched with the result, so it is read before the range read clears
+    // the interrupt.
+    int rs = (t.dev.readReg(VL53L0X::RESULT_RANGE_STATUS) >> 3) & 0x0F;
     uint16_t r = t.dev.readRangeContinuousMillimeters();
     if (!t.dev.timeoutOccurred() && t.dev.last_status == 0) {
-      t.raw[t.rawIdx] = (r >= 8000) ? -1 : r;   // 8190/8191 = nothing in range
+      t.status[rs]++;
+      if (rawStream) Serial.printf("Q %d %u %d\n", idx + 1, r, rs);
+      int v = (r >= 8000 || (rejectBad && badStatus(rs)))
+                  ? -1                              // 8190/8191 = nothing in range
+                  : max(0, int(r) + t.offset);
+      t.raw[t.rawIdx] = v;
       t.rawIdx = (t.rawIdx + 1) % 3;
       t.mm = median3(t.raw);
       t.lastReadMs = now;
@@ -308,6 +362,45 @@ void pollTof(Tof &t, int idx, uint32_t now) {
     t.reinits++;
     Serial.printf("E tof%d stopped answering, reinit #%u\n", idx + 1, t.reinits);
   }
+}
+
+// Offset calibration: hold a flat, light target (a wall, a sheet of paper)
+// square to the sensor at a known distance and send C<tof>,<mm>. Averages 30
+// good readings and stores the difference in flash. Blocks for about a second,
+// so it is a bench command, never sent while walking.
+void calibrate(int idx, int trueMm) {
+  if (idx < 0 || idx > 1) { Serial.println("E calibrate: tof must be 1 or 2"); return; }
+  Tof &t = tof[idx];
+  char key[5] = "off1";
+  key[3] = '1' + idx;
+  if (trueMm <= 0) {
+    t.offset = 0;
+    prefs.putShort(key, 0);
+    Serial.printf("I tof%d offset cleared\n", idx + 1);
+    return;
+  }
+  if (!t.ok) { Serial.printf("E tof%d not running\n", idx + 1); return; }
+  motor(0);
+  long sum = 0;
+  int n = 0;
+  uint32_t until = millis() + 3000;
+  while (n < 30 && millis() < until) {
+    if (t.dev.readReg(VL53L0X::RESULT_INTERRUPT_STATUS) & 0x07) {
+      int rs = (t.dev.readReg(VL53L0X::RESULT_RANGE_STATUS) >> 3) & 0x0F;
+      uint16_t r = t.dev.readRangeContinuousMillimeters();
+      if (!t.dev.timeoutOccurred() && r < 8000 && !badStatus(rs)) { sum += r; n++; }
+    }
+    delay(1);
+  }
+  if (n < 20) {
+    Serial.printf("E tof%d calibrate: only %d good readings, target too far or too dark\n",
+                  idx + 1, n);
+    return;
+  }
+  t.offset = trueMm - int(sum / n);
+  prefs.putShort(key, t.offset);
+  Serial.printf("I tof%d calibrated: reads %d mm, true %d mm, offset %d mm\n",
+                idx + 1, int(sum / n), trueMm, t.offset);
 }
 
 // ---- serial commands -----------------------------------------------------
@@ -328,11 +421,25 @@ void handleCommand(const String &cmd) {
     setRoles(cmd == "R1" ? 0 : 1);
     prefs.putUChar("fwd", FWD);
   } else if (cmd == "S") {
-    for (int i = 0; i < 2; i++)
-      Serial.printf("I tof%d %s ok=%d mm=%d reinits=%u\n", i + 1,
+    for (int i = 0; i < 2; i++) {
+      Serial.printf("I tof%d %s ok=%d mm=%d reinits=%u offset=%d status:", i + 1,
                     i == FWD ? "forward" : "down", tof[i].ok, tof[i].mm,
-                    tof[i].reinits);
-    Serial.printf("I auto=%d ground=%d motor=%d\n", autoBuzz, (int)baseline, motorDuty);
+                    tof[i].reinits, tof[i].offset);
+      for (int s = 0; s < 16; s++)
+        if (tof[i].status[s]) Serial.printf(" %d=%u", s, tof[i].status[s]);
+      Serial.println();
+    }
+    Serial.printf("I fw=%s auto=%d reject=%d ground=%d motor=%d\n", FW_VERSION,
+                  autoBuzz, rejectBad, (int)baseline, motorDuty);
+  } else if (cmd == "F0" || cmd == "F1") {
+    rejectBad = cmd == "F1";
+    prefs.putBool("reject", rejectBad);
+    Serial.printf("I reject flagged readings=%d\n", rejectBad);
+  } else if (cmd == "Q0" || cmd == "Q1") {
+    rawStream = cmd == "Q1";
+  } else if (cmd.startsWith("C") && cmd.indexOf(',') > 1) {
+    calibrate(cmd.substring(1, cmd.indexOf(',')).toInt() - 1,
+              cmd.substring(cmd.indexOf(',') + 1).toInt());
   } else if (cmd == "P") {
     // 1 = released (pull-up), 0 = pressed or shorted to GND.
     Serial.printf("I pins D33=%d D32=%d\n", digitalRead(PIN_BUTTON),
@@ -405,6 +512,9 @@ void setup() {
 
   prefs.begin("cane", false);
   setRoles(prefs.getUChar("fwd", 0));
+  rejectBad = prefs.getBool("reject", true);
+  tof[0].offset = prefs.getShort("off1", 0);
+  tof[1].offset = prefs.getShort("off2", 0);
 
   tof[0].bus = &Wire;  tof[0].sda = PIN_SDA1; tof[0].scl = PIN_SCL1; tof[0].xshut = PIN_XSHUT1;
   tof[1].bus = &Wire1; tof[1].sda = PIN_SDA2; tof[1].scl = PIN_SCL2; tof[1].xshut = PIN_XSHUT2;
@@ -413,7 +523,7 @@ void setup() {
   Wire.begin(PIN_SDA1, PIN_SCL1, 400000);
   Wire1.begin(PIN_SDA2, PIN_SCL2, 400000);
   delay(10);
-  Serial.println("I cane_safety boot");
+  Serial.printf("I cane_safety boot fw=%s\n", FW_VERSION);
 
   for (int i = 0; i < 2; i++) {
     digitalWrite(tof[i].xshut, HIGH);
@@ -447,6 +557,7 @@ void loop() {
   }
 
   updateMotor(now);
+  motorTick(millis());
 
   if (now - lastReport >= REPORT_MS) {
     lastReport = now;

@@ -132,28 +132,61 @@ def class_of(phrase):
 
 
 def spoken_distance(mm):
-    """1240 -> '1.2 metres', 640 -> '60 centimetres', 999 -> '1 metre'."""
-    cm = max(10, int(round(mm / 100.0)) * 10)   # 10 cm steps, ToF is +-3 cm
-    if cm < 100:
-        return f"{cm} centimetres"
-    m = cm / 100.0
-    return "1 metre" if cm == 100 else f"{m:g} metres"
+    """Measured ToF distance in metres, 0.1 m steps (the ToF is +-3 cm):
+    1240 -> '1.2 meters', 640 -> '0.6 meters', 999 -> '1 meter'."""
+    m = max(0.1, round(mm / 1000.0, 1))
+    return "1 meter" if m == 1.0 else f"{m:g} meters"
+
+
+def camera_distance(m):
+    """Camera estimate in metres. It is only good to about +-30 %, so half
+    metre steps and 'about': 2.4 -> 'about 2.5 meters'."""
+    m = max(0.5, round(m * 2) / 2.0)
+    return "about 1 meter" if m == 1.0 else f"about {m:g} meters"
+
+
+def parse_dist(dist):
+    """detect.py's distance field: 'near 2.4m' -> ('near', 2.4),
+    'close' -> ('close', None)."""
+    parts = dist.split()
+    if parts and parts[-1].endswith("m"):
+        try:
+            return " ".join(parts[:-1]), float(parts[-1][:-1])
+        except ValueError:
+            pass
+    return dist, None
 
 
 def distance_band(mm):
     """Coarse band used to decide whether a changed distance is worth saying
     again. Re-announcing every 10 cm would never let the user hear anything
     else, but 'it just got close' must not be muted by the repeat timer."""
-    return "close" if mm < 500 else "near" if mm < 1000 else "far"
+    return ("very close" if mm < 500 else "close" if mm < 1000
+            else "near" if mm < 2500 else "far")
+
+
+def tof_measures(phrase, fwd_mm):
+    """True if the forward ToF reading belongs to this object.
+
+    Only 'ahead' can get it. The VL53L0X sees a ~25 degree cone, roughly the
+    camera's ahead corridor, so a left or right object is not what the ToF is
+    measuring. And when the camera's own estimate disagrees by more than 2x,
+    the beam is on something else (a chair in front of the person the camera
+    named), so the reading is not given to the named object either.
+    """
+    if fwd_mm is None:
+        return False
+    _, direction, dist, _ = split_phrase(phrase)
+    if direction != "ahead":
+        return False
+    est = parse_dist(dist)[1]
+    return est is None or 0.5 <= (fwd_mm / 1000.0) / est <= 2.0
 
 
 def with_tof(phrases, fwd_mm):
-    """Replace the camera's distance guess with the measured ToF distance for
-    things straight ahead.
-
-    Only 'ahead' gets it. The VL53L0X sees a ~25 degree cone, roughly the
-    camera's ahead corridor, so a left or right object is not what the ToF is
-    measuring. Giving it that number would be a confident wrong answer.
+    """Spoken form of each phrase, with the best distance there is:
+    the measured ToF distance when it belongs to the object, else the
+    camera's estimate in metres, else the camera's size word.
 
     Returns (spoken phrases, repeat keys). The key carries a distance band, not
     the exact number, so 'person ahead' approaching from 1.1 m to 0.4 m is said
@@ -162,12 +195,17 @@ def with_tof(phrases, fwd_mm):
     spoken, keys = [], []
     for p in phrases:
         cls, direction, dist, _ = split_phrase(p)
-        if direction == "ahead" and fwd_mm is not None:
-            spoken.append(f"{cls} ahead, {spoken_distance(fwd_mm)}")
-            keys.append(f"{cls} ahead {distance_band(fwd_mm)}")
+        word, est = parse_dist(dist)
+        head = f"{cls} {direction}" if direction else cls
+        if tof_measures(p, fwd_mm):
+            spoken.append(f"{head}, {spoken_distance(fwd_mm)}")
+            keys.append(f"{head} {distance_band(fwd_mm)}")
+        elif est is not None:
+            spoken.append(f"{head}, {camera_distance(est)}")
+            keys.append(f"{head} {distance_band(est * 1000)}")
         else:
-            spoken.append(p)
-            keys.append(p)
+            spoken.append(f"{head}, {word}" if word else head)
+            keys.append(f"{head} {word}")
     return spoken, keys
 
 
@@ -204,6 +242,23 @@ def resolve(phrases, relevant, name_conf):
         out.append(f"obstacle {direction}, {dist}" if direction else
                    f"obstacle, {dist}")
     return out
+
+
+def pick_fresh(phrases, spoken, keys, fresh, limit):
+    """The objects to say now: most urgent first, skipping any whose own
+    repeat timer is still running and any sentence already picked (two
+    people both 'right, close' are said once). Returns (phrase, spoken, key)
+    triples. Before 8 Oct 2026 the whole sentence shared one timer, so the
+    same top two objects blocked everything else in view."""
+    picked, seen = [], set()
+    for p, s, k in zip(phrases, spoken, keys):
+        if s in seen or not fresh(k):
+            continue
+        seen.add(s)
+        picked.append((p, s, k))
+        if len(picked) == limit:
+            break
+    return picked
 
 
 class Confirmer:
@@ -362,20 +417,30 @@ class Speaker:
             # the cane silent forever while still looking healthy.
             self.busy.release()
 
+    def fresh(self, key, repeat_after=None):
+        """True if `key` has not been spoken within the repeat time."""
+        repeat_after = self.repeat_after if repeat_after is None else repeat_after
+        return time.time() - self.last_said.get(key, 0) >= repeat_after
+
     def say(self, text, key=None, urgent=False, repeat_after=None,
-            on_start=None):
+            on_start=None, part_keys=None):
         """key: what the repeat timer is keyed on, default the text itself.
         urgent: wait up to 2 s for current speech to finish instead of
         dropping. Only for ground hazards, where a dropped warning means the
         user steps into a hole with only the vibration to go on.
-        on_start: called the moment audio starts, used for the sync buzz."""
+        on_start: called the moment audio starts, used for the sync buzz.
+        part_keys: one repeat key per object in the sentence. Each object then
+        gets its own timer, so a chair is not muted because the person next
+        to it was just announced. The caller has already picked fresh ones."""
         key = key or text
         repeat_after = self.repeat_after if repeat_after is None else repeat_after
         if self.dry_run:
             now = time.time()
-            if now - self.last_said.get(key, 0) < repeat_after:
+            if not part_keys and now - self.last_said.get(key, 0) < repeat_after:
                 return
             self.last_said[key] = now
+            for k in part_keys or ():
+                self.last_said[k] = now
             print(f"  WOULD SAY: {text}")
             self._note(text)
             if on_start is not None:
@@ -389,7 +454,7 @@ class Speaker:
             return
 
         now = time.time()
-        if now - self.last_said.get(key, 0) < repeat_after:
+        if not part_keys and now - self.last_said.get(key, 0) < repeat_after:
             if self.verbose:
                 print(f"  (muted) {text}")
             return
@@ -403,6 +468,8 @@ class Speaker:
                 print(f"  (still speaking, dropped) {text}")
             return
         self.last_said[key] = now
+        for k in part_keys or ():
+            self.last_said[k] = now
         print(f"  SPEAKING: {text}")
         self._note(text)
         threading.Thread(target=self._play, args=(text, on_start),
@@ -455,24 +522,27 @@ def watchdog(link, speaker, keepalive_after, stop):
 # the same range as the ESP32's own obstacle feel (CLOSE_MM / FAR_MM in
 # cane_safety.ino): the nearer, the stronger and longer. A camera guess is not
 # a measured distance, so it never makes the buzz stronger (Adeel, 3 Oct 2026).
+# 8 Oct 2026: Adeel felt the old 60 % / 150 ms floor as "nearly negligible".
+# A coin motor barely spins up in 150 ms at 60 %, so the floor is now 80 % for
+# 200 ms, and the firmware kicks the motor at full power for its first 40 ms.
 BUZZ_CLOSE_MM, BUZZ_FAR_MM = 400, 1500
-LIGHT_BUZZ = "B60,150"   # named, but not measured by ToF 1
+LIGHT_BUZZ = "B80,200"   # named, but not measured by ToF 1
 
 
 def tof_buzz(mm):
-    """Buzz for a forward ToF distance, on a smooth scale: 60 % for 150 ms at
-    1.5 m and beyond, up to 100 % for 400 ms at 0.4 m and nearer."""
+    """Buzz for a forward ToF distance, on a smooth scale: 80 % for 200 ms at
+    1.5 m and beyond, up to 100 % for 450 ms at 0.4 m and nearer."""
     c = min(1.0, max(0.0, (BUZZ_FAR_MM - mm) / (BUZZ_FAR_MM - BUZZ_CLOSE_MM)))
-    return f"B{round(60 + 40 * c)},{round(150 + 250 * c)}"
+    return f"B{round(80 + 20 * c)},{round(200 + 250 * c)}"
 
 
 def sync_buzz(phrases, fwd_mm):
-    """Buzz for a sentence about to be spoken. Something named 'ahead' with a
-    ToF 1 distance: scaled by that distance. Anything else (left, right, or no
-    ToF reading): one fixed light buzz. Nothing to say: no buzz."""
+    """Buzz for a sentence about to be spoken. Something named 'ahead' that
+    ToF 1 is measuring: scaled by that distance. Anything else (left, right,
+    or no ToF reading): one fixed light buzz. Nothing to say: no buzz."""
     if not phrases:
         return None
-    if fwd_mm is not None and any(split_phrase(p)[1] == "ahead" for p in phrases):
+    if any(tof_measures(p, fwd_mm) for p in phrases):
         return tof_buzz(fwd_mm)
     return LIGHT_BUZZ
 
@@ -492,13 +562,25 @@ class SensorWatch:
     sensors looks healthy while protecting nobody.
     """
 
+    # The link gets this long after start-up before silence counts as a fault,
+    # so the cane no longer says "distance sensors not responding" at every
+    # start just because the first reading has not arrived yet.
+    STARTUP_GRACE_S = 3.0
+    # Ground sensor working but no ground learned for this long: it cannot
+    # reach the ground (aimed too far ahead, dark asphalt) and no drop will
+    # ever be reported. Before 8 Oct 2026 that state was silent.
+    NO_GROUND_S = 20.0
+
     def __init__(self, link, speaker, obstacle_mm, stop):
         self.link = link
         self.speaker = speaker
         self.obstacle_mm = obstacle_mm
         self.stop = stop
-        self.camera_ahead_at = 0.0   # last time the camera named something ahead
+        self.camera_ahead_at = 0.0   # last time the ToF reading was given to a
+                                     # named object ahead
         self.bad_since = {}          # sensor name -> when it started failing
+        self.no_ground_since = None
+        self.started = time.time()
         link.on_hazard = self.on_hazard
 
     def on_hazard(self, kind, mm):
@@ -511,6 +593,8 @@ class SensorWatch:
         was_alive = True
         while not self.stop.is_set():
             time.sleep(0.2)
+            if time.time() - self.started < self.STARTUP_GRACE_S:
+                continue
             if not self.link.alive(within=2.0):
                 if was_alive:
                     print("  ESP32 LINK SILENT", file=sys.stderr)
@@ -533,6 +617,14 @@ class SensorWatch:
                 elif now - self.bad_since.setdefault(name, now) > 3:
                     self.speaker.say(f"Warning, {name} sensor not working",
                                      key=f"{name}-sensor-dead", repeat_after=60)
+            if self.link.down_ok and self.link.ground_mm is None:
+                if self.no_ground_since is None:
+                    self.no_ground_since = now
+                elif now - self.no_ground_since > self.NO_GROUND_S:
+                    self.speaker.say("Ground sensor cannot see the ground",
+                                     key="no-ground", repeat_after=300)
+            else:
+                self.no_ground_since = None
             mm = self.link.fwd_mm if self.link.fwd_ok else None
             # Something solid ahead that the camera has not named recently:
             # glass, a pole, a wall, anything outside the model's classes.
@@ -587,6 +679,12 @@ def main():
                          "longer exposure = far better in dim light.")
     ap.add_argument("--ev", type=float, default=0.7,
                     help="exposure bias, forwarded to detect.py")
+    ap.add_argument("--rotate", type=int, default=0, choices=(0, 90, 180, 270),
+                    help="camera mount rotation, forwarded to detect.py")
+    ap.add_argument("--corridor", type=float, default=15.0,
+                    help="half-width of 'ahead' in degrees, forwarded")
+    ap.add_argument("--fit", choices=("letterbox", "stretch"),
+                    default="letterbox", help="forwarded to detect.py")
     ap.add_argument("--no-haptics", action="store_true",
                     help="do not drive the vibration motor")
     ap.add_argument("--motor-pin", type=int, default=18,
@@ -650,7 +748,9 @@ def main():
 
     cmd = [sys.executable, "-u", os.path.join(HERE, "detect.py"),
            "--interval", str(args.interval), "--conf", str(args.conf),
-           "--fps", str(args.fps), "--ev", str(args.ev)]
+           "--fps", str(args.fps), "--ev", str(args.ev),
+           "--rotate", str(args.rotate), "--corridor", str(args.corridor),
+           "--fit", args.fit]
     if args.all_classes:
         cmd.append("--all-classes")
     if args.model:
@@ -687,8 +787,10 @@ def main():
 
     def start_vision():
         print("starting vision...")
+        # stderr goes to the journal. It went to /dev/null until 8 Oct 2026,
+        # which hid why vision died ("exit 1") on four boots on 7 Oct.
         return subprocess.Popen(vision_cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True, bufsize=1)
+                                stderr=None, text=True, bufsize=1)
 
     # In a dict so the assistant's snapshot signals the current detect.py,
     # also after a restart.
@@ -764,9 +866,20 @@ def main():
                 if esp is not None and esp.alive() and esp.fwd_ok:
                     fwd_mm = esp.fwd_mm
                 if watch is not None and any(
-                        split_phrase(p)[1] == "ahead" for p in phrases):
+                        tof_measures(p, fwd_mm) for p in phrases):
                     watch.camera_ahead_at = time.time()
-                spoken, keys = with_tof(phrases[:args.max_objects], fwd_mm)
+
+                # Each object has its own repeat timer. Pick the most urgent
+                # ones not said recently, so in a room the cane moves on to
+                # the table and the door instead of naming the same person
+                # every 4 s. Identical sentences ("person right, close"
+                # twice for two people) are said once.
+                spoken, keys = with_tof(phrases, fwd_mm)
+                picked = pick_fresh(phrases, spoken, keys, speaker.fresh,
+                                    args.max_objects)
+                if not picked:
+                    continue
+                said = [p for p, _, _ in picked]
 
                 # Buzz BEFORE speaking, not after. Vibration reaches the user in
                 # about 200 ms, a spoken sentence takes well over a second. The
@@ -776,17 +889,19 @@ def main():
                 if haptic is not None:
                     order = {"close": 0, "near": 1, "far": 2}
                     nearest = min(
-                        (split_phrase(p)[2] for p in phrases),
+                        (parse_dist(split_phrase(p)[2])[0] for p in phrases),
                         key=lambda d: order.get(d, 3), default=None)
                     if nearest in order:
                         haptic.for_distance(nearest)
 
                 on_start = None
                 if esp is not None:
-                    cmd = sync_buzz(phrases[:args.max_objects], fwd_mm)
+                    cmd = sync_buzz(said, fwd_mm)
                     if cmd:
                         on_start = lambda c=cmd: esp.send(c)
-                speaker.say(". ".join(spoken), key=" | ".join(keys),
+                speaker.say(". ".join(s for _, s, _ in picked),
+                            key=" | ".join(k for _, _, k in picked),
+                            part_keys=[k for _, _, k in picked],
                             on_start=on_start)
             proc.wait()
             if stop.is_set():

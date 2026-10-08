@@ -14,28 +14,57 @@ dtr=False then rts=False before open (the usual advice) passes through exactly
 the reset state between the two writes. Measured: that reset the ESP32 on every
 open, while the plain default open reset it 0 times in 3.
 
+The link reopens itself when it goes quiet. On 7 and 8 Oct 2026 the port
+opened at boot and then delivered nothing for whole sessions (3.5 h and 10 h):
+the ESP32 was running and printing, the kernel logged CP2102 control-request
+timeouts ("failed set request 0x12 status: -110"), and closing and reopening
+the port brought the readings straight back. Every distance in those sessions
+was a camera guess. A USB re-enumeration (ESP32 brown-out, loose cable) can
+also move the port to a new name, so the reopen looks the device up again.
+
     python3 esp32_link.py                     # print readings for 10 s
     python3 esp32_link.py --seconds 30
     python3 esp32_link.py --send B100,500     # one buzz, then print
     python3 esp32_link.py --send R2           # swap forward/down roles (saved)
 """
 import argparse
+import glob
+import os
 import threading
 import time
 
 import serial
 
 DEFAULT_PORT = "/dev/ttyUSB0"
+BY_ID = "/dev/serial/by-id/*CP210*"
+
+
+def find_port(preferred):
+    """The configured port if it exists, else the CP2102 under any name."""
+    if os.path.exists(preferred):
+        return preferred
+    for pattern in (BY_ID, "/dev/ttyUSB*"):
+        found = sorted(glob.glob(pattern))
+        if found:
+            return found[0]
+    return preferred
 
 
 class Esp32Link:
+    SILENT_REOPEN_S = 3.0   # no line for this long: close and reopen the port
+    REOPEN_EVERY_S = 5.0    # at most one reopen per this many seconds
+
     def __init__(self, port=DEFAULT_PORT, baud=115200, on_line=None,
                  on_hazard=None):
-        # Default DTR/RTS handling on purpose, see the module docstring.
-        self.ser = serial.Serial(port, baud, timeout=0.2)
-        # Drop readings that piled up while the port was closed (over a
-        # thousand were measured). A stale distance is worse than none.
-        self.ser.reset_input_buffer()
+        self.port, self.baud = port, baud
+        self._lock = threading.Lock()   # guards self.ser against send/reopen
+        # A missing ESP32 at start-up is not final: the reader keeps looking,
+        # so a cable plugged in after boot still brings the sensors in.
+        try:
+            self.ser = self._open()
+        except (serial.SerialException, OSError) as e:
+            print(f"  ESP32 not found ({e}), will keep looking")
+            self.ser = None
         self.on_line = on_line
         self.on_hazard = on_hazard     # called as on_hazard("drop"|"step", mm)
         self.on_button = None          # called as on_button(pressed: bool)
@@ -44,10 +73,39 @@ class Esp32Link:
         self.down_mm = None            # distance to the ground
         self.ground_mm = None          # learned normal ground distance
         self.fwd_ok = self.down_ok = False
-        self.last_data = 0.0
+        self.last_data = 0.0           # last D line
+        self.last_line = time.time()   # last line of any kind, or the open
+        self.reopens = 0
+        self._last_reopen = time.time()
         self._stop = False
         self._thread = threading.Thread(target=self._reader, daemon=True)
         self._thread.start()
+
+    def _open(self):
+        # Default DTR/RTS handling on purpose, see the module docstring.
+        ser = serial.Serial(find_port(self.port), self.baud, timeout=0.2)
+        # Drop readings that piled up while the port was closed (over a
+        # thousand were measured). A stale distance is worse than none.
+        ser.reset_input_buffer()
+        return ser
+
+    def _reopen(self, why):
+        now = time.time()
+        if now - self._last_reopen < self.REOPEN_EVERY_S:
+            return
+        self._last_reopen = now
+        self.reopens += 1
+        print(f"  ESP32 {why}, reopening the port (#{self.reopens})")
+        with self._lock:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+            try:
+                self.ser = self._open()
+                self.last_line = time.time()
+            except (serial.SerialException, OSError) as e:
+                print(f"  ESP32 reopen failed: {e}")
 
     def _reader(self):
         buf = b""
@@ -56,13 +114,24 @@ class Esp32Link:
                 # Read what is waiting, or block for ONE byte. A fixed-size
                 # read(256) waits for the timeout to fill its buffer, which
                 # batched readings and added up to 200 ms of lag.
-                buf += self.ser.read(self.ser.in_waiting or 1)
-            except serial.SerialException:
+                ser = self.ser
+                buf += ser.read(ser.in_waiting or 1)
+            except (serial.SerialException, OSError, TypeError, AttributeError):
+                # TypeError/AttributeError: pyserial on a port closed under it.
+                buf = b""
                 time.sleep(0.5)
+                self._reopen("port error")
+                continue
+            if time.time() - self.last_line > self.SILENT_REOPEN_S:
+                buf = b""
+                self._reopen(f"silent for {self.SILENT_REOPEN_S:g} s")
                 continue
             while b"\n" in buf:
                 raw, buf = buf.split(b"\n", 1)
                 line = raw.decode(errors="replace").strip()
+                if not line:
+                    continue
+                self.last_line = time.time()
                 if line.startswith("D "):
                     self._parse_data(line)
                 elif line.startswith("H ") and self.on_hazard:
@@ -85,7 +154,7 @@ class Esp32Link:
 
     def _parse_data(self, line):
         try:
-            _, _ms, fwd, down, fok, dok, base = line.split()
+            _, _ms, fwd, down, fok, dok, base = line.split()[:7]
             mm = lambda v: None if int(v) < 0 else int(v)
             self.fwd_mm, self.down_mm, self.ground_mm = mm(fwd), mm(down), mm(base)
             self.fwd_ok, self.down_ok = fok == "1", dok == "1"
@@ -98,12 +167,18 @@ class Esp32Link:
         return time.time() - self.last_data < within
 
     def send(self, cmd):
-        self.ser.write((cmd + "\n").encode())
+        with self._lock:
+            try:
+                self.ser.write((cmd + "\n").encode())
+            except (serial.SerialException, OSError, AttributeError) as e:
+                print(f"  ESP32 send '{cmd}' failed: {e}")
 
     def close(self):
         self._stop = True
         self._thread.join(timeout=1)
-        self.ser.close()
+        with self._lock:
+            if self.ser is not None:
+                self.ser.close()
 
 
 def main():
