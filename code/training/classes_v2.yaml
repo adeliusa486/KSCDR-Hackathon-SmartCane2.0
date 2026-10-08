@@ -1,0 +1,194 @@
+# Smart cane - class list v2: 150 classes for US and Gulf streets, sidewalks
+# and indoors. Decided 2 Oct 2026 (Adeel): US and Gulf focus plus general
+# objects, spoken in English with US terms (sidewalk, curb, crosswalk, trash
+# can). Replaces the India-focused classes.yaml list for new training.
+#
+# Fields
+#   name    internal class name, also the label-file name
+#   say     what the cane says (US English)
+#   group   for reporting and priority
+#   danger  high = can injure (vehicles, drops, holes, crossings)
+#           medium = collision or trip, low = information or finding things
+#   why     the reason the class exists (Phase 3 Step 3.5: every class needs one)
+#   src     where boxes come from, as dataset:label. Datasets:
+#             coco       COCO 2017 (have it, free)
+#             oiv7       Open Images V7 (free, no account, fetch_openimages.py)
+#             mapillary  Mapillary Vistas v2 (account), MTSD for sign types
+#             roboflow   Roboflow Universe sets (API key)
+#             od         Obstacle-Dataset (Google Drive)
+#             rdd        RDD2022 road damage (US subset included)
+#   confirm true = the source label name or the dataset is not checked yet.
+#           It needs the account or download before training.
+#   region  true = a surface, not an object (curb, crosswalk, rail track). A
+#           detection box fits it badly. Kept for a first model, flagged for
+#           a segmentation model or the ground ToF later.
+#
+# Classes not in this list are still reported: speak_detect.py says
+# "obstacle" for anything the model cannot name with confidence.
+
+version: 2
+language: en-US
+classes:
+  # --- people and animals ---------------------------------------------------
+  - {name: person, say: person, group: people, danger: high, why: "the most common moving obstacle", src: ["coco:person", "oiv7:Person", "oiv7:Man", "oiv7:Woman", "mapillary:human--person--individual"]}
+  - {name: child, say: child, group: people, danger: high, why: "small, fast, below the camera's usual view", src: ["oiv7:Boy", "oiv7:Girl"]}
+  - {name: cyclist, say: cyclist, group: people, danger: high, why: "fast on sidewalks and bike lanes", src: ["mapillary:human--rider--bicyclist"], confirm: true}
+  - {name: motorcyclist, say: motorcyclist, group: people, danger: high, why: "fastest thing that uses sidewalks", src: ["mapillary:human--rider--motorcyclist"], confirm: true}
+  - {name: wheelchair, say: wheelchair, group: people, danger: medium, why: "slow, wide, shares the sidewalk", src: ["oiv7:Wheelchair"]}
+  - {name: stroller, say: stroller, group: people, danger: medium, why: "low, at shin height, easy to walk into", src: ["rf-strollers1:stroller", "rf-strollers2:3-stroller", "rf-sideguide:stroller"], confirm: true}
+  - {name: dog, say: dog, group: animal, danger: medium, why: "moves unpredictably, leashes trip", src: ["coco:dog", "oiv7:Dog"]}
+  - {name: cat, say: cat, group: animal, danger: low, why: "underfoot", src: ["coco:cat", "oiv7:Cat"]}
+  - {name: bird, say: bird, group: animal, danger: low, why: "common, avoids false 'obstacle'", src: ["coco:bird", "oiv7:Bird", "mapillary:animal--bird"]}
+  - {name: horse, say: horse, group: animal, danger: medium, why: "large, on Gulf and rural US roads", src: ["coco:horse", "oiv7:Horse"]}
+  - {name: cow, say: cow, group: animal, danger: medium, why: "large, rural roads", src: ["coco:cow", "oiv7:Cattle"]}
+  - {name: sheep, say: sheep, group: animal, danger: low, why: "rural Gulf roads", src: ["coco:sheep", "oiv7:Sheep"]}
+  - {name: goat, say: goat, group: animal, danger: low, why: "rural Gulf roads", src: ["oiv7:Goat"]}
+  - {name: camel, say: camel, group: animal, danger: medium, why: "large, Gulf roads", src: ["oiv7:Camel"]}
+  # --- vehicles -------------------------------------------------------------
+  - {name: car, say: car, group: vehicle, danger: high, why: "the main traffic hazard", src: ["coco:car", "oiv7:Car", "mapillary:object--vehicle--car"]}
+  - {name: bus, say: bus, group: vehicle, danger: high, why: "traffic hazard, and the bus the user wants", src: ["coco:bus", "oiv7:Bus", "mapillary:object--vehicle--bus"]}
+  - {name: truck, say: truck, group: vehicle, danger: high, why: "traffic hazard, pickups common in US and Gulf", src: ["coco:truck", "oiv7:Truck", "mapillary:object--vehicle--truck"]}
+  - {name: van, say: van, group: vehicle, danger: high, why: "traffic hazard, blocks sidewalks when parked", src: ["oiv7:Van"]}
+  - {name: taxi, say: taxi, group: vehicle, danger: high, why: "traffic hazard, and a ride the user may want", src: ["oiv7:Taxi"]}
+  - {name: ambulance, say: ambulance, group: vehicle, danger: high, why: "emergency vehicle, moves unexpectedly", src: ["oiv7:Ambulance"]}
+  - {name: motorcycle, say: motorcycle, group: vehicle, danger: high, why: "traffic, parked on sidewalks", src: ["coco:motorcycle", "oiv7:Motorcycle", "mapillary:object--vehicle--motorcycle"]}
+  - {name: bicycle, say: bicycle, group: vehicle, danger: medium, why: "parked bikes block sidewalks", src: ["coco:bicycle", "oiv7:Bicycle", "mapillary:object--vehicle--bicycle"]}
+  - {name: e-scooter, say: scooter, group: vehicle, danger: high, why: "fast, silent, left lying on US sidewalks", src: ["rf-escooter:electric scooter", "rf-etg:electricscooter", "rf-sideguide:scooter"], confirm: true}
+  - {name: skateboard, say: skateboard, group: vehicle, danger: medium, why: "fast rider, or a board underfoot", src: ["coco:skateboard", "oiv7:Skateboard"]}
+  - {name: train, say: train, group: vehicle, danger: high, why: "level crossings, platforms", src: ["coco:train", "oiv7:Train"]}
+  - {name: golf cart, say: golf cart, group: vehicle, danger: high, why: "Gulf compounds, campuses, US communities", src: ["oiv7:Golf cart"]}
+  - {name: shopping cart, say: shopping cart, group: vehicle, danger: medium, why: "parking lots and stores", src: ["oiv7:Cart"]}
+  - {name: trailer, say: trailer, group: vehicle, danger: medium, why: "parked, low tow bars at shin height", src: ["mapillary:object--vehicle--trailer"], confirm: true}
+  # --- traffic control ------------------------------------------------------
+  - {name: traffic light, say: traffic light, group: traffic, danger: high, why: "marks a crossing", src: ["coco:traffic light", "oiv7:Traffic light", "mapillary:object--traffic-light--general-upright", "mapillary:object--traffic-light--general-single", "mapillary:object--traffic-light--general-horizontal"]}
+  - {name: pedestrian signal, say: walk signal, group: traffic, danger: high, why: "the signal a pedestrian obeys", src: ["mapillary:object--traffic-light--pedestrians", "rf-risk:redlight", "rf-risk:greenlight", "rf-aid:Green PTL", "rf-aid:Red PTL"], confirm: true}
+  - {name: crosswalk button, say: crossing button, group: traffic, danger: low, why: "the push button that starts the walk signal at US crossings", src: ["rf-starvision:crosswalk button"]}
+  - {name: stop sign, say: stop sign, group: traffic, danger: medium, why: "marks an intersection", src: ["coco:stop sign", "oiv7:Stop sign", "mapillary-mtsd:regulatory--stop"]}
+  - {name: traffic sign, say: sign, group: traffic, danger: medium, why: "sign posts are collision obstacles", src: ["oiv7:Traffic sign", "mapillary:object--traffic-sign--front", "mapillary:object--traffic-sign--back", "mapillary:object--traffic-sign--direction-front", "mapillary:object--traffic-sign--direction-back", "mapillary:object--traffic-sign--temporary-front", "mapillary:object--traffic-sign--temporary-back", "mapillary-mtsd:any-other-sign"]}
+  - {name: crosswalk, say: crosswalk, group: traffic, danger: high, why: "where to cross", src: ["mapillary:marking--discrete--crosswalk-zebra", "mapillary:construction--flat--crosswalk-plain", "rf-risk:zebracrossing", "rf-aid:Pedestrian Crossing", "rf-esera:crosswalk"], confirm: true, region: true}
+  - {name: street light, say: street light, group: traffic, danger: medium, why: "pole in the sidewalk", src: ["oiv7:Street light", "mapillary:object--street-light"]}
+  - {name: utility pole, say: pole, group: traffic, danger: medium, why: "the most common sidewalk collision", src: ["mapillary:object--support--utility-pole"], confirm: true}
+  - {name: pole, say: pole, group: traffic, danger: medium, why: "sign posts and other poles", src: ["mapillary:object--support--pole", "mapillary:object--support--traffic-sign-frame"], confirm: true}
+  # --- sign types (Mapillary Traffic Sign Dataset or Roboflow) ---------------
+  - {name: yield sign, say: yield sign, group: sign, danger: medium, why: "marks a crossing point", src: ["mapillary-mtsd:regulatory--yield"], confirm: true}
+  - {name: do not enter sign, say: do not enter sign, group: sign, danger: medium, why: "one-way streets", src: ["mapillary-mtsd:regulatory--no-entry"], confirm: true}
+  - {name: one way sign, say: one way sign, group: sign, danger: medium, why: "tells traffic direction for crossing", src: ["mapillary-mtsd:regulatory--one-way-left", "mapillary-mtsd:regulatory--one-way-right", "mapillary-mtsd:regulatory--one-way-straight"], confirm: true}
+  - {name: pedestrian crossing sign, say: crossing sign, group: sign, danger: medium, why: "a crossing is near", src: ["mapillary-mtsd:warning--pedestrians-crossing", "mapillary-mtsd:information--pedestrians-crossing"], confirm: true}
+  - {name: speed limit sign, say: speed limit sign, group: sign, danger: low, why: "road type and traffic speed", src: ["mapillary-mtsd:regulatory--maximum-speed-limit"], confirm: true}
+  - {name: construction sign, say: construction sign, group: sign, danger: medium, why: "sidewalk works ahead", src: ["mapillary-mtsd:warning--roadworks"], confirm: true}
+  - {name: sidewalk closed sign, say: sidewalk closed sign, group: sign, danger: high, why: "the route ahead is blocked, cross elsewhere", src: ["rf-starvision:sidewalk closed"]}
+  - {name: bus stop sign, say: bus stop sign, group: sign, danger: low, why: "finding the bus stop", src: ["mapillary-mtsd:information--bus-stop", "mapillary-mtsd:information--tram-bus-stop"], confirm: true}
+  - {name: exit sign, say: exit sign, group: sign, danger: low, why: "finding the way out of buildings", src: ["rf-exit:Straight Exit", "rf-exit:Right Exit", "rf-exit:Left Exit", "rf-exit:Left-Right Exit", "rf-starvision:Exit", "rf-underground:exit", "rf-underground:emergency_exits"], confirm: true}
+  - {name: wet floor sign, say: wet floor sign, group: sign, danger: medium, why: "slip hazard in malls and offices", src: ["rf-wetfloor:Wet Floor Sign", "rf-starvision:wet floor sign"], confirm: true}
+  # --- street furniture and barriers ----------------------------------------
+  - {name: fire hydrant, say: fire hydrant, group: furniture, danger: medium, why: "knee-height sidewalk obstacle, very common in the US", src: ["coco:fire hydrant", "oiv7:Fire hydrant", "mapillary:object--fire-hydrant"]}
+  - {name: parking meter, say: parking meter, group: furniture, danger: medium, why: "sidewalk-edge post", src: ["coco:parking meter", "oiv7:Parking meter", "mapillary:object--parking-meter"]}
+  - {name: bench, say: bench, group: furniture, danger: medium, why: "obstacle, and somewhere to sit", src: ["coco:bench", "oiv7:Bench", "mapillary:object--bench"]}
+  - {name: trash can, say: trash can, group: furniture, danger: medium, why: "sidewalk obstacle, and needed", src: ["oiv7:Waste container", "mapillary:object--trash-can", "od:ashcan"]}
+  - {name: bike rack, say: bike rack, group: furniture, danger: medium, why: "low metal loops, trip hazard", src: ["mapillary:object--bike-rack"], confirm: true}
+  - {name: mailbox, say: mailbox, group: furniture, danger: medium, why: "US sidewalk obstacle and landmark", src: ["mapillary:object--mailbox"], confirm: true}
+  - {name: utility box, say: utility box, group: furniture, danger: medium, why: "boxes on sidewalks", src: ["mapillary:object--junction-box"], confirm: true}
+  - {name: billboard, say: billboard, group: furniture, danger: low, why: "landmark, stands block sidewalks", src: ["oiv7:Billboard", "mapillary:object--sign--advertisement"]}
+  - {name: fountain, say: fountain, group: furniture, danger: medium, why: "water and low walls in plazas and malls", src: ["oiv7:Fountain"]}
+  - {name: potted plant, say: planter, group: furniture, danger: medium, why: "planters line Gulf and US sidewalks", src: ["coco:potted plant", "oiv7:Flowerpot", "oiv7:Houseplant"]}
+  - {name: barrel, say: barrel, group: furniture, danger: medium, why: "US construction barrels", src: ["oiv7:Barrel"]}
+  - {name: traffic cone, say: traffic cone, group: furniture, danger: medium, why: "marks works and hazards", src: ["od:reflective_cone", "mapillary:object--traffic-cone", "rf-starvision:cone", "rf-openhole:Safety-cone"], confirm: true}
+  - {name: bollard, say: bollard, group: furniture, danger: medium, why: "knee-height posts, hard to see", src: ["od:warning_column", "rf-sideguide:bollard", "rf-esera:Bollard", "rf-etg:bollard", "rf-openhole:Safety-bollard"], confirm: true}
+  - {name: sidewalk sign, say: sidewalk sign, group: furniture, danger: medium, why: "A-frame boards placed in the middle of US sidewalks", src: ["rf-sideguide:movable_signage"]}
+  - {name: kiosk, say: kiosk, group: furniture, danger: medium, why: "newsstands and kiosks block sidewalks", src: ["rf-sideguide:kiosk"]}
+  - {name: barrier, say: barrier, group: furniture, danger: medium, why: "construction and road barriers", src: ["mapillary:construction--barrier--temporary", "mapillary:construction--barrier--concrete-block", "od:spherical_roadblock", "rf-sideguide:barricade", "rf-openhole:Safety-barrier"], confirm: true}
+  - {name: fence, say: fence, group: furniture, danger: medium, why: "blocks the path", src: ["mapillary:construction--barrier--fence"], confirm: true, region: true}
+  - {name: ladder, say: ladder, group: furniture, danger: medium, why: "leaning ladders at head height", src: ["oiv7:Ladder"]}
+  - {name: tent, say: tent, group: furniture, danger: medium, why: "market stalls and events", src: ["oiv7:Tent"]}
+  - {name: sculpture, say: sculpture, group: furniture, danger: medium, why: "obstacles in plazas and malls", src: ["oiv7:Sculpture"]}
+  - {name: pillar, say: pillar, group: furniture, danger: medium, why: "columns in malls, stations, arcades", src: ["rf-pillar:pillar", "rf-blind725:column"], confirm: true}
+  # --- ground and path ------------------------------------------------------
+  - {name: curb, say: curb, group: ground, danger: high, why: "the edge of the sidewalk", src: ["mapillary:construction--barrier--curb"], confirm: true, region: true}
+  - {name: curb ramp, say: curb ramp, group: ground, danger: medium, why: "the safe way down to the crossing", src: ["mapillary:construction--flat--curb-cut"], confirm: true}
+  - {name: stairs, say: stairs, group: ground, danger: high, why: "falls", src: ["oiv7:Stairs", "rf-starvision:stair"]}
+  - {name: escalator, say: escalator, group: ground, danger: high, why: "malls and stations", src: ["rf-starvision:escalator", "rf-underground:escalator"], confirm: true}
+  - {name: ramp, say: ramp, group: ground, danger: medium, why: "slope change, accessible entrances", src: ["rf-risk:slope"], confirm: true}
+  - {name: pothole, say: pothole, group: ground, danger: high, why: "trip and ankle injury", src: ["mapillary:object--pothole", "rdd:D40", "rf-risk:pothole", "rf-bump2:Pothole"], confirm: true}
+  - {name: manhole, say: manhole cover, group: ground, danger: high, why: "open or loose covers", src: ["mapillary:object--manhole", "roboflow:manhole"], confirm: true}
+  - {name: storm drain, say: storm drain, group: ground, danger: high, why: "grates and inlets at the curb", src: ["mapillary:object--catch-basin"], confirm: true}
+  - {name: sidewalk crack, say: crack, group: ground, danger: medium, why: "trip hazard", src: ["rdd:D00", "rdd:D10", "rdd:D20", "rf-risk:crack"], confirm: true}
+  - {name: speed bump, say: speed bump, group: ground, danger: medium, why: "trip hazard in parking lots", src: ["rf-bump1:Speed-Bump", "rf-bump2:Speed Bump"], confirm: true}
+  - {name: rail track, say: railroad tracks, group: ground, danger: high, why: "level crossings", src: ["mapillary:construction--flat--rail-track"], confirm: true, region: true}
+  - {name: tactile paving, say: tactile paving, group: ground, danger: low, why: "the guide surface for blind pedestrians", src: ["rf-tactile:border", "rf-underground:blind_lane"], confirm: true}
+  - {name: open hole, say: open hole, group: ground, danger: high, why: "construction pits and trenches", src: ["rf-openhole:open-hole", "rf-obstacle:Uncovered manhole"], confirm: true}
+  - {name: swimming pool, say: pool, group: ground, danger: high, why: "drowning risk at hotels and compounds", src: ["oiv7:Swimming pool"]}
+  # --- buildings and entrances ----------------------------------------------
+  - {name: door, say: door, group: building, danger: low, why: "finding entrances", src: ["oiv7:Door", "roboflow:door"]}
+  - {name: door handle, say: door handle, group: building, danger: low, why: "opening doors", src: ["oiv7:Door handle"]}
+  - {name: window, say: window, group: building, danger: low, why: "orientation, low sills", src: ["oiv7:Window"]}
+  - {name: building, say: building, group: building, danger: low, why: "orientation", src: ["oiv7:Building", "oiv7:House", "oiv7:Office building", "oiv7:Skyscraper", "mapillary:construction--structure--building"]}
+  - {name: elevator, say: elevator, group: building, danger: low, why: "finding the lift", src: ["rf-starvision:elevator", "rf-risk:elevator"], confirm: true}
+  - {name: atm, say: A T M, group: building, danger: low, why: "finding cash machines", src: ["rf-atm:zatm"], confirm: true}
+  # --- nature ---------------------------------------------------------------
+  - {name: tree, say: tree, group: nature, danger: medium, why: "trunks and low branches", src: ["oiv7:Tree"]}
+  - {name: palm tree, say: palm tree, group: nature, danger: medium, why: "line Gulf streets and plazas", src: ["oiv7:Palm tree"]}
+  - {name: plant, say: plant, group: nature, danger: low, why: "bushes over the path", src: ["oiv7:Plant"]}
+  # --- carried and loose objects --------------------------------------------
+  - {name: backpack, say: backpack, group: object, danger: low, why: "on the floor, and the user's own", src: ["coco:backpack", "oiv7:Backpack"]}
+  - {name: handbag, say: bag, group: object, danger: low, why: "finding belongings", src: ["coco:handbag", "oiv7:Handbag"]}
+  - {name: suitcase, say: suitcase, group: object, danger: medium, why: "airports, trip hazard", src: ["coco:suitcase", "oiv7:Suitcase", "oiv7:Luggage and bags"]}
+  - {name: umbrella, say: umbrella, group: object, danger: low, why: "head-height tips", src: ["coco:umbrella", "oiv7:Umbrella"]}
+  - {name: bottle, say: bottle, group: object, danger: low, why: "finding things", src: ["coco:bottle", "oiv7:Bottle"]}
+  - {name: cup, say: cup, group: object, danger: low, why: "finding things", src: ["coco:cup", "oiv7:Coffee cup", "oiv7:Mug"]}
+  - {name: box, say: box, group: object, danger: medium, why: "deliveries left on the sidewalk", src: ["oiv7:Box"]}
+  - {name: plastic bag, say: bag, group: object, danger: low, why: "trash bags on the sidewalk", src: ["oiv7:Plastic bag"]}
+  - {name: tire, say: tire, group: object, danger: medium, why: "left on the ground", src: ["oiv7:Tire"]}
+  - {name: ball, say: ball, group: object, danger: low, why: "underfoot", src: ["coco:sports ball", "oiv7:Ball"]}
+  - {name: cell phone, say: phone, group: object, danger: low, why: "finding the user's phone", src: ["coco:cell phone", "oiv7:Mobile phone"]}
+  - {name: glasses, say: glasses, group: object, danger: low, why: "finding belongings", src: ["oiv7:Glasses", "oiv7:Sunglasses"]}
+  - {name: book, say: book, group: object, danger: low, why: "finding things", src: ["coco:book", "oiv7:Book"]}
+  - {name: can, say: can, group: object, danger: low, why: "finding things", src: ["oiv7:Tin can"]}
+  - {name: toy, say: toy, group: object, danger: low, why: "trip hazard at home", src: ["oiv7:Toy"]}
+  # --- indoors --------------------------------------------------------------
+  - {name: chair, say: chair, group: indoor, danger: medium, why: "the most common indoor obstacle", src: ["coco:chair", "oiv7:Chair"]}
+  - {name: couch, say: couch, group: indoor, danger: medium, why: "obstacle, somewhere to sit", src: ["coco:couch", "oiv7:Couch"]}
+  - {name: bed, say: bed, group: indoor, danger: low, why: "orientation in a room", src: ["coco:bed", "oiv7:Bed"]}
+  - {name: table, say: table, group: indoor, danger: medium, why: "edges at hip height", src: ["coco:dining table", "oiv7:Table", "oiv7:Kitchen & dining room table"]}
+  - {name: desk, say: desk, group: indoor, danger: medium, why: "edges at hip height", src: ["oiv7:Desk"]}
+  - {name: coffee table, say: coffee table, group: indoor, danger: medium, why: "low, at shin height", src: ["oiv7:Coffee table"]}
+  - {name: nightstand, say: nightstand, group: indoor, danger: medium, why: "low, beside the bed", src: ["oiv7:Nightstand"]}
+  - {name: chest of drawers, say: dresser, group: indoor, danger: medium, why: "open drawers at hip height", src: ["oiv7:Chest of drawers"]}
+  - {name: wardrobe, say: wardrobe, group: indoor, danger: low, why: "orientation, open doors", src: ["oiv7:Wardrobe"]}
+  - {name: toilet, say: toilet, group: indoor, danger: low, why: "finding the toilet", src: ["coco:toilet", "oiv7:Toilet"]}
+  - {name: sink, say: sink, group: indoor, danger: low, why: "finding the sink", src: ["coco:sink", "oiv7:Sink"]}
+  - {name: tv, say: TV, group: indoor, danger: low, why: "orientation", src: ["coco:tv", "oiv7:Television"]}
+  - {name: laptop, say: laptop, group: indoor, danger: low, why: "finding things", src: ["coco:laptop", "oiv7:Laptop"]}
+  - {name: refrigerator, say: refrigerator, group: indoor, danger: low, why: "kitchen orientation", src: ["coco:refrigerator", "oiv7:Refrigerator"]}
+  - {name: microwave, say: microwave, group: indoor, danger: low, why: "kitchen orientation", src: ["coco:microwave", "oiv7:Microwave oven"]}
+  - {name: oven, say: oven, group: indoor, danger: medium, why: "hot surface", src: ["coco:oven", "oiv7:Oven"]}
+  - {name: stove, say: stove, group: indoor, danger: high, why: "hot surface, gas", src: ["oiv7:Gas stove"]}
+  - {name: washing machine, say: washing machine, group: indoor, danger: low, why: "home orientation", src: ["oiv7:Washing machine"]}
+  - {name: bathtub, say: bathtub, group: indoor, danger: medium, why: "slip and trip", src: ["oiv7:Bathtub"]}
+  - {name: shower, say: shower, group: indoor, danger: low, why: "bathroom orientation", src: ["oiv7:Shower"]}
+  - {name: shelf, say: shelf, group: indoor, danger: medium, why: "edges at head height", src: ["oiv7:Shelf"]}
+  - {name: bookcase, say: bookcase, group: indoor, danger: low, why: "orientation", src: ["oiv7:Bookcase"]}
+  - {name: stool, say: stool, group: indoor, danger: medium, why: "low, easy to walk into", src: ["oiv7:Stool"]}
+  - {name: mirror, say: mirror, group: indoor, danger: low, why: "glass, confuses sensors", src: ["oiv7:Mirror"]}
+  - {name: curtain, say: curtain, group: indoor, danger: low, why: "orientation", src: ["oiv7:Curtain"]}
+  - {name: cabinet, say: cabinet, group: indoor, danger: medium, why: "open doors at head height", src: ["oiv7:Cabinetry"]}
+  - {name: countertop, say: counter, group: indoor, danger: medium, why: "edges at hip height", src: ["oiv7:Countertop"]}
+  - {name: lamp, say: lamp, group: indoor, danger: low, why: "floor lamps tip over", src: ["oiv7:Lamp"]}
+  - {name: ceiling fan, say: ceiling fan, group: indoor, danger: low, why: "orientation", src: ["oiv7:Ceiling fan"]}
+  - {name: pillow, say: pillow, group: indoor, danger: low, why: "finding things", src: ["oiv7:Pillow"]}
+  - {name: clock, say: clock, group: indoor, danger: low, why: "orientation", src: ["coco:clock", "oiv7:Clock"]}
+  - {name: keyboard, say: keyboard, group: indoor, danger: low, why: "finding things", src: ["coco:keyboard", "oiv7:Computer keyboard"]}
+  - {name: mouse, say: computer mouse, group: indoor, danger: low, why: "finding things", src: ["coco:mouse", "oiv7:Computer mouse"]}
+  - {name: remote, say: remote, group: indoor, danger: low, why: "finding things", src: ["coco:remote", "oiv7:Remote control"]}
+  - {name: scissors, say: scissors, group: indoor, danger: medium, why: "sharp", src: ["coco:scissors", "oiv7:Scissors"]}
+  - {name: knife, say: knife, group: indoor, danger: high, why: "sharp", src: ["coco:knife", "oiv7:Knife"]}
+  - {name: fork, say: fork, group: indoor, danger: low, why: "eating", src: ["coco:fork", "oiv7:Fork"]}
+  - {name: spoon, say: spoon, group: indoor, danger: low, why: "eating", src: ["coco:spoon", "oiv7:Spoon"]}
+  - {name: bowl, say: bowl, group: indoor, danger: low, why: "eating", src: ["coco:bowl", "oiv7:Bowl"]}
+  - {name: plate, say: plate, group: indoor, danger: low, why: "eating", src: ["oiv7:Plate"]}
+  - {name: kettle, say: kettle, group: indoor, danger: medium, why: "hot water", src: ["oiv7:Kettle"]}
+  - {name: toothbrush, say: toothbrush, group: indoor, danger: low, why: "daily living", src: ["coco:toothbrush", "oiv7:Toothbrush"]}
+  - {name: towel, say: towel, group: indoor, danger: low, why: "daily living", src: ["oiv7:Towel"]}
+  # --- food -----------------------------------------------------------------
+  - {name: banana, say: banana, group: food, danger: low, why: "daily living", src: ["coco:banana", "oiv7:Banana"]}
+  - {name: apple, say: apple, group: food, danger: low, why: "daily living", src: ["coco:apple", "oiv7:Apple"]}
+  - {name: orange, say: orange, group: food, danger: low, why: "daily living", src: ["coco:orange", "oiv7:Orange"]}

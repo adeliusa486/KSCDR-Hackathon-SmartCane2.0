@@ -43,6 +43,10 @@ def main():
                     help="12 fits an 8 GB RTX 4060 at 640px with yolov8s. "
                          "Drop to 8 if you hit CUDA out of memory.")
     ap.add_argument("--name", default="smartcane")
+    ap.add_argument("--optimizer", default="auto",
+                    help="auto lets Ultralytics choose (8.4 picks MuSGD for long runs). "
+                         "SGD measured faster on the laptop: MuSGD's step took ~30%% of "
+                         "the CPU-bound main process (py-spy, 3 Oct 2026)")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--export", action="store_true",
                     help="skip training, just export existing weights to ONNX")
@@ -84,6 +88,7 @@ def main():
             device=0,
             name=args.name,
             resume=args.resume,
+            optimizer=args.optimizer,
             # Augmentation tuned for a body-worn camera on a street, not for
             # a benchmark leaderboard.
             degrees=10.0,      # the camera rolls when a cane swings
