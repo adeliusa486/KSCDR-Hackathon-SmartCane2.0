@@ -52,7 +52,7 @@
 #include <VL53L0X.h>
 #include <Preferences.h>
 
-const char *FW_VERSION = "2026-10-08";
+const char *FW_VERSION = "2026-10-08b";
 
 const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
@@ -152,6 +152,7 @@ uint32_t lastHazardMs = 0;
 // ---- motor ---------------------------------------------------------------
 
 uint32_t manualUntil = 0;   // a manual buzz from the Pi overrides auto
+int manualDuty = 0;         // its strength
 uint32_t hazardUntil = 0;   // the ground alarm overrides obstacle buzzing
 
 int motorDuty = 0;                 // asked duty, reported by S
@@ -182,8 +183,11 @@ void motor(int dutyPct) {
 // The ground alarm is deliberately different, one long hard pulse, so a hole
 // never feels like "something in front of you".
 void updateMotor(uint32_t now) {
-  if (now < manualUntil) return;
+  // The ground alarm wins over everything, also over a buzz the Pi asked for
+  // (speech sync, assistant cue): a hole must never feel like an obstacle.
+  // Until 8 Oct 2026 (fw 2026-10-08) a Pi buzz cut the alarm pulse short.
   if (now < hazardUntil) { motor(100); return; }
+  if (now < manualUntil) { motor(manualDuty); return; }
   Tof &f = tof[FWD];
   int mm = (f.ok && f.mm >= 0) ? f.mm : -1;
   if (!autoBuzz || mm < 0 || mm >= FAR_MM) { motor(0); return; }
@@ -467,8 +471,8 @@ void handleCommand(const String &cmd) {
     int comma = cmd.indexOf(',');
     int duty = constrain(cmd.substring(1, comma).toInt(), 0, 100);
     int ms = comma > 0 ? constrain(cmd.substring(comma + 1).toInt(), 0, 5000) : 300;
-    manualUntil = millis() + ms;
-    motor(duty);
+    manualDuty = duty;
+    manualUntil = millis() + ms;            // updateMotor() applies it
     Serial.printf("I buzz %d%% %dms\n", duty, ms);
   } else if (cmd.length()) {
     Serial.printf("E unknown command '%s'\n", cmd.c_str());

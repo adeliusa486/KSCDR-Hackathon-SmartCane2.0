@@ -21,7 +21,6 @@ service first.
 import argparse
 import os
 import sys
-import time
 from types import SimpleNamespace
 
 import numpy as np

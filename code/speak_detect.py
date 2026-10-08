@@ -244,6 +244,19 @@ def resolve(phrases, relevant, name_conf):
     return out
 
 
+def summarize(body, relevant, name_conf, fwd_mm, limit=3):
+    """One detect.py report as the cane would say it, most urgent first, for
+    the assistant's offline answer: "chair ahead, 1.3 meters. backpack left,
+    about 1.5 meters". relevant=None names every class. "" when nothing."""
+    phrases = [p.strip() for p in body.split("|")
+               if p.strip() and p.strip() != "clear"]
+    if relevant is not None:
+        phrases = resolve(phrases, relevant, name_conf)
+    phrases.sort(key=rank)
+    spoken, _ = with_tof(phrases[:limit], fwd_mm)
+    return ". ".join(spoken)
+
+
 def pick_fresh(phrases, spoken, keys, fresh, limit):
     """The objects to say now: most urgent first, skipping any whose own
     repeat timer is still running and any sentence already picked (two
@@ -389,6 +402,14 @@ class Speaker:
         self.last_said = {}
         self.last_sound = time.time()
         self.on_speak = None     # demo dashboard: called as on_speak(text, kind)
+        self.held = False        # True while the assistant has the floor
+
+    def hold(self, on):
+        """Pause routine announcements (object names, ToF "obstacle ahead")
+        while the assistant talks and listens, so its microphone never
+        records the cane's own voice. Warnings and ground hazards still speak,
+        and the ESP32 keeps vibrating either way."""
+        self.held = bool(on)
 
     def _note(self, text, kind="speech"):
         if self.on_speak is not None:
@@ -423,7 +444,7 @@ class Speaker:
         return time.time() - self.last_said.get(key, 0) >= repeat_after
 
     def say(self, text, key=None, urgent=False, repeat_after=None,
-            on_start=None, part_keys=None):
+            on_start=None, part_keys=None, routine=False):
         """key: what the repeat timer is keyed on, default the text itself.
         urgent: wait up to 2 s for current speech to finish instead of
         dropping. Only for ground hazards, where a dropped warning means the
@@ -431,13 +452,19 @@ class Speaker:
         on_start: called the moment audio starts, used for the sync buzz.
         part_keys: one repeat key per object in the sentence. Each object then
         gets its own timer, so a chair is not muted because the person next
-        to it was just announced. The caller has already picked fresh ones."""
+        to it was just announced. The caller has already picked fresh ones.
+        routine: an object announcement, paused while the assistant talks.
+
+        Returns True if the phrase was spoken (or queued as urgent), False if
+        it was muted, dropped or paused, so one-shot messages can retry."""
         key = key or text
         repeat_after = self.repeat_after if repeat_after is None else repeat_after
+        if self.held and routine and not urgent:
+            return False         # repeat timer untouched, said again later
         if self.dry_run:
             now = time.time()
             if not part_keys and now - self.last_said.get(key, 0) < repeat_after:
-                return
+                return False
             self.last_said[key] = now
             for k in part_keys or ():
                 self.last_said[k] = now
@@ -445,28 +472,28 @@ class Speaker:
             self._note(text)
             if on_start is not None:
                 on_start()
-            return
+            return True
 
         # Check the link BEFORE consuming the repeat timer, so a phrase muted
         # by a dead sink is still spoken once audio comes back.
         if not self.link.alive():
             self.link.try_reconnect()
-            return
+            return False
 
         now = time.time()
         if not part_keys and now - self.last_said.get(key, 0) < repeat_after:
             if self.verbose:
                 print(f"  (muted) {text}")
-            return
+            return False
         if urgent:
             self.last_said[key] = now
             threading.Thread(target=self._say_when_free, args=(text,),
                              daemon=True).start()
-            return
+            return True
         if not self.busy.acquire(blocking=False):
             if self.verbose:
                 print(f"  (still speaking, dropped) {text}")
-            return
+            return False
         self.last_said[key] = now
         for k in part_keys or ():
             self.last_said[k] = now
@@ -474,8 +501,9 @@ class Speaker:
         self._note(text)
         threading.Thread(target=self._play, args=(text, on_start),
                          daemon=True).start()
+        return True
 
-    def say_blocking(self, text, wait=6.0):
+    def say_blocking(self, text, wait=10.0):
         """Speak now and return when done. For the assistant, whose answer
         must not be dropped just because a detection phrase is playing.
         Detection phrases that arrive meanwhile are dropped as usual."""
@@ -484,12 +512,15 @@ class Speaker:
             self._note(text, "assistant")
             return
         if not self.link.alive():
+            print(f"  (assistant, no audio) {text}", file=sys.stderr)
             self.link.try_reconnect()
             return
         if self.busy.acquire(timeout=wait):
             print(f"  SPEAKING (assistant): {text}")
             self._note(text, "assistant")
             self._play(text)
+        else:
+            print(f"  (assistant dropped, speech stuck) {text}", file=sys.stderr)
 
     def _say_when_free(self, text):
         if self.busy.acquire(timeout=2.0):
@@ -638,6 +669,7 @@ class SensorWatch:
                 cmd = tof_buzz(mm)
                 self.speaker.say(f"obstacle ahead, {spoken_distance(mm)}",
                                  key=f"tof-obstacle {distance_band(mm)}",
+                                 routine=True,
                                  on_start=lambda c=cmd: self.link.send(c))
 
 
@@ -825,17 +857,32 @@ def main():
         def context():
             return re.sub(r"\s*@[\d.]+", "", latest["body"]) or "nothing"
 
-        helper = Assistant(snapshot, context, speaker.say_blocking, args.bt_mac)
+        def local_summary():
+            fwd = esp.fwd_mm if (esp.alive() and esp.fwd_ok) else None
+            return summarize(latest["body"], None if args.no_filter else relevant,
+                             args.name_conf, fwd)
+
+        cues = {"listen": "B100,150",     # speak now
+                "hold": "B70,60"}         # long press reached, let go to read
+        helper = Assistant(snapshot, context, speaker.say_blocking, args.bt_mac,
+                           cue=lambda kind: esp.send(cues[kind]),
+                           local_summary=local_summary,
+                           hold_speech=speaker.hold)
+        # One button does everything (Adeel, 8 Oct 2026). It is wired to D33
+        # ("K"). D32 ("J") gets the same behaviour in case a button is ever
+        # wired there instead.
         esp.on_button = helper.on_button
-        esp.on_button2 = helper.on_button2
-        print("assistant button ready (press = describe, double press = "
-              "read text, hold = ask); second button = read text")
+        esp.on_button2 = helper.on_button
+        print("assistant button ready: press = AI assistant (describe, then "
+              "ask a question), hold 1 s = read text; offline = local "
+              "detection + text reading")
 
     # If detect.py dies (camera missing, loose ribbon) the cane keeps running:
     # ESP32 alerts, vibration, buttons and Bluetooth stay up, and vision is
     # retried every 10 s. Before, the whole program exited and systemd
     # restarted it, which re-paired the earbuds and dropped button presses.
     said_ready = False
+    buzzed_ready = False
     warned_camera = False
     try:
         while not stop.is_set():
@@ -847,11 +894,14 @@ def main():
                 warned_camera = False
                 latest["body"] = m.group(1).strip()
                 if not said_ready:
-                    if haptic is not None:
+                    # Retried on every report until it is really heard (audio
+                    # down, or the assistant pressed during start-up).
+                    if haptic is not None and not buzzed_ready:
                         haptic.buzz("ready")
-                    speaker.say("Smart cane ready")
-                    said_ready = True
-                    continue
+                    buzzed_ready = True
+                    said_ready = speaker.say("Smart cane ready", key="ready")
+                    if said_ready:
+                        continue
                 body = m.group(1).strip()
                 phrases = [] if (not body or body == "clear") else \
                     [p.strip() for p in body.split("|") if p.strip()]
@@ -904,7 +954,7 @@ def main():
                     cmd = sync_buzz(said, fwd_mm)
                     if cmd:
                         on_start = lambda c=cmd: esp.send(c)
-                speaker.say(". ".join(s for _, s, _ in picked),
+                speaker.say(". ".join(s for _, s, _ in picked), routine=True,
                             key=" | ".join(k for _, _, k in picked),
                             part_keys=[k for _, _, k in picked],
                             on_start=on_start)
@@ -913,9 +963,10 @@ def main():
                 break
             print(f"vision stopped (exit {proc.returncode}), retrying in 10 s")
             if not warned_camera:
-                speaker.say("Camera not working. Distance sensors still on",
-                            key="camera dead")
-                warned_camera = True
+                # Marked as warned only once it was really spoken.
+                warned_camera = speaker.say(
+                    "Camera not working. Distance sensors still on",
+                    key="camera dead")
             stop.wait(10)
             if not stop.is_set():
                 vision["proc"] = start_vision()

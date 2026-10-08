@@ -400,6 +400,12 @@ def main():
     ap.add_argument("--height", type=int, default=720)
     args = ap.parse_args()
 
+    # Install the snapshot handler first. SIGUSR1's default action is to
+    # terminate, and the Hailo and camera take seconds to start: a button
+    # press in that window used to kill detect.py (found 8 Oct 2026).
+    global _snapshot_wanted
+    signal.signal(signal.SIGUSR1, _want_snapshot)
+
     try:
         from picamera2 import Picamera2
         from picamera2.devices import Hailo
@@ -433,8 +439,6 @@ def main():
         if args.preview:
             picam2.start_preview()
 
-        global _snapshot_wanted
-        signal.signal(signal.SIGUSR1, _want_snapshot)
         viewer = None
         if args.stream_file:
             from demo_view import Viewer

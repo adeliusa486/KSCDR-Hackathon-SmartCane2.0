@@ -15,8 +15,9 @@ What it covers, in user terms:
   - the ToF distance replaces the camera guess only for things straight ahead
   - ground drop / step warnings from the ESP32 are spoken urgently
   - the cane warns out loud when the distance sensors die
-  - assistant button: press = describe, double = read text, hold = ask,
-    and every failure (no internet, no key, no mic, no camera) says something
+  - assistant button: press = describe then listen for a question, hold =
+    read text, offline = local detection + OCR, and every failure (no
+    internet, no key, no mic, no camera, a crash) says something
 """
 import os
 import sys
@@ -358,129 +359,322 @@ class Esp32Serial(unittest.TestCase):
         self.assertEqual(self.link.fwd_mm, 640)
 
 
+def wav_bytes(seconds, tone_from=None, tone_to=None, rate=16000, amp=6000):
+    """16-bit mono WAV: quiet noise, with a 300 Hz tone between tone_from and
+    tone_to seconds (a stand-in for a voice)."""
+    import io
+    import math
+    import random
+    import struct
+    import wave
+    rnd = random.Random(1)
+    frames = bytearray()
+    for i in range(int(seconds * rate)):
+        t = i / rate
+        v = rnd.randint(-40, 40)
+        if tone_from is not None and tone_from <= t < tone_to:
+            v += int(amp * math.sin(2 * math.pi * 300 * t))
+        frames += struct.pack("<h", max(-32768, min(32767, v)))
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(bytes(frames))
+    return buf.getvalue()
+
+
 class AssistantButton(unittest.TestCase):
-    """Button timing and every failure path, with Gemini and the mic faked."""
+    """One button: short press = assistant (describe, then listen for a
+    question), long press = read text, offline = local detection + OCR.
+    Gemini, the network, the mic and Tesseract are faked."""
 
     class Mic:
-        def __init__(self, ok=True, seconds=2.0):
-            self.ok, self.seconds = ok, seconds
+        def __init__(self, ok=True, wav=None):
+            self.ok, self.wav, self.started = ok, wav, 0
 
         def start(self):
+            self.started += 1
             if self.ok:
                 with open(assistant.QUESTION_WAV, "wb") as fh:
-                    fh.write(b"\0" * int(32000 * self.seconds))
+                    fh.write(self.wav or wav_bytes(1.0))     # silence
             return self.ok
 
         def stop(self):
             pass
 
-    def make(self, mic=None, jpeg=b"\xff\xd8fake", reply=None, error=None,
-             key="k"):
-        self.said, self.prompts = [], []
-        a = assistant.Assistant(lambda: jpeg, lambda: "car left",
-                                self.said.append, "00:00:00:00:00:00",
-                                mic=mic or self.Mic())
+    def make(self, mic=None, jpeg=b"\xff\xd8fake", replies=None, error=None,
+             key="k", net=True, ocr="EXIT"):
+        self.said, self.prompts, self.cues, self.holds = [], [], [], []
+        replies = list(replies or ["A clear pavement ahead."])
+        a = assistant.Assistant(
+            lambda: jpeg, lambda: "car left", self.said.append,
+            "00:00:00:00:00:00", mic=mic or self.Mic(),
+            cue=self.cues.append,
+            local_summary=lambda: "car left, about 4 meters",
+            hold_speech=self.holds.append, is_online=lambda: net)
+        a.listen_s = 0.4
 
         def fake(k, prompt, j, wav, ctx):
             self.prompts.append((prompt, wav is not None))
             if error:
                 raise RuntimeError(error)
-            return reply or "A clear pavement ahead."
-        self._orig = (assistant.gemini, assistant.load_key, assistant.ocr_offline)
+            return replies.pop(0) if len(replies) > 1 else replies[0]
+        self._orig = (assistant.gemini, assistant.load_key, assistant.ocr_offline,
+                      assistant.STUCK_S)
         assistant.gemini = fake
         assistant.load_key = lambda: key
-        assistant.ocr_offline = lambda j: "Offline reading. EXIT"
+        assistant.ocr_offline = lambda j: ocr
         return a
 
     def tearDown(self):
-        assistant.gemini, assistant.load_key, assistant.ocr_offline = self._orig
+        (assistant.gemini, assistant.load_key, assistant.ocr_offline,
+         assistant.STUCK_S) = self._orig
 
     def press(self, a, hold):
         a.on_button(True)
         time.sleep(hold)
         a.on_button(False)
 
-    def settle(self, a, t=1.5):
+    def settle(self, a, t=0.3):
         time.sleep(t)
-        a.busy.acquire(timeout=5)
+        self.assertTrue(a.busy.acquire(timeout=8), "assistant never finished")
         a.busy.release()
 
-    def test_short_press_describes(self):
+    # -- short press, online --
+
+    def test_short_press_describes_then_listens(self):
         a = self.make()
         self.press(a, 0.1)
         self.settle(a)
         self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
         self.assertEqual(self.said, ["Looking", "A clear pavement ahead."])
+        self.assertEqual(self.cues, ["listen"])        # buzz: speak now
+        self.assertEqual(self.holds, [True, False])     # announcements paused
 
-    def test_double_press_reads_text(self):
-        a = self.make(reply="Exit")
-        self.press(a, 0.1)
-        time.sleep(0.15)
+    def test_spoken_question_is_answered(self):
+        a = self.make(mic=self.Mic(wav=wav_bytes(1.5, 0.3, 1.2)),
+                      replies=["A doorway ahead.", "The sign says Exit."])
         self.press(a, 0.1)
         self.settle(a)
-        self.assertEqual(self.prompts, [(assistant.READ, False)])
-        self.assertEqual(self.said, ["Reading", "Exit"])
+        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False), (assistant.ASK, True)])
+        self.assertEqual(self.said[-1], "The sign says Exit.")
 
-    def test_hold_asks_with_audio(self):
-        a = self.make(reply="It is a bus stop.")
-        self.press(a, 1.2)
+    def test_no_question_reply_stays_silent(self):
+        a = self.make(mic=self.Mic(wav=wav_bytes(1.5, 0.3, 1.2)),
+                      replies=["A doorway ahead.", "NO_QUESTION"])
+        self.press(a, 0.1)
         self.settle(a)
-        self.assertEqual(self.prompts, [(assistant.ASK, True)])
-        self.assertEqual(self.said[-1], "It is a bus stop.")
+        self.assertEqual(self.said, ["Looking", "A doorway ahead."])
 
-    def test_hold_with_no_mic_still_describes(self):
+    def test_silence_is_not_sent(self):
+        a = self.make()                                  # mic records silence
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(len(self.prompts), 1)
+
+    def test_press_while_listening_stops_early(self):
+        a = self.make()
+        a.listen_s = 5.0
+        self.press(a, 0.1)
+        for _ in range(100):                             # wait for the mic
+            if a.listening.is_set():
+                break
+            time.sleep(0.02)
+        self.assertTrue(a.listening.is_set())
+        t0 = time.time()
+        self.press(a, 0.05)
+        self.settle(a, 0.1)
+        self.assertLess(time.time() - t0, 2.0)
+
+    def test_no_mic_skips_listening(self):
         a = self.make(mic=self.Mic(ok=False))
-        self.press(a, 1.0)
-        self.settle(a)
-        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
-        self.assertIn("I could not hear a question, describing instead", self.said)
-
-    def test_too_short_question_is_not_sent_as_audio(self):
-        a = self.make(mic=self.Mic(seconds=0.1))
-        self.press(a, 0.8)
-        self.settle(a)
-        self.assertEqual(self.prompts, [(assistant.DESCRIBE, False)])
-
-    def test_no_internet_is_spoken(self):
-        a = self.make(error="no internet, assistant unavailable")
         self.press(a, 0.1)
         self.settle(a)
-        self.assertEqual(self.said[-1], "no internet, assistant unavailable")
-
-    def test_read_text_offline_falls_back_to_ocr(self):
-        a = self.make(error="no internet, assistant unavailable")
-        self.press(a, 0.1); time.sleep(0.15); self.press(a, 0.1)
-        self.settle(a)
-        self.assertEqual(self.said[-1], "Offline reading. EXIT")
+        self.assertEqual(self.said, ["Looking", "A clear pavement ahead."])
+        self.assertEqual(self.cues, [])
 
     def test_busy_service_retries_once(self):
         a = self.make(error="assistant busy, try again")
         self.press(a, 0.1)
-        self.settle(a, 4.0)
+        self.settle(a, 3.0)
         self.assertEqual(len(self.prompts), 2)
         self.assertIn("Still looking", self.said)
 
-    def test_no_key_is_spoken(self):
+    def test_gemini_error_still_gives_local_answer(self):
+        a = self.make(error="free assistant limit reached, try again in a minute")
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertIn("free assistant limit reached, try again in a minute", self.said)
+        self.assertEqual(self.said[-2:], ["car left, about 4 meters.", "Text reads: EXIT"])
+
+    # -- short press, offline --
+
+    def test_offline_press_uses_detector_and_local_ocr(self):
+        a = self.make(net=False)
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.prompts, [])
+        self.assertEqual(self.said, ["No internet, offline mode. car left, about 4 meters.",
+                                     "Text reads: EXIT"])
+
+    def test_offline_without_text(self):
+        a = self.make(net=False, ocr="")
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said, ["No internet, offline mode. car left, about 4 meters."])
+
+    def test_no_key_works_offline(self):
         a = self.make(key="")
         self.press(a, 0.1)
         self.settle(a)
-        self.assertEqual(self.said[-1], "Assistant key missing")
+        self.assertTrue(self.said[0].startswith("No assistant key, offline mode."))
+
+    # -- long press --
+
+    def test_long_press_reads_text_online(self):
+        a = self.make(replies=["Exit"])
+        self.press(a, 1.2)
+        self.settle(a)
+        self.assertEqual(self.prompts, [(assistant.READ, False)])
+        self.assertEqual(self.said, ["Reading", "Exit"])
+        self.assertEqual(self.cues, ["hold"])            # buzz at 1 s
+
+    def test_long_press_offline_reads_locally(self):
+        a = self.make(net=False)
+        self.press(a, 1.2)
+        self.settle(a)
+        self.assertEqual(self.said, ["Reading", "Offline reading. EXIT"])
+
+    def test_long_press_falls_back_to_ocr_when_gemini_fails(self):
+        a = self.make(error="free assistant limit reached, try again in a minute")
+        self.press(a, 1.2)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "Offline reading. EXIT")
+
+    def test_long_press_no_text(self):
+        a = self.make(net=False, ocr="")
+        self.press(a, 1.2)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "No text found")
+
+    # -- faults --
 
     def test_camera_failure_is_spoken(self):
         a = self.make(jpeg=None)
         self.press(a, 0.1)
         self.settle(a)
-        self.assertEqual(self.said[-1], "Camera not ready")
+        self.assertEqual(self.said, ["Camera not ready"])
 
     def test_presses_during_an_answer_are_ignored(self):
         a = self.make()
         a.busy.acquire()
         try:
             self.press(a, 0.1)
-            time.sleep(0.8)
+            time.sleep(0.5)
         finally:
             a.busy.release()
         self.assertEqual(self.prompts, [])
+
+    def test_stuck_switch_is_ignored(self):
+        a = self.make()
+        assistant.STUCK_S = 0.3
+        self.press(a, 0.5)
+        time.sleep(0.5)
+        self.assertEqual(self.prompts, [])
+        self.assertEqual(self.said, [])
+
+    def test_crash_inside_is_spoken_and_releases(self):
+        a = self.make()
+        a.local_summary = lambda: 1 / 0
+        a.is_online = lambda: False
+        self.press(a, 0.1)
+        self.settle(a)
+        self.assertEqual(self.said[-1], "Assistant error")
+        self.assertEqual(self.holds, [True, False])
+
+
+class AssistantParts(unittest.TestCase):
+    def test_voice_check(self):
+        self.assertFalse(assistant.has_speech(wav_bytes(1.0)))
+        self.assertTrue(assistant.has_speech(wav_bytes(1.5, 0.3, 1.0)))
+        self.assertFalse(assistant.has_speech(b"\0" * 32000))      # no header
+        self.assertFalse(assistant.has_speech(wav_bytes(0.1, 0, 0.1)))  # too short
+        # speech from start to end, no quiet floor (pressed to stop early)
+        self.assertTrue(assistant.has_speech(wav_bytes(1.2, 0, 1.2)))
+
+    def test_network_failure_stops_after_one_request(self):
+        import urllib.error
+        import urllib.request
+        calls = []
+
+        def boom(*a, **k):
+            calls.append(1)
+            raise urllib.error.URLError("no route")
+        orig = urllib.request.urlopen
+        urllib.request.urlopen = boom
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                assistant.gemini("k", "hi")
+        finally:
+            urllib.request.urlopen = orig
+        self.assertEqual(len(calls), 1)
+        self.assertIn("no internet", str(cm.exception))
+
+    def test_slow_model_hands_over_to_the_next(self):
+        import io
+        import json
+        import urllib.request
+        calls = []
+
+        class Resp(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake(req, timeout=None):
+            calls.append(req.full_url)
+            if len(calls) == 1:
+                raise TimeoutError("read timed out")
+            return Resp(json.dumps({"candidates": [{"content": {"parts": [
+                {"text": "A bench ahead."}]}}]}).encode())
+        orig = urllib.request.urlopen
+        urllib.request.urlopen = fake
+        try:
+            self.assertEqual(assistant.gemini("k", "hi"), "A bench ahead.")
+        finally:
+            urllib.request.urlopen = orig
+        self.assertEqual(len(calls), 2)
+        self.assertNotEqual(calls[0], calls[1])          # a different model
+
+    def test_online_check_is_quick_when_unreachable(self):
+        t0 = time.time()
+        self.assertFalse(assistant.online("unreachable.invalid", timeout=1.0))
+        self.assertLess(time.time() - t0, 3.0)
+
+    def test_offline_summary_sentence(self):
+        body = "chair ahead, near 1.4m @0.82 | backpack left, near 1.3m @0.75 | spoon right, far @0.30"
+        self.assertEqual(
+            sd.summarize(body, sd.RELEVANT | {"chair"}, 0.35, 1250),
+            "chair ahead, 1.2 meters. backpack left, about 1.5 meters. obstacle right, far")
+        self.assertEqual(sd.summarize("clear", sd.RELEVANT, 0.35, None), "")
+
+    def test_speech_pause_keeps_urgent_warnings(self):
+        s = speaker()
+        try:
+            s.hold(True)
+            self.assertFalse(s.say("chair ahead, 1 meter", routine=True))
+            self.assertTrue(s.say("Careful, drop ahead", urgent=True, repeat_after=2.5))
+            self.assertTrue(s.say("Warning, ground sensor not working"))
+            s.hold(False)
+            self.assertTrue(s.say("chair ahead, 1 meter", routine=True))
+            self.assertEqual(s.heard, ["Careful, drop ahead",
+                                       "Warning, ground sensor not working",
+                                       "chair ahead, 1 meter"])
+        finally:
+            s._restore()
 
 
 class DemoDashboard(unittest.TestCase):
