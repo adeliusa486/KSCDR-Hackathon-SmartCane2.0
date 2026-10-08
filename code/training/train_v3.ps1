@@ -19,8 +19,8 @@
 # Run from Task Scheduler (not WMI), see train_v2.ps1.
 
 param(
-    [string]$D = "D:\smartcane-data",
-    [string]$Py = "C:\ml\venv\Scripts\python.exe",
+    [string]$D = "D:\smart cane 2.0\datasets",
+    [string]$Py = "D:\smart cane 2.0\envs\venv\Scripts\python.exe",
     [double]$BudgetHours = 46
 )
 $L = "$D\pipeline.log"
@@ -44,8 +44,8 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
     if ($hours -lt 4) { Log "only $hours h left, no new attempt"; break }
     $name = if ($attempt -eq 1) { "smartcane152_v3" } else { "smartcane152_v3_try$attempt" }
     if (Test-Path "$D\runs\detect\$name") { Log "$name exists, stopping so nothing is overwritten"; break }
-    $argList = @("-u", "$D\pipeline_code\train.py", "--data", "$D\merged_v2\smartcane.yaml",
-        "--model", $weights, "--batch", "24", "--optimizer", "SGD", "--epochs", "100",
+    $argList = @("-u", "`"$PSScriptRoot\train.py`"", "--data", "`"$D\merged_v2\smartcane.yaml`"",
+        "--model", "`"$weights`"", "--batch", "24", "--optimizer", "SGD", "--epochs", "100",
         "--lr0", "$lr", "--lrf", "0.05", "--cos-lr", "--warmup-epochs", "0.5",
         "--close-mosaic", "4", "--patience", "8", "--time", "$hours", "--name", $name)
     Log "attempt $attempt ($name): lr0 $lr, $hours h"

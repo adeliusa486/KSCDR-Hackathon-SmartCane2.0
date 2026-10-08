@@ -13,8 +13,8 @@ answers two questions:
      It counts object instances, weighted by how often they occur on real
      streets, not label types.
 
-    python convert_vistas.py --root D:/smartcane-data/raw/mapillary_vistas \
-        --out D:/smartcane-data/vistas_yolo
+    python convert_vistas.py --root "D:/smart cane 2.0/datasets/raw/mapillary_vistas" \
+        --out "D:/smart cane 2.0/datasets/vistas_yolo"
     python convert_vistas.py --root ... --coverage
 """
 import argparse

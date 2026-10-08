@@ -2,7 +2,7 @@
 """Download every set in roboflow_sources.yaml that is not on disk yet, then
 keep one copy per original photo (dedupe_roboflow.py). Needs ROBOFLOW_API_KEY.
 
-    python fetch_all_roboflow.py --out D:/smartcane-data/raw/roboflow
+    python fetch_all_roboflow.py --out "D:/smart cane 2.0/datasets/raw/roboflow"
 """
 import argparse
 import sys
@@ -18,7 +18,7 @@ from roboflow_fetch import download  # noqa: E402
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="D:/smartcane-data/raw/roboflow")
+    ap.add_argument("--out", default="D:/smart cane 2.0/datasets/raw/roboflow")
     args = ap.parse_args()
     reg = yaml.safe_load((HERE / "roboflow_sources.yaml").read_text(encoding="utf-8"))
     out = Path(args.out)

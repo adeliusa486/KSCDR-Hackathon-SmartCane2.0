@@ -17,8 +17,8 @@ limit-40--g3". This converter:
 Only signs are labelled in MTSD. Cars, people and poles in the same photos
 are not: run pseudo_label.py on the merged set.
 
-    python convert_mtsd.py --root D:/smartcane-data/raw/mapillary_mtsd \
-        --out D:/smartcane-data/mtsd_yolo
+    python convert_mtsd.py --root "D:/smart cane 2.0/datasets/raw/mapillary_mtsd" \
+        --out "D:/smart cane 2.0/datasets/mtsd_yolo"
 """
 import argparse
 import json

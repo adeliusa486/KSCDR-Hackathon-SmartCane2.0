@@ -24,9 +24,9 @@ def main():
     ap.add_argument("file", nargs="?", default=str(Path(__file__).parent / "classes_v2.yaml"))
     ap.add_argument("--oiv7", default="C:/ml/oiv7_classes.json")
     ap.add_argument("--expect", type=int, default=150)
-    ap.add_argument("--mtsd", default="D:/smartcane-data/raw/mapillary_mtsd/mtsd_fully_annotated_annotation.zip",
+    ap.add_argument("--mtsd", default="D:/smart cane 2.0/datasets/raw/mapillary_mtsd/mtsd_fully_annotated_annotation.zip",
                     help="MTSD annotation zip, checks mapillary-mtsd: sources if present")
-    ap.add_argument("--vistas", default="D:/smartcane-data/raw/mapillary_vistas/config_v2.0.json",
+    ap.add_argument("--vistas", default="D:/smart cane 2.0/datasets/raw/mapillary_vistas/config_v2.0.json",
                     help="Vistas config, checks mapillary: sources if present")
     args = ap.parse_args()
 

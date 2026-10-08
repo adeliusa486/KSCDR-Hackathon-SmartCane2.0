@@ -15,8 +15,8 @@ the traffic sign line that matches each stop sign box (best IoU, at least
 mtsd_stop_relabel.csv with the old class, so it can be reversed. Safe to run
 twice: an already-changed line is counted, not changed again.
 
-    python relabel_mtsd_stop.py --data D:/smartcane-data/merged_v2 \
-        --mtsd D:/smartcane-data/raw/mapillary_mtsd             # dry run
+    python relabel_mtsd_stop.py --data "D:/smart cane 2.0/datasets/merged_v2" \
+        --mtsd "D:/smart cane 2.0/datasets/raw/mapillary_mtsd"             # dry run
     python relabel_mtsd_stop.py ... --apply
 """
 import argparse

@@ -12,7 +12,7 @@ Waits for each download to report success, then, in order:
   7. pseudo_label.py with a COCO and an Open Images teacher (train/val only)
   8. train.py (YOLO11s, 152 classes), in the background of this process
 
-Every stage writes to D:/smartcane-data/pipeline.log. Any failure stops the
+Every stage writes to "D:/smart cane 2.0/datasets/pipeline.log". Any failure stops the
 pipeline: nothing is trained on data that did not pass its checks.
 """
 import json
@@ -27,7 +27,7 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 PY = sys.executable
-D = Path("D:/smartcane-data")
+D = Path("D:/smart cane 2.0/datasets")
 LOG = D / "pipeline.log"
 MERGED = D / "merged_v2"
 

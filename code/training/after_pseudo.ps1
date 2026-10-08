@@ -8,18 +8,18 @@
 #
 # Launch detached so it survives the chat that started it:
 #   Invoke-CimMethod Win32_Process -MethodName Create -Arguments @{CommandLine=
-#     'powershell -NoProfile -ExecutionPolicy Bypass -File D:\smartcane-data\pipeline_code\after_pseudo.ps1'}
+#     'powershell -NoProfile -ExecutionPolicy Bypass -File <repo>\code\training\after_pseudo.ps1'}
 
 param(
-    [string]$D = "D:\smartcane-data",
-    [string]$Py = "C:\ml\venv\Scripts\python.exe",
+    [string]$D = "D:\smart cane 2.0\datasets",
+    [string]$Py = "D:\smart cane 2.0\envs\venv\Scripts\python.exe",
     [int]$Poll = 30
 )
 # No $ErrorActionPreference = "Stop": in PowerShell 5.1 a native program's
 # stderr (Ultralytics progress) would then end the script. Exit codes are
 # checked explicitly instead.
 $Data = "$D\merged_v2"
-$Code = "$D\pipeline_code"
+$Code = $PSScriptRoot
 $L    = "$D\pipeline.log"
 
 function Log($m) { Add-Content $L "$(Get-Date -Format HH:mm:ss) $m" }

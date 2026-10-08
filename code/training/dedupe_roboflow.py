@@ -12,7 +12,7 @@ This keeps one copy per original, preferring valid/test (Roboflow does not
 augment those), and deletes the rest with their labels. Ultralytics does its
 own augmentation during training.
 
-    python dedupe_roboflow.py D:/smartcane-data/raw/roboflow
+    python dedupe_roboflow.py "D:/smart cane 2.0/datasets/raw/roboflow"
 """
 import re
 import sys

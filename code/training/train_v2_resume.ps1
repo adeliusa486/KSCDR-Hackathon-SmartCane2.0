@@ -9,14 +9,14 @@
 # Do NOT start train_v2.ps1 again: that starts from scratch in a new folder.
 #
 # Run (Task Scheduler, not WMI, see train_v2.ps1):
-#   $a = New-ScheduledTaskAction -Execute powershell.exe -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File D:\smartcane-data\pipeline_code\train_v2_resume.ps1'
+#   $a = New-ScheduledTaskAction -Execute powershell.exe -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File <repo>\code\training\train_v2_resume.ps1'
 #   Set-ScheduledTask SmartcaneTrainV2 -Action $a
 #   Start-ScheduledTask SmartcaneTrainV2
 # Set MyASUS fan mode to Performance first (36 vs 20 images/s, see MEMORY.md).
 
 param(
-    [string]$D = "D:\smartcane-data",
-    [string]$Py = "C:\ml\venv\Scripts\python.exe"
+    [string]$D = "D:\smart cane 2.0\datasets",
+    [string]$Py = "D:\smart cane 2.0\envs\venv\Scripts\python.exe"
 )
 $L = "$D\pipeline.log"
 function Log($m) { Add-Content $L "$(Get-Date -Format HH:mm:ss) $m" }
@@ -27,5 +27,5 @@ if (-not (Test-Path $Last)) { Log "resume: no checkpoint at $Last, nothing start
 $n = (Get-ChildItem "$D\train_v2*.log").Count
 Copy-Item "$D\train_v2.log" "$D\train_v2_before_resume_$n.log" -ErrorAction SilentlyContinue
 Log "resume: smartcane152_v2 from $Last"
-& $Py -u "$D\pipeline_code\train.py" --data "$D\merged_v2\smartcane.yaml" --model $Last --resume --batch 24 --optimizer SGD --name smartcane152_v2 *> "$D\train_v2.log"
+& $Py -u "$PSScriptRoot\train.py" --data "$D\merged_v2\smartcane.yaml" --model $Last --resume --batch 24 --optimizer SGD --name smartcane152_v2 *> "$D\train_v2.log"
 Log "train (resume) exited $LASTEXITCODE"

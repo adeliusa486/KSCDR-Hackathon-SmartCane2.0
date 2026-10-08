@@ -5,7 +5,7 @@ Needs the API key in the ROBOFLOW_API_KEY environment variable (never in a
 file). Inspect first, then download only what the class list needs:
 
     python roboflow_fetch.py --inspect ws/project ws/project2 ...
-    python roboflow_fetch.py --download ws/project[:version] ... --out D:/smartcane-data/raw/roboflow
+    python roboflow_fetch.py --download ws/project[:version] ... --out "D:/smart cane 2.0/datasets/raw/roboflow"
 
 --inspect prints, per project: latest version, image count, class names and
 their counts, licence. The download writes <out>/<ws>__<project>/ in YOLOv8
@@ -107,7 +107,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--inspect", nargs="*", default=[])
     ap.add_argument("--download", nargs="*", default=[])
-    ap.add_argument("--out", default="D:/smartcane-data/raw/roboflow")
+    ap.add_argument("--out", default="D:/smart cane 2.0/datasets/raw/roboflow")
     args = ap.parse_args()
     for s in args.inspect:
         r = inspect(s)

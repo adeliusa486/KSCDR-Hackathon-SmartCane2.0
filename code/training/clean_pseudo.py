@@ -15,8 +15,8 @@ be removed. Each removed box is written to pseudo_removed.csv and the rows
 are dropped from pseudo_labels.csv, so the audit trail stays true. Safe to
 run twice: a box already gone is skipped.
 
-    python clean_pseudo.py --data D:/smartcane-data/merged_v2           # dry run
-    python clean_pseudo.py --data D:/smartcane-data/merged_v2 --apply
+    python clean_pseudo.py --data "D:/smart cane 2.0/datasets/merged_v2"           # dry run
+    python clean_pseudo.py --data "D:/smart cane 2.0/datasets/merged_v2" --apply
 """
 import argparse
 import collections

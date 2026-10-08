@@ -3,8 +3,8 @@
 # same settings (lr schedule, time budget, 27 epochs) read from the checkpoint.
 
 param(
-    [string]$D = "D:\smartcane-data",
-    [string]$Py = "C:\ml\venv\Scripts\python.exe"
+    [string]$D = "D:\smart cane 2.0\datasets",
+    [string]$Py = "D:\smart cane 2.0\envs\venv\Scripts\python.exe"
 )
 $L = "$D\pipeline.log"
 function Log($m) { Add-Content $L "$(Get-Date -Format 'MM-dd HH:mm:ss') v3: $m" }
@@ -13,5 +13,5 @@ Set-Location $D
 if (-not (Test-Path $Last)) { Log "resume: no $Last"; exit 1 }
 Copy-Item "$D\train_smartcane152_v3.log" "$D\train_smartcane152_v3_before_pause.log" -ErrorAction SilentlyContinue
 Log "resume after pause from $Last"
-& $Py -u "$D\pipeline_code\train.py" --data "$D\merged_v2\smartcane.yaml" --model $Last --resume --batch 24 --optimizer SGD --name smartcane152_v3 *> "$D\train_smartcane152_v3.log"
+& $Py -u "$PSScriptRoot\train.py" --data "$D\merged_v2\smartcane.yaml" --model $Last --resume --batch 24 --optimizer SGD --name smartcane152_v3 *> "$D\train_smartcane152_v3.log"
 Log "resume exited $LASTEXITCODE"
