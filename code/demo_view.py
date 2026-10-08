@@ -11,12 +11,18 @@ degrees, left / ahead / right, the camera's distance estimate in metres, and
 the confidence. The forward ToF reading comes separately from the ESP32, and
 the dashboard puts the two side by side for the object straight ahead.
 
-At most MAX_FPS frames a second are drawn, and only while someone has the
-dashboard open: demo_server.py touches <path>.watch on every request, and
-frames stop WATCH_S seconds after the last one. JPEG encoding on the Pi's CPU
-is the cost (about 73 % of a core at 10 fps on 8 Oct 2026), so with nobody
-watching the cane runs as if the dashboard were off. The Hailo path is
-untouched.
+Frames are drawn only while someone has the dashboard open: demo_server.py
+touches <path>.watch on every request, and frames stop WATCH_S seconds after
+the last one. So with nobody watching the cane runs as if the dashboard were
+off. The Hailo path is untouched.
+
+While watched, every camera frame is drawn: the camera's frame rate (10 fps
+in the service) is the limit. The cost is the shrink to 960x540: PIL took
+47 ms of a 59 ms frame on the cane, OpenCV takes 8 ms (measured 8 Oct 2026),
+so drawing fits inside one 100 ms camera frame. There is deliberately no
+time limit of its own: detect.py asks due() about 20 ms after the last draw,
+before waiting for the next frame, so any limit above 20 ms skipped every
+other frame (5 drawn a second at 9.6 fps, measured 8 Oct 2026).
 """
 import json
 import math
@@ -25,8 +31,12 @@ import time
 
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    import cv2
+except ImportError:          # PCs without OpenCV: same picture, slower
+    cv2 = None
+
 OUT_W, OUT_H = 960, 540
-MAX_FPS = 6.0
 WATCH_S = 5.0
 
 # Colour says how dangerous, the same order the cane speaks in.
@@ -76,7 +86,6 @@ class Viewer:
         self.hfov, self.corridor = hfov, corridor
         self.info = info
         self.font = _font(17)
-        self.last = 0.0
         self.frame_id = 0
         # A camera mounted on its side gives an upright portrait picture.
         self.out = (OUT_W, OUT_H) if width >= height else (OUT_H, OUT_W)
@@ -89,20 +98,25 @@ class Viewer:
 
     def due(self):
         """True when the next frame should be drawn: the dashboard asked for
-        one in the last WATCH_S seconds and MAX_FPS is not exceeded."""
-        if time.monotonic() - self.last < 1.0 / MAX_FPS:
-            return False
+        one in the last WATCH_S seconds."""
         try:
             return time.time() - os.path.getmtime(self.watch_path) < WATCH_S
         except OSError:
             return False
 
     def write(self, frame, dets, fps, infer_ms):
-        self.last = time.monotonic()
         self.frame_id += 1
         # picamera2 XRGB8888 arrives as B, G, R, X bytes.
-        img = Image.fromarray(frame[:, :, [2, 1, 0]]).resize(self.out,
-                                                            Image.BILINEAR)
+        if cv2 is not None:
+            # Shrink first, then swap the colours of the small picture.
+            # rot90 leaves a strided view, which OpenCV does not take.
+            if not frame.flags["C_CONTIGUOUS"]:
+                frame = frame.copy()
+            small = cv2.resize(frame, self.out, interpolation=cv2.INTER_AREA)
+            img = Image.fromarray(small[:, :, [2, 1, 0]])
+        else:
+            img = Image.fromarray(frame[:, :, [2, 1, 0]]).resize(self.out,
+                                                                Image.BILINEAR)
         out_w, out_h = self.out
         d = ImageDraw.Draw(img, "RGBA")
         for x in self.lanes:

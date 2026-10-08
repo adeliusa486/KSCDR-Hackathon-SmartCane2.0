@@ -3,7 +3,7 @@ name: Website
 # Publishes the project website to GitHub Pages on every push to main that
 # touches it. One-time setup: repository Settings > Pages > Source:
 # "GitHub Actions". The site is then at
-# https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/
+# https://adeliusa486.github.io/OmniWalk/
 # and its live page at .../live.html connects to a cane through its tunnel.
 
 on:

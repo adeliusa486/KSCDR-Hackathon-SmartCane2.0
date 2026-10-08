@@ -1,4 +1,4 @@
-<title>Smart Cane 2.0</title>
+<title>OmniWalk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
@@ -143,14 +143,14 @@ footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
 <nav aria-label="Sections">
   <div class="mark">
     <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11.5 25 L19.5 7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><path d="M11.5 25 L13.6 20.4" stroke="#d1262c" stroke-width="3.2" stroke-linecap="round"/></svg>
-    Smart Cane 2.0
+    OmniWalk
   </div>
   <a href="#live">Live dashboard</a>
   <a href="#how">How it works</a>
   <a href="#hardware">Hardware</a>
   <a href="#objects">152 objects</a>
   <a href="#results">Results</a>
-  <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">GitHub</a>
+  <a href="https://github.com/adeliusa486/OmniWalk">GitHub</a>
 </nav>
 
 <header class="hero">
@@ -160,15 +160,15 @@ footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
     <h1 style="margin-top:12px">A white cane that sees <span>what is ahead</span> and how far.</h1>
     <p class="lede">A camera and an AI accelerator on the cane name 152 kinds of object with their direction and distance. Two time-of-flight sensors catch obstacles and drop-offs, and a vibration motor reacts within a second of power-on, whether the computer is up or not.</p>
     <div class="cta">
-      <a class="btn primary" href="LIVE_URL">Open the live dashboard</a>
-      <a class="btn" href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">Source, models and data</a>
+      <a class="btn primary" href="LIVE_URL">Watch the cane live</a>
+      <a class="btn" href="https://github.com/adeliusa486/OmniWalk">Source, models and data</a>
     </div>
   </div>
   <figure class="shot">
-    <img src="assets/live_dashboard.jpg" alt="The cane's live dashboard playing a recording: two chairs boxed, one at about 4.3 m, a wall unit labelled tv, objects sorted into left, ahead and right, the ground sensor at 1.91 m against 1.94 m learned, a top-down radar and the log of what the cane said" width="1440" height="1000">
+    <img src="assets/live_dashboard.jpg" alt="The OmniWalk dashboard on a street photo of Tahlia Street, Jeddah: cars boxed with confidences from 60 to 89 percent and camera distances from about 11 to 24 meters, objects sorted into left, ahead and right, a top-down radar, and the sentence the cane would say: car right, far. car right, about 11 meters" width="1440" height="1000">
   </figure>
 </header>
-<p style="font-size:.9rem;color:var(--muted);margin-top:10px">The live dashboard playing a 30-second recording from the cane, 8 October 2026. The model labels the wall unit at top left "tv".</p>
+<p style="font-size:.9rem;color:var(--muted);margin-top:10px">OmniWalk's model on a photo of Tahlia Street, Jeddah, run on the cane's Hailo-8L. Every box, confidence and distance is the cane's own output. Photo: <a href="https://commons.wikimedia.org/wiki/File:Tahlia_Street_Jeddah.jpg">Tahir mq</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0">CC BY-SA 4.0</a>, cropped to 16:9.</p>
 
 <div class="facts">
   <div class="fact"><b>152</b><span>kinds of object named</span></div>
@@ -192,15 +192,15 @@ footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
 
 <section id="live">
   <div class="paving" aria-hidden="true"></div>
-  <h2>Live dashboard for judges</h2>
-  <p class="lede">The cane serves its own dashboard: camera with real boxes, every object's bearing and distance, the ToF reading beside the camera's estimate for whatever is straight ahead, the ground sensor, and everything the cane says, updated four times a second.</p>
+  <h2>Watch it live</h2>
+  <p class="lede">Switch the cane on and its camera appears on <a href="LIVE_URL">this website's live page</a> by itself: real boxes, every object's bearing and distance, the ToF reading beside the camera's estimate for whatever is straight ahead, the ground sensor, and everything the cane says.</p>
   <div class="two">
     <ol class="steps">
-      <li><div><h3>The cane serves it</h3><p>The dashboard runs on the cane all the time, locked with a private token. It draws frames only while someone is watching, so it costs no battery otherwise.</p></div></li>
-      <li><div><h3>One command opens a secure tunnel</h3><p><code>bash ~/smartcane/tools/go_live.sh</code> gives the cane a public https address through Cloudflare and waits until it answers.</p></div></li>
-      <li><div><h3>Judges open the link</h3><p>On any phone or laptop, directly or through this website. Ctrl-C closes the tunnel and the cane is private again.</p></div></li>
+      <li><div><h3>Switch the cane on</h3><p>It joins a known Wi-Fi or the owner's phone hotspot and goes online about 1.5 minutes after power-on. Nothing to type, no app.</p></div></li>
+      <li><div><h3>Open the live page</h3><p>On any phone or laptop, anywhere. The page finds the cane and connects: up to 10 pictures a second on the same Wi-Fi, about 7 over the internet.</p></div></li>
+      <li><div><h3>Cane off? Street examples</h3><p>The page shows the same model on street photos from Saudi Arabia until the cane comes on, then switches to live without a reload.</p></div></li>
     </ol>
-    <div class="note"><p>The dashboard shows the camera, so it never runs without a token, and the tunnel closes when the demo ends. If the venue's internet fails, a recording made with <code>tools/record_demo.py</code> plays back on the same page. Full steps: <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/blob/main/docs/deployment.md">docs/deployment.md</a>.</p></div>
+    <div class="note"><p>The cane signs every address it announces with a key that never leaves it, so the page only ever connects to the real cane. Frames are drawn only while someone watches, so an unwatched dashboard costs no battery.</p></div>
   </div>
 </section>
 
@@ -253,7 +253,7 @@ footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
 <section id="results">
   <div class="paving" aria-hidden="true"></div>
   <h2>Measured results</h2>
-  <p class="lede">Every number comes from the cane or its validation set, with date and method in <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/blob/main/docs/results.md">docs/results.md</a>.</p>
+  <p class="lede">Every number comes from the cane or its validation set, with date and method in <a href="https://github.com/adeliusa486/OmniWalk/blob/main/docs/results.md">docs/results.md</a>.</p>
   <div class="charts">
     <figure class="chart"><img class="light-only" src="assets/camera-path-light.svg" alt="Named objects rose from 40 to 55 percent and noticed objects from 53 to 66 percent after the camera path fixes. A sideways camera drops naming to 6 percent." loading="lazy"><img class="dark-only" src="assets/camera-path-dark.svg" alt="" loading="lazy"></figure>
     <figure class="chart"><img class="light-only" src="assets/training-light.svg" alt="Training curve: v2 fell to 0.225 mAP50 at epoch 4, v3 rose steadily to 0.536 at epoch 24" loading="lazy"><img class="dark-only" src="assets/training-dark.svg" alt="" loading="lazy"></figure>
@@ -267,9 +267,9 @@ footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
 </section>
 
 <footer>
-  <span>Smart Cane 2.0 · code and documents MIT licence</span>
+  <span>OmniWalk · code and documents MIT licence</span>
   <span>Training labels keep their datasets' licences, two of them non-commercial</span>
-  <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0</a>
+  <a href="https://github.com/adeliusa486/OmniWalk">github.com/adeliusa486/OmniWalk</a>
 </footer>
 </div>
 

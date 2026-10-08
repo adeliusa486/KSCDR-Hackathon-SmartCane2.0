@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Smart Cane Live</title>
+<title>OmniWalk Live</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
@@ -53,6 +53,10 @@ header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; pa
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 .note { color: var(--dim); font-size: 13px; flex-basis: 100%; }
 .note.err { color: var(--bad); }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 0 0; }
+.status .note { flex: 1 1 280px; margin: 0; }
+.credit { margin: 0; color: var(--faint); font-size: 12px; }
+.credit a { color: var(--dim); }
 
 main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; padding-top: 14px; }
 @media (max-width: 1020px) { main { grid-template-columns: minmax(0, 1fr); } }
@@ -128,7 +132,7 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
 <header>
   <div class="brand">
     <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#4cc9d8" stroke-width="2"/><path d="M11 25 L19 7" stroke="#e6ebf1" stroke-width="3" stroke-linecap="round"/><path d="M11 25 L13 21" stroke="#ff5a4f" stroke-width="3" stroke-linecap="round"/></svg>
-    Smart Cane
+    OmniWalk
   </div>
   <span class="state" id="state"><i></i><span id="stateText">Connecting</span></span>
   <div class="metrics" aria-label="System">
@@ -140,13 +144,17 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
   </div>
 </header>
 
+<div class="status">
+  <p class="note" id="connectNote">Looking for the cane…</p>
+  <button class="btn ghost" type="button" id="playRec" hidden>Play the examples</button>
+</div>
+<!-- Only for a cane that still requires a token (without --demo-public), or
+     opened with ?connect. A public cane is found and shown by itself. -->
 <form class="connect" id="connect" hidden>
   <label for="cane">Cane address</label>
-  <input id="cane" placeholder="https://your-tunnel.trycloudflare.com" autocomplete="off" spellcheck="false">
+  <input id="cane" placeholder="optional: found by itself" autocomplete="off" spellcheck="false">
   <input id="token" placeholder="token" autocomplete="off" spellcheck="false" aria-label="Token">
-  <button class="btn" type="submit">Connect live</button>
-  <button class="btn ghost" type="button" id="playRec" hidden>Play recording</button>
-  <p class="note" id="connectNote">Paste the address your cane printed when its tunnel started (docs/deployment.md).</p>
+  <button class="btn" type="submit">Connect</button>
 </form>
 
 <main>
@@ -163,6 +171,7 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
       <input type="range" id="seek" min="0" max="100" value="0" aria-label="Recording position">
       <span id="clock">0.0 s</span>
     </div>
+    <p class="credit" id="credit" hidden></p>
     <div class="zones" aria-label="Objects by direction">
       <div class="zone" id="z-left"><h3>Left</h3><div></div></div>
       <div class="zone" id="z-ahead"><h3>Ahead</h3><div></div></div>
@@ -304,12 +313,17 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
         ? `<span class="pill ${pct <= 30 ? "ok" : "warn"}">match, ${diff.toFixed(2)} m apart (${pct} %)</span><span>the cane says ${(fwd / 1000).toFixed(1)} m</span>`
         : `<span class="pill warn">beam is on something else</span><span>${diff.toFixed(1)} m apart, camera estimate used</span>`;
     }
+    // sensors is null when there are none: an example photo, or a cane
+    // whose ESP32 link is not up.
+    const noSensors = st.sensors === null;
+    const why = mode === "replay" && replay && replay.data.kind === "example" ? "no sensors on a photo" : "no sensor link";
+    if (noSensors) verdict = `<span class="pill dim">${why}</span>`;
     $("match").innerHTML = verdict;
 
     // ground
     const down = s.down_mm, ground = s.ground_mm;
     $("downV").textContent = m(down);
-    $("groundV").textContent = ground == null ? "learning" : m(ground);
+    $("groundV").textContent = noSensors ? "–" : ground == null ? "learning" : m(ground);
     const scale = 2500;
     $("downBar").style.width = down == null ? "0%" : Math.min(100, 100 * down / scale) + "%";
     $("groundMark").style.left = ground == null ? "-10px" : Math.min(100, 100 * ground / scale) + "%";
@@ -319,13 +333,14 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     else if (down == null || down > ground + 150) gs = `<span class="pill bad">drop: ground fell away</span>`;
     else if (down < ground - 120) gs = `<span class="pill warn">rise: step or kerb</span>`;
     else gs = `<span class="pill ok">ground normal</span><span>within ±15 cm</span>`;
+    if (noSensors) gs = `<span class="pill dim">${why}</span>`;
     $("groundState").innerHTML = gs;
 
     // spoken log, caption, hazard banner
     const said = st.said || [];
     if (said.length) {
       $("log").innerHTML = said.slice().reverse().map((x) =>
-        `<li><time>${new Date(x.t * 1000).toTimeString().slice(0, 8)}</time><span class="k-${esc(x.kind)}">${esc(x.text)}</span></li>`).join("");
+        `<li><time>${x.kind === "example" ? "photo" : new Date(x.t * 1000).toTimeString().slice(0, 8)}</time><span class="k-${esc(x.kind)}">${esc(x.text)}</span></li>`).join("");
       const last = said[said.length - 1];
       const now = mode === "replay" ? replay.clockT : Date.now() / 1000;
       const fresh = now - last.t < 4;
@@ -337,7 +352,8 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
           setTimeout(() => $("banner").classList.remove("show"), 3500);
         }
       }
-      $("captionKind").textContent = last.kind === "assistant" ? "Assistant" : last.kind === "hazard" ? "Warning" : "Cane says";
+      $("captionKind").textContent = last.kind === "assistant" ? "Assistant" : last.kind === "hazard" ? "Warning"
+        : last.kind === "example" ? "OmniWalk would say" : "Cane says";
       $("captionText").textContent = last.text;
       $("caption").classList.toggle("show", fresh);
     }
@@ -389,17 +405,26 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
   // ---- live -------------------------------------------------------------
   // Plain requests, not streams: tunnels such as Cloudflare's hold a
   // long-lived stream back (measured: 0 bytes of /events in 6 s), but answer
-  // a single request at once. State is fetched 4 times a second and the
-  // picture on two staggered lanes, so a slow link still gets several frames.
+  // a single request at once. State is fetched 4 times a second. Each picture
+  // request names the frame it already has (?after=), and the cane answers as
+  // soon as a newer one is drawn, so no picture comes twice. Next to the cane
+  // one lane gets every frame (9.8 a second, 8 Oct 2026). Through a quick
+  // tunnel a request takes about a second, so six staggered lanes: measured
+  // 4.0 pictures a second with 4 lanes, 7.0 with 6, 7.4 with 8.
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   function stopLive() { if (live) { live.stop = true; live = null; } }
   function connectLive(base, token) {
     stopReplay(); replay = null; stopLive();
+    if (base) store.set("base", base);
+    if (token) store.set("token", token);
     const q = "?" + (token ? "token=" + encodeURIComponent(token) + "&" : "") + "n=";
-    const L = live = { stop: false, got: false, fails: 0, seq: 0, shown: 0, url: "" };
+    const L = live = { stop: false, got: false, fails: 0, shownId: "", url: "" };
     mode = "live";
     setState("", "Connecting");
     $("scrub").hidden = true;
+    $("credit").hidden = true;
+    $("playRec").hidden = true;
+    note("");
     // Drop whatever the recording left on screen: until the cane answers,
     // nothing here may look like its camera.
     $("rec").hidden = true;
@@ -410,22 +435,32 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     render({});
     freeze("Connecting to the cane");
 
+    // A cane that was switched off and on comes back on a new tunnel address.
+    async function relocate() {
+      const found = await findCane();
+      if (found && found !== base && live === L) connectLive(found, token);
+    }
+
     function failed(why) {
       L.fails++;
+      if (base && L.fails % 10 === (L.got ? 6 : 1)) relocate();
       if (L.got) {
         if (L.fails >= 2) {
           setState("", "Reconnecting");
           freeze("Lost the cane. This picture is frozen until it answers again.");
+          $("playRec").hidden = false;
         }
         return;
       }
+      $("playRec").hidden = false;
       freeze("Not connected to a cane");
       setState("", "Cannot reach the cane");
-      $("connect").hidden = false;
-      $("connectNote").className = "note err";
-      $("connectNote").textContent = why === 403
-        ? "The cane answered but refused the token. Copy the whole link again, including ?token=."
-        : "No answer from that address. Check the cane is on, its tunnel is running and the address is the latest one (a quick tunnel changes address on every start).";
+      if (why === 403) {
+        $("connect").hidden = false;
+        note("This cane is private: it answered but needs its token. Enter it below.", true);
+      } else {
+        note("No answer from the cane yet. If it was just switched on, give it a minute: this page finds it by itself.", true);
+      }
     }
 
     async function pollState() {
@@ -436,7 +471,7 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
           if (!r.ok) throw r.status;
           const st = await r.json();
           if (L.stop) return;
-          if (!L.got) { L.got = true; $("connectNote").className = "note"; $("connectNote").textContent = ""; }
+          if (!L.got) { L.got = true; note(""); $("connect").hidden = !params.has("connect"); }
           L.fails = 0;
           setState("live", "Live");
           render(st);
@@ -450,33 +485,93 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     }
 
     async function pollFrames(lane) {
-      await sleep(lane * 160);
+      await sleep(lane * 120);
       while (!L.stop) {
-        const t0 = performance.now(), seq = ++L.seq;
+        const t0 = performance.now();
+        let id = null;
         try {
-          const r = await fetch(base + "/frame.jpg" + q + Date.now() + lane, { cache: "no-store" });
-          if (r.ok) {
+          const r = await fetch(base + "/frame.jpg" + q + Date.now() + lane + "&after=" + L.shownId, { cache: "no-store" });
+          id = r.headers.get("X-Frame");
+          if (r.status === 200) {
             const blob = await r.blob();
-            if (!L.stop && seq > L.shown) {
-              L.shown = seq;
+            // Ids are write times in microseconds: never step back in time.
+            if (!L.stop && (id === null || L.shownId === "" || Number(id) > Number(L.shownId))) {
+              if (id !== null) L.shownId = id;
               const old = L.url;
               L.url = URL.createObjectURL(blob);
               $("frame").src = L.url;
               if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
             }
-          } else {
+          } else if (r.status !== 204) {
             await sleep(500);   // 503 while the camera starts
           }
         } catch (e) {
           await sleep(1000);
         }
-        await sleep(Math.max(0, 330 - (performance.now() - t0)));
+        // An older cane without ?after= answers at once: pace it as before.
+        await sleep(Math.max(0, (id === null ? 330 : 30) - (performance.now() - t0)));
       }
     }
 
     pollState();
-    pollFrames(0);
-    pollFrames(1);
+    const lanes = base ? Number(params.get("lanes")) || 6 : 1;
+    for (let lane = 0; lane < lanes; lane++) pollFrames(lane);
+  }
+
+  // ---- finding the cane --------------------------------------------------
+  // Each time the cane goes online it posts "<address> <unix time>
+  // <signature>" to a public relay topic (tools/live_tunnel.sh). The
+  // signature is Ed25519 with a key that never leaves the cane, so this page
+  // only connects to an address the cane itself posted, whoever else writes
+  // to the topic. PUBKEY must match the cane's ~/.config/smartcane/live_key.pem
+  // (live_tunnel.sh prints it).
+  const RELAY = "https://ntfy.sh/omniwalk-c3b2b75649938dd6";
+  const PUBKEY = "u6/0dBdBFSgb0TR14GE03KlXrsU6BOh1BFV1Ki08hUs=";
+  const TUNNEL = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  let caneKey = null;
+  async function signedByCane(text, sig) {
+    try {
+      caneKey = caneKey || await crypto.subtle.importKey("raw", unb64(PUBKEY), { name: "Ed25519" }, false, ["verify"]);
+      return await crypto.subtle.verify({ name: "Ed25519" }, caneKey, unb64(sig), new TextEncoder().encode(text));
+    } catch (e) {
+      return false;   // no Ed25519 in this browser, or a malformed post
+    }
+  }
+  // The cane's newest signed address, or "".
+  async function announced() {
+    if (!(window.crypto && crypto.subtle)) return "";
+    try {
+      const r = await fetch(RELAY + "/json?poll=1&since=12h", { cache: "no-store" });
+      if (!r.ok) return "";
+      const msgs = (await r.text()).split("\n")
+        .map((l) => { try { return JSON.parse(l); } catch (e) { return null; } })
+        .filter((m) => m && m.event === "message").reverse().slice(0, 500);
+      for (const m of msgs) {
+        const [url, t, sig] = String(m.message || "").trim().split(" ");
+        const age = Date.now() / 1000 - Number(t);
+        if (TUNNEL.test(url || "") && sig && age > -600 && age < 13 * 3600
+            && await signedByCane(url + " " + t, sig)) return url;
+      }
+    } catch (e) { /* relay unreachable */ }
+    return "";
+  }
+  async function findCane() {
+    const url = await announced();
+    return url && (await answers(url)) ? url : "";
+  }
+  const currentToken = () => $("token").value.trim() || store.get("token");
+  // While no cane is connected, check every 10 s and go live by itself.
+  let looking = false;
+  async function lookForCane() {
+    if (looking) return;
+    looking = true;
+    while (mode !== "live") {
+      const found = await findCane();
+      if (found && mode !== "live") { connectLive(found, currentToken()); break; }
+      await sleep(10000);
+    }
+    looking = false;
   }
 
   // ---- replay -----------------------------------------------------------
@@ -488,16 +583,22 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     mode = "replay";
     replay = { data: r, i: 0, playing: true, timer: null, clockT: 0 };
     // Say on the picture itself that this is not the cane in your hand.
+    // kind "example": street photos run through the cane's own model
+    // (tools/photo_demo.py), each with its photo credit.
+    const example = r.kind === "example";
     const when = new Date(r.recorded || "");
     const at0 = isNaN(when) ? "" : " from " + when.toLocaleString(undefined,
       { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-    setState("replay", "Recording, not live");
-    $("rec").textContent = "Recording" + at0 + ", not live";
+    setState("replay", example ? "Cane offline" : "Recording, not live");
+    $("rec").textContent = example ? "Example on a street photo, not live" : "Recording" + at0 + ", not live";
     $("rec").hidden = false;
     freeze(null);
-    $("connect").hidden = false;
-    $("connectNote").className = "note";
-    $("connectNote").textContent = "This is a recording, so it does not follow the cane. To watch the cane live, enter the address and token the cane gave when it went online, then press Connect live.";
+    note(params.has("example")
+      ? "OmniWalk's model on street photos from Saudi Arabia, run on the cane's Hailo-8L."
+      : example
+      ? "The cane is switched off, so this shows OmniWalk's model on street photos from Saudi Arabia. The page goes live by itself as soon as the cane is on."
+      : "This is a recording, so it does not follow the cane. The page goes live by itself as soon as the cane is on.");
+    $("playRec").hidden = true;
     $("scrub").hidden = false;
     $("seek").max = r.frames.length - 1;
     // Preload so playback does not stutter.
@@ -513,7 +614,15 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     $("frame").src = "replay/" + f.img;
     replay.clockT = f.state && f.state.t ? f.state.t : 0;
     $("seek").value = i;
-    $("clock").textContent = f.t.toFixed(1) + " s";
+    const n = replay.data.frames.length;
+    $("clock").textContent = replay.data.kind === "example" ? `${i + 1} / ${n}` : f.t.toFixed(1) + " s";
+    const c = f.credit;
+    $("credit").hidden = !c;
+    if (c) {
+      $("credit").innerHTML = `Photo: <a href="${esc(c.page)}" target="_blank" rel="noopener">${esc(c.title)}</a>, ` +
+        `${esc(c.author)}, <a href="${esc(c.license_url)}" target="_blank" rel="noopener">${esc(c.license)}</a>. ` +
+        "Cropped to the camera's 16:9. Boxes and words are the cane's model.";
+    }
     render(f.state || {});
   }
   function step() {
@@ -522,7 +631,7 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     show(replay.i);
     if (!replay.playing) return;
     const next = (replay.i + 1) % fr.length;
-    const wait = next === 0 ? 1500 : Math.max(60, (fr[next].t - fr[replay.i].t) * 1000);
+    const wait = next === 0 ? (replay.data.loop_ms || 1500) : Math.max(60, (fr[next].t - fr[replay.i].t) * 1000);
     replay.i = next;
     replay.timer = setTimeout(step, wait);
   }
@@ -539,19 +648,24 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
   });
 
   // ---- start ------------------------------------------------------------
-  $("connect").addEventListener("submit", (e) => {
+  function note(text, err) {
+    $("connectNote").className = err ? "note err" : "note";
+    $("connectNote").textContent = text;
+  }
+  $("connect").addEventListener("submit", async (e) => {
     e.preventDefault();
     const base = $("cane").value.trim().replace(/\/+$/, "");
     const token = $("token").value.trim();
-    if (!/^https?:\/\//.test(base)) {
-      $("connectNote").className = "note err";
-      $("connectNote").textContent = "Enter the full address, starting with https://";
-      return;
-    }
-    store.set("base", base); store.set("token", token);
-    connectLive(base, token);
+    if (base && !/^https?:\/\//.test(base)) return note("Enter the full address, starting with https://, or leave it empty.", true);
+    if (token) store.set("token", token);
+    if (base) return connectLive(base, token);
+    note("Looking for the cane…");
+    const found = await findCane();
+    if (found) return connectLive(found, token);
+    note("The cane is not online yet. This page keeps looking and goes live by itself when it is.");
+    lookForCane();
   });
-  $("playRec").addEventListener("click", () => startReplay());
+  $("playRec").addEventListener("click", () => startReplay().then(() => { if (!params.has("example")) lookForCane(); }));
 
   // True if a cane's /health answers "ok" within 4 s. Quick tunnels change
   // address on every start, so a saved address is often dead.
@@ -568,24 +682,30 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
   }
 
   async function boot() {
-    $("cane").value = params.get("cane") || store.get("base");
-    $("token").value = params.get("token") || store.get("token");
-    // 1. Opened with ?cane=... : connect to that cane.
-    if (params.get("cane")) return connectLive(params.get("cane").replace(/\/+$/, ""), params.get("token") || "");
+    const token = params.get("token") || store.get("token");
+    if (params.get("token")) store.set("token", token);
+    $("cane").value = params.get("cane") || "";
+    $("token").value = token;
+    $("connect").hidden = !params.has("connect");
+    // 0. ?example: the street photo examples only, even with the cane on.
+    if (params.has("example") && await startReplay()) return;
+    // 1. Opened with ?cane=... : connect to that cane (an old address is
+    //    replaced by the current one through the relay, see relocate()).
+    if (params.get("cane")) return connectLive(params.get("cane").replace(/\/+$/, ""), token);
     // 2. Served by the cane itself: its /health answers on this origin.
     const own = await fetch("health", { cache: "no-store" }).then((x) => x.ok && x.text()).catch(() => "");
     if (own && own.trim() === "ok") return connectLive("", params.get("token") || "");
-    // 3. The cane connected from this browser before and still answers there.
+    // 3. The cane is on: its current address from the relay (or the last
+    //    one used in this browser, should the relay be down).
+    setState("", "Looking for the cane");
     const saved = store.get("base");
-    if (saved) {
-      setState("", "Looking for the cane");
-      if (await answers(saved)) return connectLive(saved, store.get("token"));
-    }
-    // 4. Anywhere else: show the connect form, and the recording if there is one.
-    $("connect").hidden = false;
+    const found = (await findCane()) || (saved && (await answers(saved)) ? saved : "");
+    if (found) return connectLive(found, token);
+    // 4. The cane is off: the examples, while checking every 10 s for it.
     const hasRec = await fetch("replay/replay.json", { method: "GET" }).then((x) => x.ok).catch(() => false);
-    $("playRec").hidden = !hasRec;
-    if (hasRec) startReplay(); else setState("", "Not connected");
+    if (hasRec) await startReplay();
+    else { setState("", "Cane offline"); note("The cane is switched off. This page goes live by itself as soon as it is on."); }
+    lookForCane();
   }
   boot();
 })();

@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(ROOT, "docs"))
 sys.path.insert(0, os.path.join(ROOT, "code"))
 from make_objects import GROUPS  # noqa: E402
 
-PAGES_URL = "https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/"
+PAGES_URL = "https://adeliusa486.github.io/OmniWalk/"
 ASSETS = ["docs/figures/sensor_geometry.svg",
           "docs/figures/cross_section.svg", "docs/figures/live_dashboard.jpg"] + \
          [f"docs/charts/{n}-{m}.svg" for n in ("camera-path", "training", "safety-classes", "dataset")

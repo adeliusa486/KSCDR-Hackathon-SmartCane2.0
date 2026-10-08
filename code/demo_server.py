@@ -5,7 +5,10 @@ Runs inside speak_detect.py with --demo-port. Open http://smartcane.local:8080
 address (docs/deployment.md) from anywhere:
 
     /             the dashboard (demo_dashboard.html, no internet needed)
-    /frame.jpg    the latest camera frame with detections drawn
+    /frame.jpg    the latest camera frame with detections drawn. Its id is in
+                  the X-Frame header. With ?after=<id> the request waits up
+                  to FRAME_WAIT_S for a newer frame (204 if none), so
+                  polling gets each frame once, as soon as it is drawn
     /state.json   detections with boxes, bearings and camera distances, fps,
                   ToF distances, ground state, temperature, everything spoken
     /stream.mjpg  the frames as one MJPEG stream (for VLC or a plain <img>)
@@ -40,6 +43,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+FRAME_WAIT_S = 2.0
 
 
 def cpu_temp():
@@ -65,6 +69,7 @@ class DemoServer:
         self.n_classes = n_classes
         self.token = token or ""
         self.started = time.time()
+        self.frame_wait = FRAME_WAIT_S
         self.said = collections.deque(maxlen=14)
         self.seq = 0
         self.lock = threading.Lock()
@@ -127,17 +132,20 @@ class DemoServer:
             def log_message(self, *a):
                 pass
 
-            def _headers(self, code, ctype, length=None):
+            def _headers(self, code, ctype, length=None, frame=None):
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Cache-Control", "no-cache, no-store")
+                if frame is not None:
+                    self.send_header("X-Frame", frame)
+                    self.send_header("Access-Control-Expose-Headers", "X-Frame")
                 if length is not None:
                     self.send_header("Content-Length", str(length))
                 self.end_headers()
 
-            def _send(self, code, ctype, body):
-                self._headers(code, ctype, len(body))
+            def _send(self, code, ctype, body, frame=None):
+                self._headers(code, ctype, len(body), frame)
                 self.wfile.write(body)
 
             def do_GET(self):
@@ -160,13 +168,27 @@ class DemoServer:
                     self._send(200, "application/json",
                                json.dumps(server.state()).encode())
                 elif path == "/frame.jpg":
-                    try:
-                        with open(server.view_path, "rb") as fh:
-                            self._send(200, "image/jpeg", fh.read())
-                    except OSError:
-                        self._send(503, "text/plain", b"no frame yet")
+                    self._frame(parse_qs(url.query).get("after", [""])[0])
                 else:
                     self.send_error(404)
+
+            def _frame(self, after):
+                # The id is the file's write time in microseconds, read from
+                # the open file, so id and picture always belong together
+                # (each frame is a new file, renamed into place).
+                deadline = time.monotonic() + server.frame_wait
+                while True:
+                    try:
+                        with open(server.view_path, "rb") as fh:
+                            fid = str(os.fstat(fh.fileno()).st_mtime_ns // 1000)
+                            if fid != after:
+                                return self._send(200, "image/jpeg", fh.read(), fid)
+                    except OSError:
+                        return self._send(503, "text/plain", b"no frame yet")
+                    if time.monotonic() > deadline:
+                        return self._send(204, "image/jpeg", b"", fid)
+                    server.touch()
+                    time.sleep(0.02)
 
             def _mjpeg(self):
                 self._headers(200, "multipart/x-mixed-replace; boundary=frame")

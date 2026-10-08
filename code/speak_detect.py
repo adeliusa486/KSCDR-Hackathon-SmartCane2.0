@@ -716,7 +716,12 @@ def main():
                          "?token=... Default: read from "
                          "~/.config/smartcane/demo_token, created with a "
                          "random token if missing. The dashboard shows the "
-                         "camera, so it never runs without one")
+                         "camera, so it never runs without one, unless "
+                         "--demo-public")
+    ap.add_argument("--demo-public", action="store_true",
+                    help="anyone with the address may watch the dashboard, "
+                         "no token (owner's choice, 8 Oct 2026: the website "
+                         "shows the cane live to every visitor while it is on)")
     ap.add_argument("--fps", type=int, default=15,
                     help="camera fps, forwarded to detect.py. Lower = "
                          "longer exposure = far better in dim light.")
@@ -828,13 +833,15 @@ def main():
             except OSError as e:
                 print(f"dashboard token not saved ({e}), the dashboard "
                       "stays locked until the cane restarts with one")
-        demo = DemoServer(args.demo_port, view, esp, args.model, n, token=token)
+        demo = DemoServer(args.demo_port, view, esp, args.model, n,
+                          token="" if args.demo_public else token)
         try:
             demo.start()
             speaker.on_speak = demo.spoken
             # The token itself is never printed: the journal is not secret.
             print(f"demo dashboard on http://{os.uname().nodename}.local:"
-                  f"{args.demo_port} (token required)")
+                  f"{args.demo_port} "
+                  f"({'public' if args.demo_public else 'token required'})")
         except OSError as e:
             print(f"demo dashboard unavailable ({e}), cane runs normally")
 
@@ -925,7 +932,7 @@ def main():
                     if haptic is not None and not buzzed_ready:
                         haptic.buzz("ready")
                     buzzed_ready = True
-                    said_ready = speaker.say("Smart cane ready", key="ready")
+                    said_ready = speaker.say("Omni Walk ready", key="ready")
                     if said_ready:
                         continue
                 body = m.group(1).strip()

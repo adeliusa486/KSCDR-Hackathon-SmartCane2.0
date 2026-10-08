@@ -712,7 +712,7 @@ class DemoDashboard(unittest.TestCase):
         try:
             base = f"http://127.0.0.1:{port}"
             page = urllib.request.urlopen(base + "/", timeout=5).read()
-            self.assertIn(b"Smart Cane", page)
+            self.assertIn(b"OmniWalk", page)
             with urllib.request.urlopen(base + "/stream.mjpg", timeout=5) as r:
                 # Part header (~70 bytes) then the JPEG's start marker. The
                 # stream never ends, so read a fixed small amount.
@@ -761,6 +761,58 @@ class DemoDashboard(unittest.TestCase):
             self.assertTrue(os.path.exists(d.watch_path))
         finally:
             httpd.shutdown()
+
+    def test_frame_after_waits_for_a_new_frame(self):
+        # The dashboard asks for "a frame newer than the one I have": the same
+        # picture is never sent twice, and a new one goes out at once.
+        import socket
+        import urllib.request
+        import demo_server
+        view = os.path.join(assistant.SHM, "cane_view_after.jpg")
+        with open(view, "wb") as fh:
+            fh.write(b"\xff\xd8one")
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        d = demo_server.DemoServer(port, view, host="127.0.0.1")
+        d.frame_wait = 0.3
+        httpd = d.start()
+        try:
+            base = f"http://127.0.0.1:{port}/frame.jpg"
+            with urllib.request.urlopen(base, timeout=5) as r:
+                first = r.headers["X-Frame"]
+                self.assertEqual(r.read(), b"\xff\xd8one")
+                self.assertIn("X-Frame", r.headers["Access-Control-Expose-Headers"])
+            with urllib.request.urlopen(f"{base}?after={first}", timeout=5) as r:
+                self.assertEqual((r.status, r.read()), (204, b""))
+            time.sleep(0.01)
+            tmp = view + ".tmp"
+            with open(tmp, "wb") as fh:
+                fh.write(b"\xff\xd8two")
+            os.replace(tmp, view)
+            with urllib.request.urlopen(f"{base}?after={first}", timeout=5) as r:
+                self.assertEqual(r.read(), b"\xff\xd8two")
+                self.assertGreater(int(r.headers["X-Frame"]), int(first))
+        finally:
+            httpd.shutdown()
+            os.remove(view)
+
+    def test_view_keeps_colours(self):
+        # picamera2 gives B, G, R, X bytes: a blue scene must stay blue on
+        # the dashboard, whichever resize path (OpenCV or PIL) is used.
+        import numpy as np
+        import demo_view
+        from PIL import Image
+        view = os.path.join(assistant.SHM, "cane_view_colour.jpg")
+        frame = np.zeros((360, 640, 4), dtype=np.uint8)
+        frame[:, :, 0] = 255                       # B
+        v = demo_view.Viewer(view, 640, 360, 98.2, 10, info=lambda d: {})
+        v.write(frame, [], 10.0, 30.0)
+        r, g, b = Image.open(view).convert("RGB").getpixel((480, 270))
+        self.assertEqual(Image.open(view).size, (960, 540))
+        self.assertTrue(b > 200 and r < 50 and g < 50, (r, g, b))
+        os.remove(view)
+        os.remove(os.path.splitext(view)[0] + ".json")
 
 
 if __name__ == "__main__":

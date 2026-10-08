@@ -1,31 +1,33 @@
-# Smart Cane 2.0
+# OmniWalk
 
 **An offline AI white cane for blind and low-vision pedestrians.** A camera and an AI accelerator on the cane name 152 kinds of object with their direction and distance. Two time-of-flight sensors catch obstacles and drop-offs, and a vibration motor alerts within a second of power-on, whether the computer has booted or not.
 
 Working prototype built for the KSCDR Hackathon, tested indoors and on the bench. Walking needs no phone, no internet and no subscription. Only the optional AI assistant uses the internet, and it falls back to on-cane text reading without it.
 
-[![Live dashboard](https://img.shields.io/badge/Live%20dashboard-open-d1262c?style=for-the-badge)](https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/live.html)
-[![Website](https://img.shields.io/badge/Project%20website-visit-1f6feb?style=for-the-badge)](https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/)
+[![Watch the cane live](https://img.shields.io/badge/Watch%20the%20cane-live-d1262c?style=for-the-badge)](https://adeliusa486.github.io/OmniWalk/live.html)
+[![Website](https://img.shields.io/badge/Website-adeliusa486.github.io%2FOmniWalk-1f6feb?style=for-the-badge)](https://adeliusa486.github.io/OmniWalk/)
 
-[![CI](https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/actions/workflows/ci.yml/badge.svg)](https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/actions/workflows/ci.yml)
-[![Website deploy](https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/actions/workflows/pages.yml/badge.svg)](https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/actions/workflows/pages.yml)
+**Website:** https://adeliusa486.github.io/OmniWalk/ · **Live video:** https://adeliusa486.github.io/OmniWalk/live.html (the cane's camera with real-time object boxes whenever it is switched on)
+
+[![CI](https://github.com/adeliusa486/OmniWalk/actions/workflows/ci.yml/badge.svg)](https://github.com/adeliusa486/OmniWalk/actions/workflows/ci.yml)
+[![Website deploy](https://github.com/adeliusa486/OmniWalk/actions/workflows/pages.yml/badge.svg)](https://github.com/adeliusa486/OmniWalk/actions/workflows/pages.yml)
 ![Platform](https://img.shields.io/badge/Raspberry%20Pi%205-Hailo--8L-2ea44f)
 ![Model](https://img.shields.io/badge/model-YOLO11s%20%C2%B7%20152%20classes-orange)
 ![Status](https://img.shields.io/badge/status-prototype-yellow)
 ![License](https://img.shields.io/badge/code-MIT-blue)
 
-<p align="center"><a href="https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/live.html"><img src="docs/figures/live_dashboard.jpg" alt="The cane's live dashboard: camera view with two chairs boxed, one at about 4.3 m, objects sorted into left, ahead and right, the ground sensor, a top-down radar and the log of what the cane said" width="900"></a></p>
-<p align="center"><sub>The live dashboard playing a real 30-second recording from the cane (8 October 2026). Two chairs, one at about 4.3 m, and a wall unit the model labels "tv". Click to open it.</sub></p>
+<p align="center"><a href="https://adeliusa486.github.io/OmniWalk/live.html"><img src="docs/figures/live_dashboard.jpg" alt="The OmniWalk dashboard on a street photo of Tahlia Street, Jeddah: cars boxed with confidences from 60 to 89 percent and camera distances from about 11 to 24 meters, objects sorted into left, ahead and right, a top-down radar, and the sentence the cane would say: car right, far. car right, about 11 meters" width="900"></a></p>
+<p align="center"><sub>The dashboard with OmniWalk's model on a photo of Tahlia Street, Jeddah, run on the cane's Hailo-8L: every box, confidence and distance is the cane's own output. Photo: <a href="https://commons.wikimedia.org/wiki/File:Tahlia_Street_Jeddah.jpg">Tahir mq</a>, CC BY-SA 4.0. Click to watch the cane live.</sub></p>
 
 ## Contents
 
 - [What it does](#what-it-does)
-- [Live dashboard](#live-dashboard)
+- [Watch the cane live](#watch-the-cane-live)
+- [Measured results](#measured-results)
 - [System architecture](#system-architecture)
 - [The one-button assistant](#the-one-button-assistant)
 - [Hardware](#hardware)
 - [Objects it recognises](#objects-it-recognises)
-- [Measured results](#measured-results)
 - [Model and training data](#model-and-training-data)
 - [Operating the prototype](#operating-the-prototype)
 - [Repository layout](#repository-layout)
@@ -47,32 +49,50 @@ Working prototype built for the KSCDR Hackathon, tested indoors and on the bench
 | Anything unknown is still announced | Low-confidence or untrained objects become "obstacle" with direction and distance | Working |
 | Describe the scene, answer a question, read text | One button. Gemini online, the cane's own detector and Tesseract OCR offline | Working |
 | Says when it is broken | Spoken warnings for a dead camera, a lost sensor link or a ground sensor that cannot see the ground | Working |
-| Live dashboard for judges | Camera with real boxes, real ToF and camera distances, speech log, in any browser through a secure tunnel | Working |
+| Live video on the website | Switch the cane on and its camera, real boxes, ToF and camera distances and speech log appear on the website by itself, in any browser | Working |
 
-## Live dashboard
+## Watch the cane live
 
-Open **[the live dashboard](https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/live.html)** in any browser:
+**[adeliusa486.github.io/OmniWalk/live.html](https://adeliusa486.github.io/OmniWalk/live.html)** works in any browser, on any network:
 
-- **During a demo** the page connects to the cane itself. You see the camera with the cane's own boxes, each object's bearing and distance, the forward ToF reading next to the camera's estimate for the object straight ahead, the ground sensor and everything the cane says, updated four times a second.
-- **At any other time** it plays a real 30-second recording from the cane, labelled with its date. Add `?at=15` to the address to start 15 s in.
+- **Cane on:** about 1.5 minutes after power-on the page shows the cane's camera live, with its own boxes, each object's bearing and distance, the forward ToF reading next to the camera's estimate, the ground sensor and everything the cane says. Nothing to type: the cane goes online by itself and the page finds it.
+- **Cane off:** the page shows the same model on street photos from Saudi Arabia, and switches to live without a reload as soon as the cane comes on. [`live.html?example`](https://adeliusa486.github.io/OmniWalk/live.html?example) shows the examples at any time.
+- **Same Wi-Fi as the cane:** `http://smartcane.local:8080` is the cane's own page, at the full camera rate.
 
-How the team takes the cane live:
-
-```bash
-# on the cane, in a terminal kept open for the demo
-bash ~/smartcane/tools/go_live.sh
-```
-
-The script checks that the dashboard is running and locked, opens a Cloudflare tunnel, waits until the new public address answers, and prints two links: one straight to the cane and one through the website. Ctrl-C closes the tunnel and the cane is private again.
-
-| Safeguard | Detail |
+| | Measured 8 October 2026 |
 |---|---|
-| Access token | Every address except `/health` needs the cane's private token. Tested through the public tunnel on 8 October 2026: no token or a wrong token returns 403 |
-| No open ports | The tunnel is an outgoing connection from the cane. No router setup, and it works on a phone hotspot |
-| No cost when idle | The camera view is drawn only while someone watches: detect.py uses about 10 % of a CPU core unwatched and 30 % watched |
-| Works through proxies | The page polls single requests instead of holding a stream open, because the tunnel held streams back (0 bytes in 6 s in testing) |
+| Pictures per second, same Wi-Fi | 9.8, every camera frame |
+| Pictures per second, over the internet | 7.0 |
+| Opening the page to live video | 3.2 s, no settings or token needed |
+| A forged address posted to the relay | ignored: the page only follows addresses signed by the cane |
 
-Setup, a fixed address, bandwidth and privacy notes: [docs/deployment.md](docs/deployment.md).
+How it works: at boot the cane opens a Cloudflare tunnel (an outgoing connection, so no router setup, and it works on a phone hotspot) and posts the new address, signed with a key that never leaves the cane, to a public relay. The page reads the newest correctly signed address and connects. The camera view is drawn only while someone watches, so an unwatched dashboard costs no battery. Details: [docs/deployment.md](docs/deployment.md).
+
+## Measured results
+
+| Measurement | Result |
+|---|---|
+| Model accuracy, 27,906 validation images | mAP50 0.535, mAP50-95 0.376 |
+| 408 street photos through the cane's camera path | 55 % named, 66 % noticed (40 % and 53 % before the 8 October fixes) |
+| Hailo-8L inference per frame | 29 ms. Benchmark 38.7 FPS, the cane runs at 10 fps |
+| ESP32 power-on to first sensor reading | 0.81 s |
+| Pi boot to `systemd` ready | 5.9 to 9.4 s |
+| ToF repeatability on the bench | stdev 1.04 mm and 1.17 mm |
+| Live dashboard cost (detect.py) | about 10 % of one CPU core unwatched, 67 % of one core (the Pi 5 has four) while watched at 10 pictures a second |
+| Live dashboard frame rate | 9.8 pictures a second on the same Wi-Fi, 7.0 over the internet |
+
+<table>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/camera-path-dark.svg"><img src="docs/charts/camera-path-light.svg" alt="Named objects rose from 40 to 55 percent and noticed objects from 53 to 66 percent after the camera path fixes. A sideways camera drops naming to 6 percent."></picture></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/training-dark.svg"><img src="docs/charts/training-light.svg" alt="Training curve: v2 fell to 0.225 mAP50 at epoch 4, v3 rose steadily to 0.536 at epoch 24"></picture></td>
+</tr>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/safety-classes-dark.svg"><img src="docs/charts/safety-classes-light.svg" alt="Per-object accuracy: dog 0.84, person and car 0.81, chair 0.67, stairs 0.60, table 0.55, pothole 0.50, curb 0.24, crosswalk 0.22"></picture></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/dataset-dark.svg"><img src="docs/charts/dataset-light.svg" alt="Training images by source: Open Images 121,134, Roboflow 52,723, COCO 40,000, Mapillary Traffic Signs 30,000, Mapillary Vistas 20,000"></picture></td>
+</tr>
+</table>
+
+Every number with its date and method: [docs/results.md](docs/results.md). The charts are generated by `docs/charts/make_charts.py`.
 
 ## System architecture
 
@@ -92,7 +112,7 @@ flowchart LR
   end
   LOOP <-->|"USB serial, 20 Hz"| SPK
   SPK --> EAR[Bluetooth earbuds]
-  DASH -.->|"Cloudflare tunnel, token"| WEB["Judges' browsers"]
+  DASH -.->|"Cloudflare tunnel, signed address"| WEB["Website live page, any browser"]
 ```
 
 1. **Reflexes on the ESP32.** Both distance sensors, the motor and the button hang off an ESP32. It vibrates for obstacles and drop-offs on its own, so a slow boot or a crash on the Pi never silences the safety alerts.
@@ -155,31 +175,6 @@ The detector names 152 kinds of object, chosen for sidewalks, crossings and indo
 
 <!-- OBJECTS:END -->
 
-## Measured results
-
-| Measurement | Result |
-|---|---|
-| Model accuracy, 27,906 validation images | mAP50 0.535, mAP50-95 0.376 |
-| 408 street photos through the cane's camera path | 55 % named, 66 % noticed (40 % and 53 % before the 8 October fixes) |
-| Hailo-8L inference per frame | 29 ms. Benchmark 38.7 FPS, the cane runs at 10 fps |
-| ESP32 power-on to first sensor reading | 0.81 s |
-| Pi boot to `systemd` ready | 5.9 to 9.4 s |
-| ToF repeatability on the bench | stdev 1.04 mm and 1.17 mm |
-| Live dashboard cost (detect.py) | 10 % of a CPU core unwatched, 30 % watched |
-
-<table>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/camera-path-dark.svg"><img src="docs/charts/camera-path-light.svg" alt="Named objects rose from 40 to 55 percent and noticed objects from 53 to 66 percent after the camera path fixes. A sideways camera drops naming to 6 percent."></picture></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/training-dark.svg"><img src="docs/charts/training-light.svg" alt="Training curve: v2 fell to 0.225 mAP50 at epoch 4, v3 rose steadily to 0.536 at epoch 24"></picture></td>
-</tr>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/safety-classes-dark.svg"><img src="docs/charts/safety-classes-light.svg" alt="Per-object accuracy: dog 0.84, person and car 0.81, chair 0.67, stairs 0.60, table 0.55, pothole 0.50, curb 0.24, crosswalk 0.22"></picture></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/charts/dataset-dark.svg"><img src="docs/charts/dataset-light.svg" alt="Training images by source: Open Images 121,134, Roboflow 52,723, COCO 40,000, Mapillary Traffic Signs 30,000, Mapillary Vistas 20,000"></picture></td>
-</tr>
-</table>
-
-Every number with its date and method: [docs/results.md](docs/results.md). The charts are generated by `docs/charts/make_charts.py`.
-
 ## Model and training data
 
 **smartcane152_v3** is YOLO11s trained on 263,857 images from COCO 2017, Open Images V7, Mapillary Vistas v2, the Mapillary Traffic Sign Dataset and 20 Roboflow Universe projects. Two teacher models added 517,087 pseudo-labels for classes each source never labelled, and two systematic errors were cleaned out before training. The best of 27 epochs (epoch 24) reached mAP50 0.536 on validation. It was compiled with the Hailo Dataflow Compiler 3.34 and runs on HailoRT 4.23.
@@ -196,10 +191,10 @@ Dataset, training runs and compile settings: [docs/training.md](docs/training.md
 ## Operating the prototype
 
 1. **Power on.** The ESP32 safety loop starts within a second, before the Pi has booted.
-2. **Wait for "Smart cane ready"**, about 20 s after power-on. Speech goes to the paired earbuds.
+2. **Wait for "Omni Walk ready"**, about 20 s after power-on. Speech goes to the paired earbuds.
 3. **Walk.** Objects are spoken by urgency, obstacles straight ahead vibrate, drop-offs give one long pulse and a spoken warning.
 4. **Press or hold the button** for the assistant (see above).
-5. **For a demo**, run `bash ~/smartcane/tools/go_live.sh` and share the printed link.
+5. **To show it**, open the [live page](https://adeliusa486.github.io/OmniWalk/live.html) on any phone or laptop. The cane goes online by itself.
 
 Live log on the cane: `sudo journalctl _SYSTEMD_USER_UNIT=smartcane.service -f`. Program details, service settings and maintenance tools: [docs/software.md](docs/software.md).
 
@@ -211,18 +206,19 @@ code/
   speak_detect.py        what to say and when, ESP32 link, assistant, service entry point
   assistant.py           one-button assistant: Gemini online, detector and Tesseract offline
   esp32_link.py          serial link to the ESP32, reopens itself after a stall
-  demo_server.py         live dashboard server (token, state, frames)
+  demo_server.py         live dashboard server (state, frames, optional token)
   demo_view.py           draws the cane's boxes on the camera frame, only while watched
   demo_dashboard.html    the dashboard page, also the website's live.html
   esp32/cane_safety/     ESP32 firmware: sensors, ground watch, vibration, button
   smartcane.service      systemd user service that starts the cane at boot
-  tests/                 62 simulation tests, no hardware needed
-  tools/                 go_live.sh, record_demo.py, probes, evaluation, verified flashing, backups
+  smartcane-live.service puts the dashboard online at every boot (tools/live_tunnel.sh)
+  tests/                 64 simulation tests, no hardware needed
+  tools/                 live_tunnel.sh, photo_demo.py, record_demo.py, probes, evaluation, verified flashing, backups
   training/              dataset build, pseudo-labelling, training, validation, label export
 models/smartcane152_v3/  HEF for the Hailo-8L, PyTorch weights, ONNX, class names
 data/merged_v2/          training labels, counts per class and per source
 docs/                    hardware, software, deployment, training, objects, results, power, plan
-web/                     project website source and the dashboard recording (web/replay/)
+web/                     project website source and the street-photo examples (web/replay/)
 .github/workflows/       CI (tests, firmware build, website build) and the website deployment
 experiments/             test plans and raw results per development step
 MEMORY.md                engineering log, every session since 19 September 2026
@@ -231,15 +227,15 @@ MEMORY.md                engineering log, every session since 19 September 2026
 ## Quality: tests and CI/CD
 
 ```bash
-cd ~/smartcane && python3 -m unittest tests/test_cane.py    # on the cane: 62 tests
-python -m pytest code/tests/test_cane.py -q                  # on a PC: 56 pass, 6 need a Linux pty
+cd ~/smartcane && python3 -m unittest tests/test_cane.py    # on the cane: 64 tests
+python -m pytest code/tests/test_cane.py -q                  # on a PC: 58 pass, 6 need a Linux pty
 ```
 
-The tests simulate blind-user scenarios without a camera, Hailo, ESP32 or audio: naming of every safety class, urgency order, the obstacle fallback, distances in metres, the ToF consistency check, picture geometry, the real serial link on a pseudo-terminal, every assistant path and failure, and the dashboard server, including its token and the watch-only drawing.
+The tests simulate blind-user scenarios without a camera, Hailo, ESP32 or audio: naming of every safety class, urgency order, the obstacle fallback, distances in metres, the ToF consistency check, picture geometry, the real serial link on a pseudo-terminal, every assistant path and failure, and the dashboard server, including its token, the watch-only drawing, the wait for a new frame and the colour order of the drawn picture.
 
 | Workflow | Runs on | What it does |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | Every push and pull request | flake8 for syntax errors and undefined names, all 62 tests, the training-pipeline tests, an ESP32 firmware compile with the exact core and library versions on the cane, and a website build |
+| [`ci.yml`](.github/workflows/ci.yml) | Every push and pull request | flake8 for syntax errors and undefined names, all 64 tests, the training-pipeline tests, an ESP32 firmware compile with the exact core and library versions on the cane, and a website build |
 | [`pages.yml`](.github/workflows/pages.yml) | Every push to `main` that touches the website, docs or dashboard | Builds the website with `web/build.py` and deploys it to GitHub Pages |
 
 ## Troubleshooting
@@ -252,17 +248,16 @@ The tests simulate blind-user scenarios without a camera, Hailo, ESP32 or audio:
 | The vibration is weak | Mount the motor against the grip wall where the hand presses. Test with `python3 esp32_link.py --send B100,1000` |
 | The Pi LED turns red and it switches off | The power bank cannot hold 5 V under load. See [docs/power.md](docs/power.md) |
 | No speech | `pactl info \| grep "Default Sink"` shows `auto_null`: the earbuds are disconnected. Run `bluetoothctl connect <address>` |
-| The dashboard link says "token required" | The link lost its `?token=` part. Copy the whole link printed by `go_live.sh` |
-| The website cannot reach the cane | The tunnel is closed or its address changed. Run `go_live.sh` again and use the new link |
+| The live page shows the street examples although the cane is on | It is not online yet: allow about 1.5 minutes after power-on, and check it has Wi-Fi with internet. On the cane: `systemctl --user status smartcane-live` |
 
 ## Limitations
 
 - Indoor-tested prototype, not yet tested by blind users or on a long street walk. Not a medical device, and not a replacement for the white cane technique or orientation and mobility training.
-- Weak classes (curb, crosswalk, manhole, pole, desk, cabinet) are often heard as "obstacle". The model also makes false detections, for example a plain wall labelled "bathtub" in the dashboard recording.
+- Weak classes (curb, crosswalk, manhole, pole, desk, cabinet) are often heard as "obstacle". The model also makes false detections, for example a plain wall labelled "bathtub" indoors, or the bollard in the KFUPM footpath example labelled "fire hydrant" at 34 % (spoken as "obstacle", since names need 35 %).
 - The VL53L0X reaches about 2 m indoors, much less in sunlight, and does not see glass reliably.
 - Without an IMU, swinging the cane changes the ground distance, so the drop-off thresholds still need tuning on real walks.
 - Bluetooth audio drops out at times. A wired headset is planned.
-- A quick tunnel gets a new address on every start, and the picture is slower through it than on the local network.
+- The live video is public while the cane is on: anyone with the page sees what the camera sees, including the room it is in. Over the internet the picture comes at about 7 a second, against 10 on the same Wi-Fi.
 
 ## Roadmap
 
@@ -270,8 +265,8 @@ The full plan, with a pass test for each item, is in [docs/implementation-plan.m
 
 ## License and data
 
-Code, firmware, documentation and figures: [MIT](LICENSE). Training labels in `data/` keep the licences of their source datasets, two of which are non-commercial: see [data/LICENSE.md](data/LICENSE.md).
+Code, firmware, documentation and figures: [MIT](LICENSE), except the street-photo examples (`web/replay/*.jpg` and `docs/figures/live_dashboard.jpg`), which are derived from Wikimedia Commons photos and stay under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0): Tahlia Street Jeddah and Jeddah Corniche 24 by Tahir mq, Sidewalk in KFUPM 1 and 2 by AhmadElq. Training labels in `data/` keep the licences of their source datasets, two of which are non-commercial: see [data/LICENSE.md](data/LICENSE.md).
 
 ## Acknowledgements
 
-COCO, Open Images V7, Mapillary Vistas, the Mapillary Traffic Sign Dataset and the Roboflow Universe authors for the training data. Ultralytics for YOLO11. Hailo for HailoRT and the Dataflow Compiler. Raspberry Pi for Picamera2. Pololu for the VL53L0X library. Cloudflare for the tunnel used in live demos.
+COCO, Open Images V7, Mapillary Vistas, the Mapillary Traffic Sign Dataset and the Roboflow Universe authors for the training data. Ultralytics for YOLO11. Hailo for HailoRT and the Dataflow Compiler. Raspberry Pi for Picamera2. Pololu for the VL53L0X library. Cloudflare for the tunnel and ntfy.sh for the relay behind the live video. Tahir mq and AhmadElq for the street photos on Wikimedia Commons.

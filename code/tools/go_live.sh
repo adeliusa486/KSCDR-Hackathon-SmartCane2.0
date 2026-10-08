@@ -1,41 +1,44 @@
 #!/bin/bash
-# Smart cane - put the live dashboard on the internet for a demo.
+# OmniWalk - show where the live dashboard is on the internet, or open a
+# tunnel by hand if the automatic one (smartcane-live.service) is off.
 #
-# Run ON THE PI, in a terminal you keep open for the demo:
+# Run ON THE PI:
 #     bash ~/smartcane/tools/go_live.sh
 #
 # Needs: cloudflared installed (docs/deployment.md) and the cane service
-# running with --demo-port 8080. Opens a Cloudflare quick tunnel (no account),
-# prints the two links to give judges, and closes the tunnel on Ctrl-C.
-# The dashboard shows the camera: it always requires the token.
+# running with --demo-port 8080. Prints the links and, for a tunnel it opened
+# itself, closes it on Ctrl-C. With --demo-public (the default service) the
+# links need no token, otherwise they carry it.
 set -u
 PORT=${PORT:-8080}
 TOKEN_FILE=$HOME/.config/smartcane/demo_token
-PAGES=https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/live.html
+PAGES=https://adeliusa486.github.io/OmniWalk/live.html
 
 command -v cloudflared >/dev/null || { echo "cloudflared is not installed, see docs/deployment.md"; exit 1; }
-
-if [ ! -s "$TOKEN_FILE" ]; then
-  umask 077
-  mkdir -p "$(dirname "$TOKEN_FILE")"
-  python3 -c "import secrets; print(secrets.token_urlsafe(12))" > "$TOKEN_FILE"
-  echo "Created a new token. Restart the cane so the dashboard uses it:"
-  echo "    systemctl --user restart smartcane"
-  exit 1
-fi
-TOKEN=$(cat "$TOKEN_FILE")
 
 if ! curl -sf "http://localhost:$PORT/health" >/dev/null; then
   echo "The dashboard is not running on port $PORT."
   echo "Is the cane running?  systemctl --user status smartcane"
-  echo "Its ExecStart in ~/.config/systemd/user/smartcane.service must end with '--demo-port $PORT'"
+  echo "Its ExecStart in ~/.config/systemd/user/smartcane.service must have '--demo-port $PORT'"
   echo "(the repository's code/smartcane.service does). After a change:"
   echo "    systemctl --user daemon-reload && systemctl --user restart smartcane"
   exit 1
 fi
-if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/state.json")" != "403" ]; then
-  echo "WARNING: the dashboard answers without a token. Restart the cane after creating $TOKEN_FILE."
-  exit 1
+Q=""
+if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/state.json")" = "403" ]; then
+  Q="?token=$(cat "$TOKEN_FILE")"
+fi
+
+# The cane already puts itself online at boot (smartcane-live.service): give
+# out that address instead of opening a second tunnel.
+if systemctl --user is-active --quiet smartcane-live; then
+  URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$HOME/.cache/smartcane/live_tunnel.log" 2>/dev/null | head -1)
+  if [ -n "$URL" ]; then
+    echo "The cane is already online (smartcane-live)."
+    echo "Live dashboard, direct:   $URL/$Q"
+    echo "Through the website:      $PAGES$Q"
+    exit 0
+  fi
 fi
 
 # Kept after the demo for diagnosis (one tunnel per file, overwritten next time).
@@ -75,8 +78,8 @@ if [ -z "$ONLINE" ]; then
 fi
 
 echo
-echo "Live dashboard, direct:   $URL/?token=$TOKEN"
-echo "Through the website:      $PAGES?cane=$URL&token=$TOKEN"
+echo "Live dashboard, direct:   $URL/$Q"
+echo "Through the website:      $PAGES?cane=$URL${Q:+&${Q#?}}"
 echo
 echo "Give judges either link. Keep this terminal open. Ctrl-C closes the tunnel."
 wait $PID

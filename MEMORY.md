@@ -272,7 +272,7 @@ gets a shaky, low view. The "eyes" belong somewhere stable.
   `datasets\` (merged_v2, runs, Hailo build files), `envs\` (training venv,
   WSL distro with the Hailo compiler), `backups\` (SD image). Nothing anywhere
   else (Adeel, 8 Oct 2026).
-- **Public repo**: https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0.
+- **Public repo**: https://github.com/adeliusa486/OmniWalk (renamed from KSCDR-Hackathon-SmartCane2.0 on 8 Oct 2026).
   No AI co-author lines or credits in commits, PRs or files (Adeel, 8 Oct 2026).
 - Code lives in `code/`, step-by-step guides live in `docs/`.
 - Prices in USD, retail target in INR.
@@ -2526,6 +2526,78 @@ http://192.168.3.51:8080/?token=... in his default browser from the laptop:
 the watch file was then touched every second and frames advanced ~3.5 a
 second. Lesson: on the same Wi-Fi, always give Adeel the cane's own link with
 the token, not the website.
+
+### 8 October 2026 (18:10 to 20:20): frame rate, live on switch-on, OmniWalk
+
+Adeel asked, in a run of messages: why the fps is low; the website should
+show the live video when he turns the cane on; same Wi-Fi without any hurdle;
+the old live link; a proper name, **OmniWalk**, as the brand; the website link
+and live video in the README; graphs in the README; no "build it" on the
+website; no AI credit anywhere; a new website picture ("you used my bed").
+His answers to four questions: rename the repo to OmniWalk; the live camera
+public to anyone with the link; the picture from a KSA footpath photo with
+our model's boxes; add his phone hotspot.
+
+**Frame rate (measured on the cane).** Drawn 3.3 a second while the detector
+ran 9.4 fps. Cause 1: PIL's resize took 47 ms of a 59 ms draw; OpenCV takes
+8 ms (demo_view.py now uses cv2, PIL fallback). Cause 2: detect.py asks
+due() about 20 ms after the last draw, before waiting for the next frame, so
+any time cap above 20 ms skipped every other frame (5.0 drawn at 9.6 fps).
+The cap is gone; the camera's 10 fps is the limit. Now 10.0 drawn at 10.0
+fps. detect.py: 67 % of one core while watched (was 30 % at 3.3 a second),
+unwatched unchanged (~10 %). Browser side: /frame.jpg?after=<id> waits up to
+2 s for a newer frame (X-Frame header = mtime in us, 204 if none), so no
+duplicates. Same Wi-Fi: 1 lane, 9.8 pictures a second. Tunnel: a request
+takes ~1 s, so lanes matter: 4.0 with 4, 7.0 with 6 (default), 7.4 with 8.
+
+**Live on switch-on (verified with a reboot).** smartcane-live.service runs
+tools/live_tunnel.sh at boot: quick tunnel, wait until it answers, then post
+"<url> <unix time> <Ed25519 signature>" to ntfy.sh/omniwalk-c3b2b75649938dd6
+every 30 min. Key ~/.config/smartcane/live_key.pem (0600, made on the cane,
+never copied). Public key u6/0dBdBFSgb0TR14GE03KlXrsU6BOh1BFV1Ki08hUs= and
+the topic are in demo_dashboard.html (PUBKEY, RELAY). The page takes the
+newest correctly signed post from the last 13 h, checks /health, connects;
+otherwise plays the examples and looks again every 10 s; follows a restarted
+cane to its new address. A forged newest post was ignored. Reboot command to
+signed post: 80 s (26 s boot). Fresh browser to live: 3.2 s, 3.7 s after the
+reboot. openssl pkeyutl -rawin signs NOTHING when read from a pipe (empty
+signature posted once): sign from a temp file, refuse to post unless the
+signature is 88 base64 chars. cloudflared once died with "context deadline
+exceeded" after printing its address: the script now exits at once and
+systemd restarts it after 15 s. First a token-derived private topic was
+built; replaced when Adeel chose public.
+
+**Public dashboard.** speak_detect.py --demo-public (in the service): no
+token. Without it the token still works and the page shows a token field on
+403. go_live.sh now only prints the links (smartcane-live does the tunnel).
+
+**Wi-Fi.** Hotspot saved as both "S23 Ultra" and "s23 ultra" (he typed
+"s23 ultra", password given, not visible during the session, so the exact
+SSID is unconfirmed), autoconnect priority -5; home "preconfigured"
+(HUAWEI-1CFS1N) raised to 10.
+
+**Examples instead of the bed recording.** The 8 Oct recording (web/replay
+f0001-f0100) showed Adeel's bed: removed from the site and README (still in
+git history, not purged). New: tools/photo_demo.py runs photos through the
+cane's own path on the Hailo (16:9 crop, letterbox, HEF, decoder, conf 0.25,
+dedupe, rank, Viewer, speak_detect.summarize at name-conf 0.35). The cane
+must be stopped while it runs (Hailo is single-process). Four Wikimedia
+Commons photos, all CC BY-SA 4.0: Tahlia Street Jeddah and Jeddah Corniche 24
+(Tahir mq), Sidewalk in KFUPM 1 and 2 (AhmadElq). Says: "car right, far. car
+right, about 11 meters"; KFUPM 1 bollard = "fire hydrant 34 %" -> spoken
+"obstacle right, about 5 meters". replay.json kind "example", credits per
+frame, live.html?example shows them any time. New hero
+docs/figures/live_dashboard.jpg = live.html?example screenshot (Tahlia).
+Those images are CC BY-SA 4.0 (README licence section says so).
+
+**OmniWalk.** Dashboard, website, README, deployment doc, spoken greeting
+("Omni Walk ready", two words so espeak says it right). Code docstrings and
+service/file names keep "smartcane". "Omni Walker" is a Saucony walking
+shoe line (told Adeel). Deleted the claude.ai artifact "Smart Cane 2.0" (an
+old copy of the website with the Build it section) at his request.
+README: website and live links at the top, "Watch the cane live" section,
+the four charts moved up to "Measured results" right after it. No AI credit
+in any file or in the 77 commits (checked).
 
 ---
 
