@@ -711,6 +711,12 @@ def main():
     ap.add_argument("--demo-port", type=int, default=0,
                     help="serve the live laptop dashboard on this port "
                          "(e.g. 8080). 0 = off")
+    ap.add_argument("--demo-token", default="",
+                    help="access token for the dashboard, required as "
+                         "?token=... Default: read from "
+                         "~/.config/smartcane/demo_token, created with a "
+                         "random token if missing. The dashboard shows the "
+                         "camera, so it never runs without one")
     ap.add_argument("--fps", type=int, default=15,
                     help="camera fps, forwarded to detect.py. Lower = "
                          "longer exposure = far better in dim light.")
@@ -804,11 +810,31 @@ def main():
         if args.labels and os.path.exists(args.labels):
             with open(args.labels) as fh:
                 n = sum(1 for l in fh if l.strip())
-        demo = DemoServer(args.demo_port, view, esp, args.model, n)
+        token = args.demo_token
+        token_file = os.path.expanduser("~/.config/smartcane/demo_token")
+        if not token and os.path.exists(token_file):
+            with open(token_file) as fh:
+                token = fh.read().strip()
+        if not token:
+            # The dashboard shows the camera: never serve it open.
+            import secrets
+            token = secrets.token_urlsafe(12)
+            try:
+                os.makedirs(os.path.dirname(token_file), exist_ok=True)
+                fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(token + "\n")
+                print(f"created a dashboard token in {token_file}")
+            except OSError as e:
+                print(f"dashboard token not saved ({e}), the dashboard "
+                      "stays locked until the cane restarts with one")
+        demo = DemoServer(args.demo_port, view, esp, args.model, n, token=token)
         try:
             demo.start()
             speaker.on_speak = demo.spoken
-            print(f"demo dashboard on http://{os.uname().nodename}.local:{args.demo_port}")
+            # The token itself is never printed: the journal is not secret.
+            print(f"demo dashboard on http://{os.uname().nodename}.local:"
+                  f"{args.demo_port} (token required)")
         except OSError as e:
             print(f"demo dashboard unavailable ({e}), cane runs normally")
 

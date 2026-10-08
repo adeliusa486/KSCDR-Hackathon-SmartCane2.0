@@ -1,0 +1,51 @@
+name: Website
+
+# Publishes the project website to GitHub Pages on every push to main that
+# touches it. One-time setup: repository Settings > Pages > Source:
+# "GitHub Actions". The site is then at
+# https://adeliusa486.github.io/KSCDR-Hackathon-SmartCane2.0/
+# and its live page at .../live.html connects to a cane through its tunnel.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "docs/**"
+      - "data/merged_v2/class_counts.csv"
+      - "code/demo_dashboard.html"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build the site
+        run: python web/build.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

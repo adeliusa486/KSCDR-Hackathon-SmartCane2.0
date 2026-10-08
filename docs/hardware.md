@@ -1,10 +1,6 @@
 # Hardware
 
-Everything in the prototype rides on the cane: the Raspberry Pi 5 with its AI HAT+, the ESP32 safety controller, the camera, both distance sensors, the vibration motor, two buttons and the power bank. Speech goes to Bluetooth earbuds.
-
-![Exploded view](figures/exploded_view.svg)
-
-*Figure 1. Exploded view. Schematic: component sizes come from the manufacturers' data, the housing layout is representative because the 3D-printed body has no published CAD file.*
+Everything in the prototype rides on the cane: the Raspberry Pi 5 with its AI HAT+, the ESP32 safety controller, the camera, both distance sensors, the vibration motor, the button and the power bank. Speech goes to Bluetooth earbuds.
 
 ## Bill of materials
 
@@ -20,7 +16,7 @@ Prices are what the prototype cost, in USD.
 | 6 | Safety controller | ESP32 DevKit V1 (ESP32-D0WD-V3, CP2102 USB bridge) | Distance sensors, vibration, buttons. Works without the Pi | ~$4 |
 | 7 | Distance sensors | 2x ST VL53L0X time-of-flight breakouts | ToF 1 looks forward (obstacles), ToF 2 looks down (holes, kerbs) | owned |
 | 8 | Vibration | Coin vibration motor module (signal, VCC, GND) | Obstacle and ground alerts | owned |
-| 9 | Buttons | 2 momentary push buttons | Assistant (describe, read, ask) and read-text | owned |
+| 9 | Button | 1 momentary push button | AI assistant: press = describe and ask, hold = read text | owned |
 | 10 | Battery | 10,000 mAh USB power bank | Powers everything through the Pi | owned |
 | 11 | Audio | Soundcore Life P2 Mini Bluetooth earbuds | Speech and the assistant's microphone | owned |
 | 12 | Cane | White cane, 124 to 127 cm | Body for all parts | owned |
@@ -41,8 +37,8 @@ The Pi only takes power and one USB cable to the ESP32. Every sensor, the motor 
 | GPIO27 | ToF 2 XSHUT | Same |
 | GPIO13 | Motor module IN | 200 Hz PWM |
 | VIN (5 V from USB) | Motor module VCC | |
-| GPIO33 | Assistant button to GND | Internal pull-up, pressed = LOW |
-| GPIO32 | Read-text button to GND | Internal pull-up, pressed = LOW |
+| GPIO33 | The button, to GND | Internal pull-up, pressed = LOW |
+| GPIO32 | Free | The firmware reads it as a second button (same behaviour) if one is ever wired |
 | Micro-USB | Raspberry Pi 5 USB port | Power for the ESP32, serial link at 115200 baud, and firmware flashing |
 
 | Raspberry Pi 5 | Goes to |
@@ -59,7 +55,7 @@ ESP32 pins 0, 2, 5, 12 and 15 are boot strapping pins and 34 to 39 are input-onl
 
 ![Sensor geometry](figures/sensor_geometry.svg)
 
-*Figure 2. Side view with the cane held at a normal walking angle of 40° from vertical. Distances follow from the mount heights and angles below.*
+*Figure 1. Side view with the cane held at a normal walking angle of 40° from vertical. Distances follow from the mount heights and angles below.*
 
 | Item | Position on the shaft (from the tip) | Aim |
 |---|---|---|
@@ -75,7 +71,7 @@ Two rules from testing:
 
 ![Cross-section](figures/cross_section.svg)
 
-*Figure 3. Cross-section through the housing along the shaft, showing how the boards stack and where the cables run. Schematic.*
+*Figure 2. Cross-section through the housing along the shaft, showing how the boards stack and where the cables run. Schematic.*
 
 ## Assembly order
 

@@ -1,0 +1,312 @@
+<title>Smart Cane 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one 1120px column of full-width bands. The hero pairs the claim
+   with the real dashboard. A tactile-paving dot band marks section starts.
+   Type: Atkinson Hyperlegible Next (Braille Institute, built for low vision)
+   for everything readable, IBM Plex Mono for measured numbers. */
+:root {
+  --bg: #f7f8f6; --surface: #ffffff; --ink: #11161c; --ink-2: #4a5562; --muted: #6b7684;
+  --line: #dfe3e0; --accent: #f2b705; --accent-ink: #5c4400; --cane: #d1262c; --ok: #187a3b;
+  --code-bg: #eef1ef;
+  --sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --step-0: 1.05rem; --step-1: 1.3rem; --step-2: 1.75rem; --step-3: 2.4rem; --step-4: clamp(2.6rem, 6vw, 4.2rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161a; --surface: #1a2026; --ink: #eef2f5; --ink-2: #b7c1cb; --muted: #8b97a3;
+    --line: #2a323a; --accent: #f5c518; --accent-ink: #f5c518; --cane: #ff5a5f; --ok: #46c66f;
+    --code-bg: #20272e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161a; --surface: #1a2026; --ink: #eef2f5; --ink-2: #b7c1cb; --muted: #8b97a3;
+  --line: #2a323a; --accent: #f5c518; --accent-ink: #f5c518; --cane: #ff5a5f; --ok: #46c66f;
+  --code-bg: #20272e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--step-0)/1.6 var(--sans); }
+.page { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 8px 48px; }
+a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
+a:hover { text-decoration-color: var(--cane); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { line-height: 1.12; text-wrap: balance; margin: 0; }
+h2 { font-size: var(--step-3); font-weight: 800; letter-spacing: -.01em; }
+h3 { font-size: var(--step-1); font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+.lede { font-size: var(--step-1); color: var(--ink-2); }
+.eyebrow { font: 600 .78rem/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.mono, code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; font-size: .88em; }
+img { max-width: 100%; height: auto; display: block; }
+
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.mark { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; margin-right: auto; }
+.mark svg { width: 30px; height: 30px; flex: none; }
+nav a { text-decoration: none; color: var(--ink-2); font-size: .98rem; }
+nav a:hover { color: var(--ink); }
+
+section { padding-block: 64px 8px; display: flex; flex-direction: column; gap: 22px; }
+.paving { height: 14px; width: 132px; background-image: radial-gradient(circle, var(--accent) 3.2px, transparent 3.6px);
+          background-size: 14px 14px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 40px; align-items: center; padding-block: 56px 16px; }
+@media (max-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.hero h1 { font-size: var(--step-4); font-weight: 800; letter-spacing: -.02em; }
+.hero h1 span { color: var(--cane); }
+.hero .lede { margin-top: 18px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 8px; font-weight: 600;
+       text-decoration: none; border: 2px solid var(--ink); }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.primary:hover { background: var(--cane); border-color: var(--cane); color: #fff; }
+.btn:hover { text-decoration: none; }
+.shot { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #0b0e12; }
+.shot figcaption, figure figcaption { font-size: .9rem; color: var(--muted); padding-top: 10px; }
+figure { margin: 0; }
+
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 2px solid var(--ink); margin-top: 36px; }
+@media (max-width: 760px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fact { padding: 16px 16px 4px 0; }
+.fact b { display: block; font: 600 var(--step-2)/1.1 var(--mono); }
+.fact span { color: var(--ink-2); font-size: .95rem; }
+
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; }
+@media (max-width: 900px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .features { grid-template-columns: minmax(0, 1fr); } }
+.feature { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.feature p { color: var(--ink-2); font-size: .98rem; }
+.status { font: 600 .75rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.status.done { color: var(--ok); } .status.open { color: var(--accent-ink); }
+.say { font-family: var(--mono); font-size: .9rem; background: var(--code-bg); padding: 6px 10px; border-radius: 6px; color: var(--ink); }
+
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+@media (max-width: 900px) { .flow { grid-template-columns: minmax(0, 1fr); } }
+.node { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; position: relative; min-width: 0; }
+.node h3 { font-size: 1.02rem; }
+.node p { font-size: .9rem; color: var(--ink-2); margin-top: 6px; }
+.node .mono { font-size: .8rem; color: var(--muted); display: block; margin-top: 8px; }
+.node.reflex { border-color: var(--cane); }
+.lane { font: 600 .74rem/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: #ffffff; border-radius: 12px; border: 1px solid var(--line); padding: 10px; }
+
+.objtools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.objtools input { flex: 1 1 260px; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+                  background: var(--surface); font: inherit; color: var(--ink); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 6px 12px;
+       font: 600 .85rem/1 var(--sans); cursor: pointer; }
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--ink-2); font-size: .88rem; }
+.legend i { display: inline-block; width: 26px; height: 6px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+.objgroups { display: flex; flex-direction: column; gap: 22px; }
+.objgroup h3 { margin-bottom: 10px; }
+.objgroup h3 small { font: 400 .85rem var(--mono); color: var(--muted); margin-left: 8px; }
+.objs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.obj { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.obj b { font-weight: 600; display: block; }
+.obj .meter { height: 6px; background: var(--code-bg); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.obj .meter i { display: block; height: 100%; border-radius: 3px; background: var(--ink-2); }
+.obj .meter i.hi { background: var(--ok); } .obj .meter i.lo { background: var(--accent); }
+.obj small { display: flex; justify-content: space-between; gap: 8px; font: .78rem/1.5 var(--mono); color: var(--muted); margin-top: 4px; }
+.count { font: .9rem var(--mono); color: var(--muted); }
+
+.charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 860px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+.chart img { border-radius: 10px; border: 1px solid var(--line); }
+.dark-only { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dark-only { display: block; }
+                                       :root:not([data-theme="light"]) .light-only { display: none; } }
+:root[data-theme="dark"] .dark-only { display: block; }
+:root[data-theme="dark"] .light-only { display: none; }
+
+ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 16px; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; }
+ol.steps > li::before { content: counter(s); font: 600 1.1rem/44px var(--mono); text-align: center; width: 44px; height: 44px;
+                        border-radius: 50%; background: var(--accent); color: #2a2000; }
+ol.steps h3 { margin-top: 9px; }
+ol.steps p { color: var(--ink-2); margin-top: 6px; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: .86rem/1.55 var(--mono); margin: 10px 0 0; }
+
+.note { border-left: 4px solid var(--cane); padding: 4px 0 4px 16px; color: var(--ink-2); }
+footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem;
+         display: flex; flex-wrap: wrap; gap: 10px 26px; }
+</style>
+<!--BODY-->
+<div class="page">
+<nav aria-label="Sections">
+  <div class="mark">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11.5 25 L19.5 7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><path d="M11.5 25 L13.6 20.4" stroke="#d1262c" stroke-width="3.2" stroke-linecap="round"/></svg>
+    Smart Cane 2.0
+  </div>
+  <a href="#live">Live dashboard</a>
+  <a href="#how">How it works</a>
+  <a href="#hardware">Hardware</a>
+  <a href="#objects">152 objects</a>
+  <a href="#results">Results</a>
+  <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">GitHub</a>
+</nav>
+
+<header class="hero">
+  <div>
+    <div class="paving" aria-hidden="true"></div>
+    <p class="eyebrow" style="margin-top:16px">KSCDR Hackathon · working prototype</p>
+    <h1 style="margin-top:12px">A white cane that sees <span>what is ahead</span> and how far.</h1>
+    <p class="lede">A camera and an AI accelerator on the cane name 152 kinds of object with their direction and distance. Two time-of-flight sensors catch obstacles and drop-offs, and a vibration motor reacts within a second of power-on, whether the computer is up or not.</p>
+    <div class="cta">
+      <a class="btn primary" href="LIVE_URL">Open the live dashboard</a>
+      <a class="btn" href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">Source, models and data</a>
+    </div>
+  </div>
+  <figure class="shot">
+    <img src="assets/live_dashboard.jpg" alt="The cane's live dashboard playing a recording: two chairs boxed, one at about 4.3 m, a wall unit labelled tv, objects sorted into left, ahead and right, the ground sensor at 1.91 m against 1.94 m learned, a top-down radar and the log of what the cane said" width="1440" height="1000">
+  </figure>
+</header>
+<p style="font-size:.9rem;color:var(--muted);margin-top:10px">The live dashboard playing a 30-second recording from the cane, 8 October 2026. The model labels the wall unit at top left "tv".</p>
+
+<div class="facts">
+  <div class="fact"><b>152</b><span>kinds of object named</span></div>
+  <div class="fact"><b>29 ms</b><span>per frame on the Hailo-8L</span></div>
+  <div class="fact"><b>0.8 s</b><span>power-on to first sensor reading</span></div>
+  <div class="fact"><b>0</b><span>cloud services needed to walk</span></div>
+</div>
+
+<section id="what">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>What it does</h2>
+  <div class="features">
+    <div class="feature"><span class="status done">Working</span><h3>Names objects, with direction and distance</h3><p>YOLO11s on the cane's Hailo-8L. Straight ahead, the forward ToF sensor gives the measured distance. Elsewhere the camera estimates it from the object's size.</p><span class="say">"chair ahead, 1.3 meters"</span></div>
+    <div class="feature"><span class="status done">Working</span><h3>Vibrates before you touch the obstacle</h3><p>An ESP32 reads the forward sensor 30 times a second and pulses the motor faster as you get closer. Silent beyond 1.5 m, solid under 0.4 m.</p><span class="say">felt, not heard</span></div>
+    <div class="feature"><span class="status open">Tuning on walks</span><h3>Warns of drops and kerbs</h3><p>A second sensor watches the ground about 50 cm past the tip and alarms on a sudden change: one long pulse and a spoken warning.</p><span class="say">"Careful, drop ahead"</span></div>
+    <div class="feature"><span class="status done">Working</span><h3>One-button assistant</h3><p>Press: Gemini describes the scene, then you can ask a question, such as "read the sign". Hold: it reads text. Offline, the same press uses the cane's own detector and Tesseract OCR.</p><span class="say">press · hold</span></div>
+    <div class="feature"><span class="status done">Working</span><h3>Never silent about the unknown</h3><p>Anything the model is unsure of, or never learned, is still announced as "obstacle" with its direction and distance.</p><span class="say">"obstacle left, about 2 meters"</span></div>
+    <div class="feature"><span class="status done">Working</span><h3>Says when it is broken</h3><p>A dead camera, a lost sensor link, a sensor that cannot see the ground: each one is spoken, because a silent failure looks like safety.</p><span class="say">"Ground sensor not working"</span></div>
+  </div>
+</section>
+
+<section id="live">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>Live dashboard for judges</h2>
+  <p class="lede">The cane serves its own dashboard: camera with real boxes, every object's bearing and distance, the ToF reading beside the camera's estimate for whatever is straight ahead, the ground sensor, and everything the cane says, updated four times a second.</p>
+  <div class="two">
+    <ol class="steps">
+      <li><div><h3>The cane serves it</h3><p>The dashboard runs on the cane all the time, locked with a private token. It draws frames only while someone is watching, so it costs no battery otherwise.</p></div></li>
+      <li><div><h3>One command opens a secure tunnel</h3><p><code>bash ~/smartcane/tools/go_live.sh</code> gives the cane a public https address through Cloudflare and waits until it answers.</p></div></li>
+      <li><div><h3>Judges open the link</h3><p>On any phone or laptop, directly or through this website. Ctrl-C closes the tunnel and the cane is private again.</p></div></li>
+    </ol>
+    <div class="note"><p>The dashboard shows the camera, so it never runs without a token, and the tunnel closes when the demo ends. If the venue's internet fails, a recording made with <code>tools/record_demo.py</code> plays back on the same page. Full steps: <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/blob/main/docs/deployment.md">docs/deployment.md</a>.</p></div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>How it works</h2>
+  <p class="lede">Two computers with separate jobs. The ESP32 owns the reflexes, the Raspberry Pi owns the understanding.</p>
+  <span class="lane">Reflex path, ESP32, works without the Pi</span>
+  <div class="flow">
+    <div class="node reflex"><h3>Forward ToF</h3><p>VL53L0X at 115 cm, aimed 5° above level</p><span class="mono">up to ~2 m indoors</span></div>
+    <div class="node reflex"><h3>Down ToF</h3><p>VL53L0X at 110 cm, aimed at the ground past the tip</p><span class="mono">ground learned, ±15 cm</span></div>
+    <div class="node reflex"><h3>ESP32 safety loop</h3><p>Median filter, range-status check, ground model, motor PWM</p><span class="mono">20 Hz to the Pi</span></div>
+    <div class="node reflex"><h3>Vibration motor</h3><p>Obstacle pulses, one long ground alarm, assistant cues</p><span class="mono">40 ms kick per buzz</span></div>
+    <div class="node reflex"><h3>Button</h3><p>Press: assistant. Hold: read text</p><span class="mono">ESP32 D33</span></div>
+  </div>
+  <span class="lane">Understanding path, Raspberry Pi 5</span>
+  <div class="flow">
+    <div class="node"><h3>Camera</h3><p>IMX708, 98° view, 10 fps, turned upright and letterboxed</p><span class="mono">640 x 360 to the model</span></div>
+    <div class="node"><h3>Hailo-8L</h3><p>YOLO11s, 152 classes, 13 TOPS</p><span class="mono">29 ms per frame</span></div>
+    <div class="node"><h3>Scene logic</h3><p>Bearing, distance, ToF match, three-frame confirm, urgency order</p><span class="mono">report every 0.3 s</span></div>
+    <div class="node"><h3>Speech</h3><p>Each object on its own repeat timer, hazards first</p><span class="mono">espeak-ng to earbuds</span></div>
+    <div class="node"><h3>Assistant</h3><p>Gemini online. Detector and Tesseract offline</p><span class="mono">about 3 s online</span></div>
+  </div>
+</section>
+
+<section id="hardware">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>Hardware</h2>
+  <p class="lede">Everything rides on the cane. The bought parts cost about USD 206. The sensors, motor, power bank and earbuds were already owned.</p>
+  <div class="two">
+    <figure class="panel"><img src="assets/sensor_geometry.svg" alt="Side view of the cane held 40 degrees from vertical: the forward sensor and camera look 5 degrees above level, the down sensor's beam reaches the ground about 50 cm past the tip" loading="lazy"></figure>
+    <figure class="panel"><img src="assets/cross_section.svg" alt="Cross-section of the housing showing how the Pi, AI HAT+, ESP32, power bank and sensors stack and how the cables run" loading="lazy"></figure>
+  </div>
+</section>
+
+<section id="objects">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>152 objects it can name</h2>
+  <p class="lede">Chosen for sidewalks, crossings and indoors. The bar under each name is its accuracy on 27,906 validation images (mAP50). Weak classes are still announced as "obstacle" when seen.</p>
+  <div class="objtools">
+    <label class="eyebrow" for="q">Find</label>
+    <input id="q" type="search" placeholder="Try: stairs, door, bus, curb" autocomplete="off">
+    <span class="count" id="count"></span>
+  </div>
+  <div class="tabs" id="tabs" role="group" aria-label="Group"></div>
+  <div class="legend"><span><i style="background:var(--ok)"></i>reliable, 0.70 or more</span><span><i style="background:var(--ink-2)"></i>usable, 0.50 to 0.70</span><span><i style="background:var(--accent)"></i>weak, under 0.50</span></div>
+  <div class="objgroups" id="objgroups"></div>
+</section>
+
+<section id="results">
+  <div class="paving" aria-hidden="true"></div>
+  <h2>Measured results</h2>
+  <p class="lede">Every number comes from the cane or its validation set, with date and method in <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0/blob/main/docs/results.md">docs/results.md</a>.</p>
+  <div class="charts">
+    <figure class="chart"><img class="light-only" src="assets/camera-path-light.svg" alt="Named objects rose from 40 to 55 percent and noticed objects from 53 to 66 percent after the camera path fixes. A sideways camera drops naming to 6 percent." loading="lazy"><img class="dark-only" src="assets/camera-path-dark.svg" alt="" loading="lazy"></figure>
+    <figure class="chart"><img class="light-only" src="assets/training-light.svg" alt="Training curve: v2 fell to 0.225 mAP50 at epoch 4, v3 rose steadily to 0.536 at epoch 24" loading="lazy"><img class="dark-only" src="assets/training-dark.svg" alt="" loading="lazy"></figure>
+    <figure class="chart"><img class="light-only" src="assets/safety-classes-light.svg" alt="Per-object accuracy: dog 0.84, person and car 0.81, chair 0.67, stairs 0.60, table 0.55, pothole 0.50, curb 0.24, crosswalk 0.22" loading="lazy"><img class="dark-only" src="assets/safety-classes-dark.svg" alt="" loading="lazy"></figure>
+    <figure class="chart"><img class="light-only" src="assets/dataset-light.svg" alt="Training images by source: Open Images 121,134, Roboflow 52,723, COCO 40,000, Mapillary Traffic Signs 30,000, Mapillary Vistas 20,000" loading="lazy"><img class="dark-only" src="assets/dataset-dark.svg" alt="" loading="lazy"></figure>
+  </div>
+</section>
+
+<section>
+  <div class="note"><p>A prototype, tested indoors and on the bench, not yet with blind users on a long street walk. It adds information to the white cane and orientation and mobility training, and replaces neither.</p></div>
+</section>
+
+<footer>
+  <span>Smart Cane 2.0 · code and documents MIT licence</span>
+  <span>Training labels keep their datasets' licences, two of them non-commercial</span>
+  <a href="https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0">github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0</a>
+</footer>
+</div>
+
+<script>
+(() => {
+  const OBJECTS = /*OBJECTS*/[]/*END*/;
+  const tabs = document.getElementById("tabs"), out = document.getElementById("objgroups");
+  const q = document.getElementById("q"), count = document.getElementById("count");
+  const groups = [...new Set(OBJECTS.map((o) => o.group))];
+  let active = "All";
+  for (const g of ["All", ...groups]) {
+    const b = document.createElement("button");
+    b.className = "tab"; b.type = "button"; b.textContent = g;
+    b.setAttribute("aria-pressed", g === active ? "true" : "false");
+    b.addEventListener("click", () => { active = g; for (const t of tabs.children) t.setAttribute("aria-pressed", t.textContent === g ? "true" : "false"); draw(); });
+    tabs.appendChild(b);
+  }
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function draw() {
+    const term = q.value.trim().toLowerCase();
+    let n = 0, html = "";
+    for (const g of groups) {
+      if (active !== "All" && g !== active) continue;
+      const items = OBJECTS.filter((o) => o.group === g && (!term || o.name.includes(term)));
+      if (!items.length) continue;
+      n += items.length;
+      html += `<div class="objgroup"><h3>${esc(g)}<small>${items.length}</small></h3><div class="objs">` +
+        items.map((o) => {
+          const tier = o.map50 >= 0.7 ? "hi" : o.map50 < 0.5 ? "lo" : "";
+          return `<div class="obj"><b>${esc(o.name)}</b><div class="meter" role="img" aria-label="mAP50 ${o.map50.toFixed(2)}"><i class="${tier}" style="width:${Math.round(o.map50 * 100)}%"></i></div>` +
+                 `<small><span>mAP50 ${o.map50.toFixed(2)}</span><span>${o.boxes.toLocaleString("en-US")} boxes</span></small></div>`;
+        }).join("") + "</div></div>";
+    }
+    out.innerHTML = html || `<p>No object matches "${esc(term)}". The cane still announces it as "obstacle" if it is in the way.</p>`;
+    count.textContent = `${n} of ${OBJECTS.length}`;
+  }
+  q.addEventListener("input", draw);
+  draw();
+})();
+</script>

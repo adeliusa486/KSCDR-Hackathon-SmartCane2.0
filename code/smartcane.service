@@ -46,10 +46,11 @@ ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:C
 # tools/vision_probe.py --orient while the cane is held as when walking
 # (8 Oct 2026: a camera on its side drops named objects from 55 % to 6 %).
 #
-# Live laptop dashboard (investor demo): add --demo-port 8080 to the end of
-# ExecStart, then open http://smartcane.local:8080. OFF by default since
-# 8 Oct 2026: it raised detect.py from ~12 % to 73 % of a core, and the
-# cane already browns out on weak supplies.
+# Live dashboard on port 8080, always token-protected (the token is in
+# ~/.config/smartcane/demo_token, created on first start). Frames are drawn
+# only while someone has the dashboard open, so it costs nothing otherwise
+# (drawing raised detect.py from ~12 % to 73 % of a core on 8 Oct 2026).
+# To show it on the internet: bash ~/smartcane/tools/go_live.sh
 ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
     --interval 0.3 \
     --conf 0.25 \
@@ -64,7 +65,8 @@ ExecStart=/usr/bin/python3 -u /home/pi/smartcane/speak_detect.py \
     --ev 0.7 \
     --rotate 0 \
     --model /home/pi/smartcane/models/smartcane152_v3_h8l.hef \
-    --labels /home/pi/smartcane/models/smartcane152.txt
+    --labels /home/pi/smartcane/models/smartcane152.txt \
+    --demo-port 8080
 
 # Restart if the vision loop dies for any reason. A cane that goes silent
 # after a crash is worse than one that stutters.

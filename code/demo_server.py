@@ -1,22 +1,43 @@
-"""Smart cane - live demo dashboard for a laptop browser.
+"""Smart cane - live dashboard server.
 
 Runs inside speak_detect.py with --demo-port. Open http://smartcane.local:8080
-(or the Pi's IP) on any laptop on the same network:
+(or the Pi's IP) on any laptop on the same network, or the public tunnel
+address (docs/deployment.md) from anywhere:
 
     /             the dashboard (demo_dashboard.html, no internet needed)
-    /stream.mjpg  camera with detections drawn, from detect.py --stream-file
-    /events       server-sent events, 4 per second: detections, fps, ToF
-                  distances, ground state, temperature, everything spoken
+    /frame.jpg    the latest camera frame with detections drawn
+    /state.json   detections with boxes, bearings and camera distances, fps,
+                  ToF distances, ground state, temperature, everything spoken
+    /stream.mjpg  the frames as one MJPEG stream (for VLC or a plain <img>)
+    /events       the state as server-sent events, 4 per second
+    /health       "ok", for tunnel and uptime checks
 
-Standard library only. Each browser tab costs one thread and ~10 fps of JPEGs
-that are already encoded, so several laptops can watch at once.
+The dashboard itself polls /state.json and /frame.jpg. Tunnels such as
+Cloudflare's hold long-lived streams back (tested: /events delivered 0 bytes
+in 6 s through a quick tunnel), while single requests pass at once. The two
+stream endpoints stay for local use.
+
+With --demo-token every URL except /health needs ?token=<token> (the
+dashboard passes it on by itself). Use a token whenever the dashboard is
+reachable from the internet: it shows the camera.
+
+Cross-origin reads are allowed (Access-Control-Allow-Origin: *) so the
+project website can show the live feed from another address. The token, not
+the origin, decides who gets in.
+
+Standard library only. Each browser tab costs one thread and the frames that
+are already encoded, so several laptops can watch at once. Frames are drawn
+only while a request arrived in the last few seconds (see touch()), so the
+server can stay on all the time.
 """
 import collections
+import hmac
 import json
 import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -30,17 +51,36 @@ def cpu_temp():
 
 
 class DemoServer:
-    def __init__(self, port, view_path, esp=None, model="", n_classes=0):
+    def __init__(self, port, view_path, esp=None, model="", n_classes=0,
+                 token="", host="0.0.0.0"):
         self.port = port
+        self.host = host
         self.view_path = view_path
         self.json_path = os.path.splitext(view_path)[0] + ".json"
+        # demo_view.Viewer.due() draws frames only while this file is fresh.
+        self.watch_path = view_path + ".watch"
+        self._touched = 0.0
         self.esp = esp
         self.model = os.path.basename(model or "")
         self.n_classes = n_classes
+        self.token = token or ""
         self.started = time.time()
         self.said = collections.deque(maxlen=14)
         self.seq = 0
         self.lock = threading.Lock()
+
+    def touch(self):
+        """Someone is watching: tell detect.py to keep drawing frames."""
+        now = time.monotonic()
+        if now - self._touched < 1.0:
+            return
+        self._touched = now
+        try:
+            with open(self.watch_path, "a"):
+                pass
+            os.utime(self.watch_path)
+        except OSError:
+            pass
 
     # Called by the speaker for every sentence actually spoken.
     def spoken(self, text, kind="speech"):
@@ -70,8 +110,14 @@ class DemoServer:
             said = list(self.said)
         return {"vision": vision, "vision_age": round(age, 2),
                 "sensors": sensors, "said": said, "temp": cpu_temp(),
-                "uptime": int(time.time() - self.started),
+                "uptime": int(time.time() - self.started), "t": time.time(),
                 "model": self.model, "classes": self.n_classes}
+
+    def allowed(self, query):
+        if not self.token:
+            return True
+        given = parse_qs(query).get("token", [""])[0]
+        return hmac.compare_digest(given.encode(), self.token.encode())
 
     def start(self):
         server = self
@@ -81,28 +127,49 @@ class DemoServer:
             def log_message(self, *a):
                 pass
 
+            def _headers(self, code, ctype, length=None):
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "no-cache, no-store")
+                if length is not None:
+                    self.send_header("Content-Length", str(length))
+                self.end_headers()
+
+            def _send(self, code, ctype, body):
+                self._headers(code, ctype, len(body))
+                self.wfile.write(body)
+
             def do_GET(self):
-                if self.path in ("/", "/index.html"):
+                url = urlsplit(self.path)
+                path = url.path
+                if path == "/health":
+                    return self._send(200, "text/plain", b"ok")
+                if not server.allowed(url.query):
+                    return self._send(403, "text/plain",
+                                      b"token required: add ?token=... to the address")
+                server.touch()
+                if path in ("/", "/index.html"):
                     with open(page, "rb") as fh:
-                        body = fh.read()
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                elif self.path.startswith("/stream.mjpg"):
+                        self._send(200, "text/html; charset=utf-8", fh.read())
+                elif path == "/stream.mjpg":
                     self._mjpeg()
-                elif self.path.startswith("/events"):
+                elif path == "/events":
                     self._events()
+                elif path == "/state.json":
+                    self._send(200, "application/json",
+                               json.dumps(server.state()).encode())
+                elif path == "/frame.jpg":
+                    try:
+                        with open(server.view_path, "rb") as fh:
+                            self._send(200, "image/jpeg", fh.read())
+                    except OSError:
+                        self._send(503, "text/plain", b"no frame yet")
                 else:
                     self.send_error(404)
 
             def _mjpeg(self):
-                self.send_response(200)
-                self.send_header("Content-Type",
-                                 "multipart/x-mixed-replace; boundary=frame")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
+                self._headers(200, "multipart/x-mixed-replace; boundary=frame")
                 last = 0
                 try:
                     while True:
@@ -111,6 +178,7 @@ class DemoServer:
                         except OSError:
                             time.sleep(0.2)
                             continue
+                        server.touch()
                         if m == last:
                             time.sleep(0.02)
                             continue
@@ -124,12 +192,10 @@ class DemoServer:
                     pass
 
             def _events(self):
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
+                self._headers(200, "text/event-stream")
                 try:
                     while True:
+                        server.touch()
                         data = json.dumps(server.state())
                         self.wfile.write(f"data: {data}\n\n".encode())
                         self.wfile.flush()
@@ -137,7 +203,7 @@ class DemoServer:
                 except (ConnectionError, OSError):
                     pass
 
-        httpd = ThreadingHTTPServer(("0.0.0.0", self.port), Handler)
+        httpd = ThreadingHTTPServer((self.host, self.port), Handler)
         httpd.daemon_threads = True
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         return httpd

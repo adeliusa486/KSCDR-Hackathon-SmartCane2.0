@@ -16,3 +16,11 @@ datasets/
 envs/
 *.har
 .pytest_cache/
+
+# Website build output (web/build.py)
+web/_site/
+
+# Private working notes, kept on the laptop only
+docs/handoff-prompt.md
+docs/smart-cane-prompt.md
+docs/phase-prompts/

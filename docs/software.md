@@ -63,9 +63,28 @@ Example sentences: "chair ahead, 1.3 meters", "chair right, about 2 meters", "ob
 
 `esp32_link.py` reads the ESP32's serial lines in a background thread. It reopens the port after 3 s of silence and keeps looking for the ESP32 if it is missing at boot. Both were real failures on 7 and 8 October 2026: the port opened at boot and then delivered nothing for 3.5 and 10 hours, so every distance the user heard was a camera guess.
 
-### AI assistant
+### AI assistant (one button)
 
-`assistant.py` uses the ESP32's buttons. Assistant button: short press describes the scene, double press reads text, hold asks a spoken question (the earbud microphone records while held). The second button reads text. It sends a snapshot (and the recorded question) to Gemini (`gemini-flash-lite-latest` first), and falls back to offline Tesseract OCR for reading when there is no internet. The API key lives only on the Pi at `~/.config/smartcane/gemini_key`.
+`assistant.py` times the cane's one button (ESP32 D33, "K" lines on the serial link).
+
+| Press | Online (Gemini reachable and a key on the Pi) | Offline (no internet or no key) |
+|---|---|---|
+| **Short** | "Looking", then Gemini describes the scene. One buzz, then the cane listens 5 s on the earbud mic. Ask anything, for example "read the sign", and it answers from a fresh photo. Silence ends it. A press ends listening early | Says at once what the cane's own detector sees ("chair ahead, 1.2 meters. backpack left, about 1.5 meters"), then reads any text with Tesseract |
+| **Long, 1 s** (a short buzz says you can let go) | "Reading", then Gemini reads the text word for word | Tesseract reads the text. Also used when Gemini fails |
+
+While the assistant works, the routine object announcements pause so the microphone never records the cane's own voice. Warnings and ground hazards still speak, and the ESP32 never stops vibrating. Presses while it answers are ignored, and a "press" longer than 15 s (a stuck switch) is ignored too.
+
+Failure handling, all covered by tests: the internet check takes at most 2 s and runs while the photo is taken; a slow model hands over to the next one; a garbled reply falls back offline; every path ends in something spoken ("Camera not ready", "Assistant error", the reason the online assistant failed). Models are tried in order `gemini-flash-lite-latest`, `gemini-flash-latest`, `gemini-3.8-flash`, with a 25 s overall limit. The API key lives only on the Pi at `~/.config/smartcane/gemini_key`.
+
+Measured on the cane with `tools/assistant_check.py` (real camera, Gemini, Tesseract): short press 3.4 s to the end of the description, long press 3.4 s, offline 0.5 s. The earbud microphone has not been tested yet.
+
+### Live dashboard
+
+`speak_detect.py --demo-port 8080` starts `demo_server.py`, which serves `demo_dashboard.html`: the camera with boxes drawn on the cane (`demo_view.py`, up to 6 frames a second), every object with bearing and distance, the forward ToF reading next to the camera's estimate for the object straight ahead, the ground sensor and everything the cane said. The service always starts it. It needs the token in `~/.config/smartcane/demo_token`, which the cane creates on first start, and it draws frames only while someone is watching. The page polls `/state.json` and `/frame.jpg` rather than holding a stream open, because tunnels hold streams back. Going public through a tunnel, the GitHub Pages site and the replay recorder: [deployment.md](deployment.md).
+
+![Live dashboard](figures/live_dashboard.jpg)
+
+*The live dashboard playing the recording from 8 October 2026: two chairs, one at about 4.3 m, and a wall unit the model labels "tv".*
 
 ## ESP32 firmware: the reflexes
 
@@ -84,7 +103,7 @@ Example sentences: "chair ahead, 1.3 meters", "chair right, about 2 meters", "ob
 |---|---|---|
 | ESP32 to Pi | `D <ms> <fwd> <down> <fok> <dok> <ground>` | 20 Hz. Distances in mm, -1 = nothing in range, ground -1 = not learned |
 | | `H drop <mm> <ground>` / `H step <mm> <ground>` | Ground hazard |
-| | `K down` / `K up`, `J down` / `J up` | Assistant button, read-text button |
+| | `K down` / `K up` | The button (D33). `J down` / `J up` (D32) is handled the same way if a button is ever wired there |
 | | `Q <tof> <mm> <status>` | Raw reading, while `Q1` is on |
 | | `I ...` / `E ...` | Information / error |
 | Pi to ESP32 | `B<duty>,<ms>` | One buzz, for example `B100,500` |
@@ -132,11 +151,11 @@ systemctl --user stop smartcane && nohup ~/smartcane/tools/flash_NEW.sh &
 
 ## Tests
 
-`code/tests/test_cane.py` simulates the blind-user scenarios without a camera, Hailo, ESP32 or audio: names for every safety class, urgency order, flicker, the obstacle fallback, distances in metres, the ToF consistency check, per-object repeat timers, picture geometry (letterbox, rotation, FOV, distance estimate), the real `Esp32Link` on a pseudo-terminal (hazards, buttons, silence, reopen), and every assistant path and failure.
+`code/tests/test_cane.py` simulates the blind-user scenarios without a camera, Hailo, ESP32 or audio: names for every safety class, urgency order, flicker, the obstacle fallback, distances in metres, the ToF consistency check, per-object repeat timers, picture geometry (letterbox, rotation, FOV, distance estimate), the real `Esp32Link` on a pseudo-terminal (hazards, buttons, silence, reopen), and every assistant path and failure (online, offline, no key, quota, busy retry, slow model, silence, a spoken question, early stop, long press, stuck switch, no mic, camera failure, a crash), and the dashboard server.
 
 ```bash
-cd ~/smartcane && python3 -m unittest tests/test_cane.py      # 46 tests, all pass on the Pi
-python -m pytest code/tests/test_cane.py -q                    # on a PC: 40 pass, 6 pty tests skip
+cd ~/smartcane && python3 -m unittest tests/test_cane.py      # 62 tests, all pass on the Pi
+python -m pytest code/tests/test_cane.py -q                    # Windows: 56 pass, 6 pty tests skip (all 62 run on Linux and in CI)
 ```
 
 `code/training/tests/` covers the dataset build, pseudo-label cleaning and the MTSD relabel step.

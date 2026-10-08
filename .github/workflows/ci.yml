@@ -1,0 +1,66 @@
+name: CI
+
+# Every push and pull request: the cane's software tests (including the
+# serial-link tests that need a Linux pseudo-terminal), the training-pipeline
+# tests, a compile of the ESP32 firmware, and a build of the website.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  software:
+    name: Cane software tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"          # same as Raspberry Pi OS Bookworm
+      - name: Install test dependencies
+        run: pip install numpy pillow pyserial pytest flake8 pyyaml
+      - name: Syntax errors and undefined names
+        run: flake8 code docs web --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Cane tests (camera, Hailo, ESP32 and audio simulated)
+        run: python -m pytest code/tests/test_cane.py -v
+      - name: Training pipeline tests
+        working-directory: code/training
+        run: |
+          for t in tests/test_*.py; do echo "== $t"; python "$t"; done
+
+  firmware:
+    name: ESP32 firmware build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install the ESP32 core and the VL53L0X library (versions used on the cane)
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.3.12
+          arduino-cli lib install VL53L0X@1.3.1
+      - name: Compile cane_safety
+        run: arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir build code/esp32/cane_safety
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cane_safety-firmware
+          path: build/cane_safety.ino.bin
+
+  website:
+    name: Website build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build
+        run: python web/build.py
+      - name: Check the pages exist
+        run: test -s web/_site/index.html && test -s web/_site/live.html

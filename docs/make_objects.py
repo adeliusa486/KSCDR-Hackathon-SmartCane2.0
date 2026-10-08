@@ -107,6 +107,30 @@ def main():
     with open(os.path.join(ROOT, "docs/objects.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(out))
     print(f"wrote docs/objects.md: {len(names)} classes, {total_boxes} train boxes")
+    update_readme(val)
+
+
+def update_readme(val):
+    """Refresh the object list between the OBJECTS markers in README.md."""
+    path = os.path.join(ROOT, "README.md")
+    if not os.path.exists(path):
+        return
+    text = open(path, encoding="utf-8").read()
+    start, end = "<!-- OBJECTS:START -->", "<!-- OBJECTS:END -->"
+    if start not in text or end not in text:
+        return
+    rows = ["| Group | Objects |", "|---|---|"]
+    for title, classes in GROUPS:
+        names = ", ".join(f"**{c}**" if float(val.get(c, {}).get("mAP50") or 0) >= 0.7 else c
+                          for c in classes)
+        rows.append(f"| {title} ({len(classes)}) | {names} |")
+    block = (start + "\n\n" + "\n".join(rows) + "\n\n**Bold**: reliable, mAP50 of 0.70 or more on "
+             "the validation set. Accuracy, training examples and speech urgency for every object: "
+             "[docs/objects.md](docs/objects.md).\n\n" + end)
+    text = text[:text.index(start)] + block + text[text.index(end) + len(end):]
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+    print("updated the object list in README.md")
 
 
 if __name__ == "__main__":

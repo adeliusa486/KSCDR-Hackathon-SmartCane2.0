@@ -442,8 +442,12 @@ def main():
         viewer = None
         if args.stream_file:
             from demo_view import Viewer
-            viewer = Viewer(args.stream_file, W, H, hfov_up, args.corridor,
-                            zone, nearness)
+            def info(d):
+                return {"zone": zone(d.x0, d.x1, W, hfov_up, args.corridor),
+                        "near": nearness(d.y0, d.y1, H),
+                        "est_m": estimate_m(d, W, H, hfov_up),
+                        "bearing": bearing(d.x0, d.x1, W, hfov_up)}
+            viewer = Viewer(args.stream_file, W, H, hfov_up, args.corridor, info)
         print("running. ctrl-c to stop.\n")
 
         import numpy as np
@@ -460,7 +464,8 @@ def main():
                         save_snapshot(picam2, args.rotate)
                     except Exception as exc:
                         print(f"snapshot failed: {exc}", file=sys.stderr)
-                if viewer is not None:
+                view = None
+                if viewer is not None and viewer.due():
                     # Both streams from one request, so the boxes drawn on
                     # the main frame belong to exactly this picture.
                     req = picam2.capture_request()
@@ -481,7 +486,7 @@ def main():
                 infer_ms = 1000 * (time.perf_counter() - t_inf)
                 dets = extract_detections(raw, labels, W, H, args.conf, region)
                 dets = rank(dedupe(dets), W, H, not args.all_classes)
-                if viewer is not None:
+                if view is not None:
                     # The demo view must never be able to stop the cane.
                     try:
                         viewer.write(view, dets, fps, infer_ms)

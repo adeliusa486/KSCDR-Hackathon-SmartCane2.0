@@ -68,9 +68,13 @@ All runs on one laptop: NVIDIA RTX 4060 Laptop GPU, Intel i9-13900H, Ultralytics
 | Run | Start | Settings | Result |
 |---|---|---|---|
 | v2 | `yolo11s.pt` (COCO) | 40 epochs planned, batch 24, SGD, lr0 0.01 | mAP50 0.386, 0.398, 0.360, then **0.225** at epoch 4 when warm-up ended at lr 0.01. Stopped |
-| **v3** | v2 `best.pt` (epoch 2) | SGD, batch 24, lr0 0.002 cosine to 5 %, warm-up 0.5 epoch, close-mosaic 4, patience 8, 45 h budget, watchdog that restarts from the best checkpoint with half the learning rate if mAP falls | 25 epochs, restarted once at epoch 13. **Best epoch 24: mAP50 0.536, mAP50-95 0.376, precision 0.65, recall 0.49** |
+| **v3** | v2 `best.pt` (epoch 2) | SGD, batch 24, lr0 0.002 cosine to 5 %, warm-up 0.5 epoch, close-mosaic 4, patience 8, 45 h budget, watchdog that restarts from the best checkpoint with half the learning rate if mAP falls | 27 epochs logged in `results.csv` (the 45 h budget ended it). **Best epoch 24: mAP50 0.536, mAP50-95 0.376, precision 0.65, recall 0.49** |
 
-Re-validated on 8 October 2026 with `code/training/val_per_class.py` on all 27,906 validation images: mAP50 0.535, mAP50-95 0.376. Per-class numbers are in `docs/results/v3_per_class.csv` and [objects.md](objects.md). Training curves are in `docs/results/v3_training/`.
+Re-validated on 8 October 2026 with `code/training/val_per_class.py` on all 27,906 validation images: mAP50 0.535, mAP50-95 0.376. Per-class numbers are in `docs/results/v3_per_class.csv` and [objects.md](objects.md). Training curves are in `docs/results/v3_training/` and the chart below.
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="charts/training-dark.svg"><img src="charts/training-light.svg" alt="v2 fell to 0.225 mAP50 at epoch 4, v3 rose steadily to 0.536 at epoch 24"></picture>
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="charts/dataset-dark.svg"><img src="charts/dataset-light.svg" alt="Training images by source"></picture>
 
 To reproduce v3 (Windows, CUDA):
 

@@ -724,6 +724,44 @@ class DemoDashboard(unittest.TestCase):
         finally:
             httpd.shutdown()
 
+    def test_frames_drawn_only_while_watched(self):
+        # With nobody watching, detect.py must not spend CPU drawing frames.
+        import demo_view
+        view = os.path.join(assistant.SHM, "cane_view_watch.jpg")
+        v = demo_view.Viewer(view, 640, 360, 98.2, 10, info=lambda d: {})
+        if os.path.exists(v.watch_path):
+            os.remove(v.watch_path)
+        self.assertFalse(v.due())
+        open(v.watch_path, "a").close()
+        self.assertTrue(v.due())
+        old = time.time() - demo_view.WATCH_S - 1
+        os.utime(v.watch_path, (old, old))
+        self.assertFalse(v.due())
+
+    def test_requests_mark_watched_only_with_token(self):
+        import socket
+        import urllib.error
+        import urllib.request
+        import demo_server
+        view = os.path.join(assistant.SHM, "cane_view_tok.jpg")
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        d = demo_server.DemoServer(port, view, token="s3cret", host="127.0.0.1")
+        if os.path.exists(d.watch_path):
+            os.remove(d.watch_path)
+        httpd = d.start()
+        try:
+            base = f"http://127.0.0.1:{port}"
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(base + "/state.json", timeout=5)
+            self.assertEqual(e.exception.code, 403)
+            self.assertFalse(os.path.exists(d.watch_path))
+            urllib.request.urlopen(base + "/state.json?token=s3cret&n=1", timeout=5).read()
+            self.assertTrue(os.path.exists(d.watch_path))
+        finally:
+            httpd.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

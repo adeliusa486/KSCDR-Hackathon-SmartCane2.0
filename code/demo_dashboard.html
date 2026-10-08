@@ -2,261 +2,534 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smart Cane Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-  :root {
-    --bg: #07090d; --panel: #10141b; --line: #1d2430; --text: #e8edf4;
-    --dim: #8792a2; --accent: #32d7e6; --ok: #30d158; --warn: #ff9f0a;
-    --bad: #ff3b30; --drop: #ff3b30; --vehicle: #ff9500; --living: #ffd60a;
-    --obstacle: #bf5af2; --object: #32d7e6;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    background: radial-gradient(1200px 600px at 20% -10%, #0e1a24 0%, var(--bg) 60%);
-    color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    display: flex; flex-direction: column; overflow: hidden;
-  }
-  header {
-    display: flex; align-items: center; gap: 14px; padding: 14px 22px;
-    border-bottom: 1px solid var(--line);
-  }
-  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: .3px; }
-  .logo svg { width: 28px; height: 28px; }
-  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
-          color: var(--bad); letter-spacing: 1.5px; margin-left: 4px; }
-  .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); animation: pulse 1.4s infinite; }
-  .live.off { color: var(--dim); } .live.off i { background: var(--dim); animation: none; }
-  @keyframes pulse { 50% { opacity: .25; } }
-  .pills { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-          padding: 5px 12px; font-size: 13px; color: var(--dim); white-space: nowrap; }
-  .pill b { color: var(--text); font-variant-numeric: tabular-nums; }
+/* Instrument console: one dark world on purpose (a camera monitor reads best
+   on dark), video left, readouts right, all numbers in a mono face. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0e12; --panel: #12171d; --panel-2: #171d25; --line: #222b36;
+  --fg: #e6ebf1; --dim: #8a96a5; --faint: #5b6674; --accent: #4cc9d8;
+  --ok: #3ecf73; --warn: #f5a524; --bad: #ff5a4f;
+  --drop: #ff5a4f; --vehicle: #ff9f0a; --living: #ffd60a; --obstacle: #bf7af0; --object: #4cc9d8;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 10px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 14px/1.45 var(--sans); min-height: 100vh; padding: 0 16px 16px; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px;
-         padding: 18px 22px 12px; min-height: 0; }
-  .stage { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  .video { position: relative; border-radius: 14px; overflow: hidden; background: #000;
-           border: 1px solid var(--line); aspect-ratio: 16/9; max-height: 100%; }
-  .video img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .video .paused { position: absolute; inset: 0; display: none; place-items: center;
-                   color: var(--dim); font-size: 18px; background: rgba(0,0,0,.6); }
-  .video.stale .paused { display: grid; }
-  .alert { position: absolute; left: 0; right: 0; top: 0; padding: 14px 20px; font-size: 26px;
-           font-weight: 800; letter-spacing: .5px; background: linear-gradient(90deg, var(--bad), #c4161c);
-           transform: translateY(-110%); transition: transform .25s; display: flex; gap: 12px; align-items: center; }
-  .alert.show { transform: none; animation: flash .5s 4 alternate; }
-  @keyframes flash { to { filter: brightness(1.35); } }
-  .caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-             max-width: 86%; background: rgba(0,0,0,.72); backdrop-filter: blur(6px);
-             padding: 10px 18px; border-radius: 12px; font-size: 22px; font-weight: 600;
-             opacity: 0; transition: opacity .3s; text-align: center; }
-  .caption.show { opacity: 1; }
-  .caption small { display: block; font-size: 12px; color: var(--accent); letter-spacing: 1.5px;
-                   font-weight: 700; margin-bottom: 2px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 0 12px;
+         border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: .2px; }
+.brand svg { width: 26px; height: 26px; }
+.state { display: inline-flex; align-items: center; gap: 7px; font: 600 11px/1 var(--mono);
+         letter-spacing: 1.4px; text-transform: uppercase; padding: 6px 10px; border-radius: 999px;
+         background: var(--panel); border: 1px solid var(--line); color: var(--dim); }
+.state i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.state.live { color: var(--bad); } .state.live i { background: var(--bad); animation: pulse 1.4s infinite; }
+.state.replay { color: var(--warn); } .state.replay i { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .state.live i { animation: none; } }
+.metrics { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.metric { font: 12px/1 var(--mono); color: var(--dim); background: var(--panel); border: 1px solid var(--line);
+          border-radius: 6px; padding: 6px 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.metric b { color: var(--fg); font-weight: 600; }
 
-  .zones { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .zone { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-          padding: 10px 14px; min-height: 64px; transition: border-color .2s, background .2s; }
-  .zone h4 { font-size: 11px; letter-spacing: 1.6px; color: var(--dim); margin-bottom: 4px; }
-  .zone div { font-size: 16px; font-weight: 600; }
-  .zone.hot { border-color: var(--warn); background: #1b1408; }
-  .zone.danger { border-color: var(--bad); background: #1f0b0b; }
+.connect { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; }
+.connect label { font: 600 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); }
+.connect input { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+                 min-width: 0; flex: 1 1 220px; }
+.connect input#token { flex: 0 1 180px; }
+.btn { background: var(--accent); color: #06232a; border: 0; border-radius: 6px; padding: 8px 14px;
+       font-weight: 600; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.note { color: var(--dim); font-size: 13px; flex-basis: 100%; }
+.note.err { color: var(--bad); }
 
-  aside { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
-  .card h3 { font-size: 11px; letter-spacing: 1.6px; color: var(--dim); margin-bottom: 8px; font-weight: 700; }
-  .dist { display: flex; align-items: baseline; gap: 8px; }
-  .dist .num { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
-  .dist .unit { color: var(--dim); font-size: 16px; }
-  .gauge { height: 10px; border-radius: 6px; margin-top: 10px; background: #1a212c; overflow: hidden; position: relative; }
-  .gauge i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 6px; transition: width .2s, background .2s; }
-  .ground { display: flex; align-items: center; justify-content: space-between; margin-top: 12px;
-            padding-top: 12px; border-top: 1px solid var(--line); }
-  .badge { font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 999px; }
-  .badge.ok { background: #0f2a18; color: var(--ok); } .badge.bad { background: #2c0c0c; color: var(--bad); }
-  .badge.na { background: #1a212c; color: var(--dim); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; padding-top: 14px; }
+@media (max-width: 1020px) { main { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; min-width: 0; }
+.card h2 { margin: 0 0 10px; font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--dim); }
 
-  .says { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .says ul { list-style: none; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
-  .says li { padding: 8px 10px; border-radius: 10px; background: #151b24; border-left: 3px solid var(--accent);
-             animation: in .35s ease-out; }
-  .says li.hazard { border-left-color: var(--bad); background: #1f0e0e; }
-  .says li.assistant { border-left-color: var(--obstacle); background: #19121f; }
-  .says li time { display: block; font-size: 11px; color: var(--dim); }
-  .says li:nth-child(n+2) { opacity: .75; } .says li:nth-child(n+4) { opacity: .5; }
-  @keyframes in { from { transform: translateY(-8px); opacity: 0; } }
-  .empty { color: var(--dim); font-size: 14px; }
+.video { position: relative; background: #000; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line);
+         aspect-ratio: 16 / 9; max-width: 100%; }
+.video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.video img:not([src]) { visibility: hidden; }
+.video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); text-align: center;
+                padding: 20px; font-size: 15px; }
+.banner { position: absolute; left: 0; right: 0; top: 0; padding: 12px 18px; background: var(--bad); color: #fff;
+          font-weight: 700; font-size: 20px; letter-spacing: .3px; transform: translateY(-110%); transition: transform .25s; }
+.banner.show { transform: none; }
+.caption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: 88%;
+           background: rgba(8, 11, 15, .78); border: 1px solid rgba(255,255,255,.08); padding: 8px 14px; border-radius: 8px;
+           font-size: 18px; font-weight: 500; text-align: center; opacity: 0; transition: opacity .3s; }
+.caption.show { opacity: 1; }
+.caption small { display: block; font: 600 10px/1.4 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); }
+.scrub { display: flex; align-items: center; gap: 10px; }
+.scrub[hidden] { display: none; }
+.scrub input { flex: 1; accent-color: var(--warn); }
+.scrub span { font: 12px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
 
-  .dets { display: flex; flex-direction: column; gap: 7px; }
-  .det { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
-  .det .dot { width: 10px; height: 10px; border-radius: 3px; }
-  .det .bar { grid-column: 2 / 4; height: 4px; background: #1a212c; border-radius: 3px; overflow: hidden; margin-top: -3px; }
-  .det .bar i { display: block; height: 100%; }
-  .det span { color: var(--dim); font-variant-numeric: tabular-nums; }
+.zones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.zone { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; min-height: 82px; min-width: 0; }
+.zone.hot { border-color: var(--accent); }
+.zone h3 { margin: 0 0 6px; font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--dim); }
+.chip { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 6px 0; padding: 3px 8px; border-radius: 999px;
+        background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+.chip i { width: 8px; height: 8px; border-radius: 2px; }
+.chip em { font: 12px var(--mono); color: var(--dim); font-style: normal; }
 
-  footer { display: flex; gap: 18px; padding: 8px 22px 14px; color: var(--dim); font-size: 12px; flex-wrap: wrap; }
-  footer i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font: 600 10px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint);
+     padding: 0 8px 8px 0; }
+td { padding: 7px 8px 7px 0; border-top: 1px solid var(--line); white-space: nowrap; }
+td.num { font-family: var(--mono); }
+.tablewrap { overflow-x: auto; }
 
-  @media (max-width: 1000px) {
-    body { overflow: auto; } main { grid-template-columns: 1fr; }
-    .pills { display: none; }
-  }
+.big { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.big div { min-width: 0; }
+.big .v { font: 600 34px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.big .l { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font: 600 11px/1.4 var(--mono); letter-spacing: .8px; }
+.pill.ok { background: rgba(62, 207, 115, .14); color: var(--ok); }
+.pill.warn { background: rgba(245, 165, 36, .14); color: var(--warn); }
+.pill.bad { background: rgba(255, 90, 79, .16); color: var(--bad); }
+.pill.dim { background: var(--panel-2); color: var(--dim); }
+.match { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--dim); font-size: 13px; }
+
+.bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 10px; position: relative; }
+.bar b { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); border-radius: 4px; transition: width .25s; }
+.bar u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--fg); }
+canvas { width: 100%; display: block; }
+
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.log li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.log time { font: 11px/1.7 var(--mono); color: var(--faint); }
+.log .k-hazard { color: var(--bad); font-weight: 600; }
+.log .k-assistant { color: var(--accent); }
+footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">
-    <svg viewBox="0 0 32 32" fill="none" stroke="#32d7e6" stroke-width="2.4" stroke-linecap="round">
-      <path d="M11 4c4 0 6 2 6 5v19"/><path d="M17 28l4-1"/><circle cx="24" cy="10" r="2.2" fill="#32d7e6" stroke="none"/>
-      <path d="M27 6a7 7 0 0 1 0 8" opacity=".7"/><path d="M29.5 3.5a11 11 0 0 1 0 13" opacity=".4"/>
-    </svg>
-    Smart Cane <span class="live off" id="live"><i></i>LIVE</span>
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#4cc9d8" stroke-width="2"/><path d="M11 25 L19 7" stroke="#e6ebf1" stroke-width="3" stroke-linecap="round"/><path d="M11 25 L13 21" stroke="#ff5a4f" stroke-width="3" stroke-linecap="round"/></svg>
+    Smart Cane
   </div>
-  <div class="pills">
-    <div class="pill">AI chip <b>Hailo-8L</b></div>
-    <div class="pill">Knows <b id="classes">-</b> objects</div>
-    <div class="pill">Camera <b id="fps">-</b> fps</div>
-    <div class="pill">AI time <b id="ms">-</b> ms</div>
-    <div class="pill">Temp <b id="temp">-</b></div>
+  <span class="state" id="state"><i></i><span id="stateText">Connecting</span></span>
+  <div class="metrics" aria-label="System">
+    <span class="metric">Camera <b id="fps">–</b> fps</span>
+    <span class="metric">Hailo <b id="infer">–</b> ms</span>
+    <span class="metric">CPU <b id="temp">–</b> °C</span>
+    <span class="metric">Up <b id="uptime">–</b></span>
+    <span class="metric">Model <b id="model">–</b></span>
   </div>
 </header>
 
-<main>
-  <section class="stage">
-    <div class="video" id="video">
-      <img id="cam" src="/stream.mjpg" alt="Live view from the cane camera with detected objects outlined">
-      <div class="alert" id="alert">&#9888; <span id="alertText">Drop ahead</span></div>
-      <div class="caption" id="caption"><small>CANE SAYS</small><span id="captionText"></span></div>
-      <div class="paused">Camera paused</div>
-    </div>
-    <div class="zones">
-      <div class="zone" id="z-left"><h4>LEFT</h4><div>clear</div></div>
-      <div class="zone" id="z-ahead"><h4>AHEAD</h4><div>clear</div></div>
-      <div class="zone" id="z-right"><h4>RIGHT</h4><div>clear</div></div>
-    </div>
-  </section>
+<form class="connect" id="connect" hidden>
+  <label for="cane">Cane address</label>
+  <input id="cane" placeholder="https://your-tunnel.trycloudflare.com" autocomplete="off" spellcheck="false">
+  <input id="token" placeholder="token" autocomplete="off" spellcheck="false" aria-label="Token">
+  <button class="btn" type="submit">Connect live</button>
+  <button class="btn ghost" type="button" id="playRec" hidden>Play recording</button>
+  <p class="note" id="connectNote">Paste the address your cane printed when its tunnel started (docs/deployment.md).</p>
+</form>
 
-  <aside>
+<main>
+  <div class="col">
+    <div class="video" id="video">
+      <img id="frame" alt="Live camera view of the cane with detected objects outlined">
+      <div class="empty" id="empty">Waiting for the camera</div>
+      <div class="banner" id="banner">Drop ahead</div>
+      <div class="caption" id="caption"><small id="captionKind">Cane says</small><span id="captionText"></span></div>
+    </div>
+    <div class="scrub" id="scrub" hidden>
+      <button class="btn ghost" type="button" id="playPause">Pause</button>
+      <input type="range" id="seek" min="0" max="100" value="0" aria-label="Recording position">
+      <span id="clock">0.0 s</span>
+    </div>
+    <div class="zones" aria-label="Objects by direction">
+      <div class="zone" id="z-left"><h3>Left</h3><div></div></div>
+      <div class="zone" id="z-ahead"><h3>Ahead</h3><div></div></div>
+      <div class="zone" id="z-right"><h3>Right</h3><div></div></div>
+    </div>
     <div class="card">
-      <h3>DISTANCE AHEAD &middot; LASER SENSOR</h3>
-      <div class="dist"><span class="num" id="dist">--</span><span class="unit" id="distUnit"></span></div>
-      <div class="gauge"><i id="gauge"></i></div>
-      <div class="ground">
-        <span>Ground in front of tip</span><span class="badge na" id="ground">no sensor</span>
+      <h2>Detections this frame</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Object</th><th>Where</th><th>Bearing</th><th>Confidence</th><th>Camera estimate</th><th>ToF measured</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="6" style="color:var(--dim)">Nothing detected yet</td></tr></tbody>
+        </table>
       </div>
     </div>
-    <div class="card says">
-      <h3>WHAT THE CANE SAYS</h3>
-      <ul id="said"><li class="empty" style="border:0;background:none">Waiting for the first words&hellip;</li></ul>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>Straight ahead: distance check</h2>
+      <div class="big">
+        <div><div class="v" id="tofV">–</div><div class="l">ToF sensor, measured</div></div>
+        <div><div class="v" id="camV">–</div><div class="l" id="camL">Camera estimate</div></div>
+      </div>
+      <div class="match" id="match"><span class="pill dim">waiting</span></div>
     </div>
     <div class="card">
-      <h3>SEEING NOW</h3>
-      <div class="dets" id="dets"><div class="empty">Nothing in view</div></div>
+      <h2>Ground sensor</h2>
+      <div class="big">
+        <div><div class="v" id="downV">–</div><div class="l">to the ground now</div></div>
+        <div><div class="v" id="groundV">–</div><div class="l">learned ground</div></div>
+      </div>
+      <div class="bar" aria-hidden="true"><b id="downBar"></b><u id="groundMark"></u></div>
+      <div class="match" id="groundState"><span class="pill dim">waiting</span></div>
     </div>
-  </aside>
+    <div class="card">
+      <h2>Around the cane (top view)</h2>
+      <canvas id="radar" width="660" height="400" aria-label="Objects plotted by direction and distance"></canvas>
+    </div>
+    <div class="card">
+      <h2>What the cane said</h2>
+      <ul class="log" id="log"><li><time></time><span style="color:var(--dim)">Nothing yet</span></li></ul>
+    </div>
+  </div>
 </main>
-
-<footer>
-  <span><i style="background:var(--drop)"></i>Drop-off / step</span>
-  <span><i style="background:var(--vehicle)"></i>Vehicle</span>
-  <span><i style="background:var(--living)"></i>Person / animal</span>
-  <span><i style="background:var(--obstacle)"></i>Obstacle</span>
-  <span><i style="background:var(--object)"></i>Other object</span>
-  <span style="margin-left:auto">Everything runs on the cane. No cloud needed for detection.</span>
-</footer>
+<footer id="foot">Boxes are drawn on the cane. Camera distances come from each object's size in the picture, about ±30 %. The ToF sensor measures what is straight ahead, ±3 cm.</footer>
 
 <script>
-const $ = id => document.getElementById(id);
-const COLORS = { drop: "var(--drop)", vehicle: "var(--vehicle)", living: "var(--living)",
-                 obstacle: "var(--obstacle)", object: "var(--object)" };
-let lastSaid = 0, alertTimer = null, captionTimer = null;
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const COLORS = { drop: "#ff5a4f", vehicle: "#ff9f0a", living: "#ffd60a", obstacle: "#bf7af0", object: "#4cc9d8" };
+  const params = new URLSearchParams(location.search);
+  const store = {
+    get(k) { try { return localStorage.getItem("cane." + k) || ""; } catch (e) { return ""; } },
+    set(k, v) { try { localStorage.setItem("cane." + k, v); } catch (e) { /* storage blocked */ } },
+  };
+  let live = null, lastSaidId = 0, replay = null, mode = "none";
 
-// The MJPEG stream drops if the Pi restarts the service. Reconnect quietly.
-$("cam").onerror = () => setTimeout(() => { $("cam").src = "/stream.mjpg?" + Date.now(); }, 1000);
-
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
-
-function render(s) {
-  const v = s.vision || {};
-  $("live").classList.toggle("off", s.vision_age > 2);
-  $("video").classList.toggle("stale", s.vision_age > 2);
-  $("fps").textContent = v.fps ?? "-";
-  $("ms").textContent = v.infer_ms ? Math.round(v.infer_ms) : "-";
-  $("temp").textContent = s.temp ? s.temp + "°C" : "-";
-  $("classes").textContent = s.classes || "-";
-
-  // Zones
-  const z = { left: [], ahead: [], right: [] };
-  (v.dets || []).forEach(d => z[d.zone] && z[d.zone].push(d));
-  for (const k of Object.keys(z)) {
-    const el = $("z-" + k);
-    el.querySelector("div").textContent = z[k].length
-      ? [...new Set(z[k].map(d => d.label))].slice(0, 3).join(", ") : "clear";
-    el.classList.toggle("danger", z[k].some(d => d.kind === "drop" || d.near === "close"));
-    el.classList.toggle("hot", z[k].length > 0);
+  // ---- helpers ----------------------------------------------------------
+  const m = (mm) => (mm == null ? "–" : (mm / 1000).toFixed(2) + " m");
+  const fmtUp = (s) => s == null ? "–" : s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function setState(kind, text) {
+    $("state").className = "state " + kind;
+    $("stateText").textContent = text;
   }
 
-  // Detections list
-  const dets = (v.dets || []).slice(0, 6);
-  $("dets").innerHTML = dets.length ? dets.map(d => `
-    <div class="det"><i class="dot" style="background:${COLORS[d.kind]}"></i>
-      <div>${esc(d.label)} <span>&middot; ${d.zone}, ${d.near}</span></div>
-      <span>${Math.round(d.score * 100)}%</span>
-      <div class="bar"><i style="width:${Math.round(d.score * 100)}%;background:${COLORS[d.kind]}"></i></div>
-    </div>`).join("") : '<div class="empty">Nothing in view</div>';
-
-  // Distance sensors
-  const sn = s.sensors;
-  if (!sn) {
-    $("dist").textContent = "--"; $("distUnit").textContent = "";
-    $("ground").className = "badge na"; $("ground").textContent = "no sensor";
-  } else {
-    const mm = sn.fwd_mm;
-    if (mm == null) { $("dist").textContent = "clear"; $("distUnit").textContent = "> 2 m"; }
-    else if (mm < 1000) { $("dist").textContent = Math.round(mm / 10); $("distUnit").textContent = "cm"; }
-    else { $("dist").textContent = (mm / 1000).toFixed(2); $("distUnit").textContent = "m"; }
-    const pct = mm == null ? 0 : Math.max(0, Math.min(100, (2000 - mm) / 16));
-    $("gauge").style.width = pct + "%";
-    $("gauge").style.background = mm != null && mm < 400 ? "var(--bad)" : mm != null && mm < 1000 ? "var(--warn)" : "var(--ok)";
-    const g = $("ground");
-    if (!sn.alive) { g.className = "badge bad"; g.textContent = "sensors offline"; }
-    else if (!sn.down_ok) { g.className = "badge na"; g.textContent = "no reading"; }
-    else if (sn.ground_mm && sn.down_mm > sn.ground_mm + 150) { g.className = "badge bad"; g.textContent = "DROP"; }
-    else if (sn.ground_mm && sn.down_mm < sn.ground_mm - 120) { g.className = "badge bad"; g.textContent = "STEP UP"; }
-    else { g.className = "badge ok"; g.textContent = sn.ground_mm ? "level" : "learning"; }
+  // Same rule as speak_detect.tof_measures(): the ToF reading belongs to an
+  // object ahead only if the camera's own estimate agrees within 2x.
+  function tofFor(det, fwdMm) {
+    if (fwdMm == null || det.zone !== "ahead") return null;
+    if (det.est_m == null) return fwdMm;
+    const r = fwdMm / 1000 / det.est_m;
+    return r >= 0.5 && r <= 2 ? fwdMm : null;
   }
 
-  // Speech transcript, newest first
-  const said = s.said || [];
-  if (said.length && said[said.length - 1].id !== lastSaid) {
-    const fresh = said.filter(x => x.id > lastSaid);
-    lastSaid = said[said.length - 1].id;
-    $("said").innerHTML = said.slice().reverse().slice(0, 7).map(x => {
-      const cls = /drop|step|careful|warning/i.test(x.text) ? "hazard" : x.kind === "assistant" ? "assistant" : "";
-      const t = new Date(x.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      return `<li class="${cls}"><time>${t}${x.kind === "assistant" ? " &middot; AI assistant" : ""}</time>${esc(x.text)}</li>`;
-    }).join("");
-    const newest = fresh[fresh.length - 1];
-    if (newest) {
-      $("captionText").textContent = newest.text;
-      $("caption").classList.add("show");
-      clearTimeout(captionTimer);
-      captionTimer = setTimeout(() => $("caption").classList.remove("show"), 3500);
-      if (/drop|step up|careful/i.test(newest.text)) {
-        $("alertText").textContent = newest.text;
-        $("alert").classList.add("show");
-        clearTimeout(alertTimer);
-        alertTimer = setTimeout(() => $("alert").classList.remove("show"), 3000);
+  // ---- render one state -------------------------------------------------
+  function render(st) {
+    const v = st.vision || {};
+    const dets = v.dets || [];
+    const s = st.sensors || {};
+    const fwd = s.fwd_mm == null ? null : s.fwd_mm;
+    $("fps").textContent = v.fps != null ? Number(v.fps).toFixed(1) : "–";
+    $("infer").textContent = v.infer_ms != null ? Number(v.infer_ms).toFixed(0) : "–";
+    $("temp").textContent = st.temp != null ? Number(st.temp).toFixed(0) : "–";
+    $("uptime").textContent = fmtUp(st.uptime);
+    $("model").textContent = st.classes ? `${st.classes} classes` : "–";
+    $("empty").hidden = mode === "replay" || (st.vision_age != null && st.vision_age < 3);
+    if (!$("empty").hidden) $("empty").textContent = st.vision_age >= 3 ? "Camera paused or starting" : "Waiting for the camera";
+
+    // zones
+    for (const z of ["left", "ahead", "right"]) {
+      const box = $("z-" + z).querySelector("div");
+      const here = dets.filter((d) => d.zone === z);
+      $("z-" + z).classList.toggle("hot", here.length > 0 && z === "ahead");
+      box.innerHTML = here.length ? here.map((d) => {
+        const t = tofFor(d, fwd);
+        const dist = t != null ? (t / 1000).toFixed(1) + " m" : d.est_m != null ? "~" + d.est_m.toFixed(1) + " m" : d.near || "";
+        return `<span class="chip"><i style="background:${COLORS[d.kind] || COLORS.object}"></i>${esc(d.label)} <em>${esc(dist)}</em></span>`;
+      }).join("") : '<span style="color:var(--faint)">clear</span>';
+    }
+
+    // table
+    $("rows").innerHTML = dets.length ? dets.map((d) => {
+      const t = tofFor(d, fwd);
+      return `<tr><td><span class="chip" style="margin:0"><i style="background:${COLORS[d.kind] || COLORS.object}"></i>${esc(d.label)}</span></td>
+        <td>${esc(d.zone || "")}</td><td class="num">${d.bearing != null ? (d.bearing > 0 ? "+" : "") + d.bearing.toFixed(0) + "°" : "–"}</td>
+        <td class="num">${Math.round(d.score * 100)} %</td>
+        <td class="num">${d.est_m != null ? "~" + d.est_m.toFixed(2) + " m" : esc(d.near || "–")}</td>
+        <td class="num">${t != null ? (t / 1000).toFixed(2) + " m" : "–"}</td></tr>`;
+    }).join("") : '<tr><td colspan="6" style="color:var(--dim)">Nothing detected</td></tr>';
+
+    // distance check: the largest box ahead
+    const ahead = dets.filter((d) => d.zone === "ahead")
+      .sort((a, b) => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]) - (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]))[0];
+    $("tofV").textContent = s.alive === false ? "offline" : m(fwd);
+    if (ahead && ahead.est_m != null) {
+      $("camV").textContent = "~" + ahead.est_m.toFixed(2) + " m";
+      $("camL").textContent = `Camera estimate (${ahead.label})`;
+    } else {
+      $("camV").textContent = "–";
+      $("camL").textContent = ahead ? `Camera: ${ahead.label}, box cut by the frame` : "Camera estimate";
+    }
+    let verdict;
+    if (fwd == null) verdict = `<span class="pill dim">nothing within ToF range</span>`;
+    else if (!ahead) verdict = `<span class="pill warn">ToF sees something the camera has not named</span><span>spoken as "obstacle ahead"</span>`;
+    else if (ahead.est_m == null) verdict = `<span class="pill ok">ToF used for ${esc(ahead.label)}</span>`;
+    else {
+      const diff = Math.abs(fwd / 1000 - ahead.est_m), pct = Math.round(100 * diff / (fwd / 1000));
+      const t = tofFor(ahead, fwd);
+      verdict = t != null
+        ? `<span class="pill ${pct <= 30 ? "ok" : "warn"}">match, ${diff.toFixed(2)} m apart (${pct} %)</span><span>the cane says ${(fwd / 1000).toFixed(1)} m</span>`
+        : `<span class="pill warn">beam is on something else</span><span>${diff.toFixed(1)} m apart, camera estimate used</span>`;
+    }
+    $("match").innerHTML = verdict;
+
+    // ground
+    const down = s.down_mm, ground = s.ground_mm;
+    $("downV").textContent = m(down);
+    $("groundV").textContent = ground == null ? "learning" : m(ground);
+    const scale = 2500;
+    $("downBar").style.width = down == null ? "0%" : Math.min(100, 100 * down / scale) + "%";
+    $("groundMark").style.left = ground == null ? "-10px" : Math.min(100, 100 * ground / scale) + "%";
+    let gs = `<span class="pill dim">waiting</span>`;
+    if (s.down_ok === false) gs = `<span class="pill bad">ground sensor not working</span>`;
+    else if (ground == null) gs = `<span class="pill warn">learning the ground</span>`;
+    else if (down == null || down > ground + 150) gs = `<span class="pill bad">drop: ground fell away</span>`;
+    else if (down < ground - 120) gs = `<span class="pill warn">rise: step or kerb</span>`;
+    else gs = `<span class="pill ok">ground normal</span><span>within ±15 cm</span>`;
+    $("groundState").innerHTML = gs;
+
+    // spoken log, caption, hazard banner
+    const said = st.said || [];
+    if (said.length) {
+      $("log").innerHTML = said.slice().reverse().map((x) =>
+        `<li><time>${new Date(x.t * 1000).toTimeString().slice(0, 8)}</time><span class="k-${esc(x.kind)}">${esc(x.text)}</span></li>`).join("");
+      const last = said[said.length - 1];
+      const now = mode === "replay" ? replay.clockT : Date.now() / 1000;
+      const fresh = now - last.t < 4;
+      if (last.id !== lastSaidId) {
+        lastSaidId = last.id;
+        if (last.kind === "hazard" && fresh) {
+          $("banner").textContent = last.text;
+          $("banner").classList.add("show");
+          setTimeout(() => $("banner").classList.remove("show"), 3500);
+        }
+      }
+      $("captionKind").textContent = last.kind === "assistant" ? "Assistant" : last.kind === "hazard" ? "Warning" : "Cane says";
+      $("captionText").textContent = last.text;
+      $("caption").classList.toggle("show", fresh);
+    }
+    drawRadar(dets, fwd, v.hfov || 98.2);
+  }
+
+  // ---- radar: top view, cane at the bottom centre -----------------------
+  function drawRadar(dets, fwd, hfov) {
+    const c = $("radar"), g = c.getContext("2d");
+    const W = c.width, H = c.height, cx = W / 2, cy = H - 26, R = H - 50, maxM = 5;
+    const px = (mm) => R * Math.min(mm / 1000, maxM) / maxM;
+    g.clearRect(0, 0, W, H);
+    g.font = "22px IBM Plex Mono, monospace";
+    g.textAlign = "center";
+    // camera field of view
+    const half = hfov / 2 * Math.PI / 180;
+    g.fillStyle = "rgba(76, 201, 216, .07)";
+    g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, -Math.PI / 2 - half, -Math.PI / 2 + half); g.closePath(); g.fill();
+    // rings
+    g.strokeStyle = "#222b36"; g.lineWidth = 2; g.fillStyle = "#5b6674";
+    for (let r = 1; r <= maxM; r++) {
+      g.beginPath(); g.arc(cx, cy, R * r / maxM, Math.PI, 2 * Math.PI); g.stroke();
+      g.fillText(r + " m", cx + R * r / maxM - 22, cy + 22);
+    }
+    // ToF beam, 25 degree cone
+    const tofHalf = 12.5 * Math.PI / 180;
+    g.fillStyle = "rgba(245, 165, 36, .14)";
+    g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, px(2000), -Math.PI / 2 - tofHalf, -Math.PI / 2 + tofHalf); g.closePath(); g.fill();
+    if (fwd != null) {
+      g.strokeStyle = "#f5a524"; g.lineWidth = 4;
+      g.beginPath(); g.arc(cx, cy, px(fwd), -Math.PI / 2 - tofHalf, -Math.PI / 2 + tofHalf); g.stroke();
+    }
+    // objects
+    for (const d of dets) {
+      const t = tofFor(d, fwd);
+      const dist = t != null ? t : d.est_m != null ? d.est_m * 1000 : { close: 1000, near: 2500, far: 4200 }[d.near] || 3000;
+      const a = (d.bearing || 0) * Math.PI / 180;
+      const x = cx + px(dist) * Math.sin(a), y = cy - px(dist) * Math.cos(a);
+      const col = COLORS[d.kind] || COLORS.object;
+      g.beginPath(); g.arc(x, y, 11, 0, 2 * Math.PI);
+      if (t != null || d.est_m != null) { g.fillStyle = col; g.fill(); }
+      else { g.strokeStyle = col; g.lineWidth = 3; g.stroke(); }
+      g.fillStyle = "#e6ebf1"; g.fillText(d.label, x, y - 18);
+    }
+    // the cane
+    g.fillStyle = "#e6ebf1"; g.beginPath(); g.arc(cx, cy, 8, 0, 2 * Math.PI); g.fill();
+  }
+
+  // ---- live -------------------------------------------------------------
+  // Plain requests, not streams: tunnels such as Cloudflare's hold a
+  // long-lived stream back (measured: 0 bytes of /events in 6 s), but answer
+  // a single request at once. State is fetched 4 times a second and the
+  // picture on two staggered lanes, so a slow link still gets several frames.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function stopLive() { if (live) { live.stop = true; live = null; } }
+  function connectLive(base, token) {
+    stopReplay(); replay = null; stopLive();
+    const q = "?" + (token ? "token=" + encodeURIComponent(token) + "&" : "") + "n=";
+    const L = live = { stop: false, got: false, fails: 0, seq: 0, shown: 0, url: "" };
+    mode = "live";
+    setState("", "Connecting");
+    $("scrub").hidden = true;
+
+    function failed(why) {
+      L.fails++;
+      if (L.got) { if (L.fails >= 2) setState("", "Reconnecting"); return; }
+      setState("", "Cannot reach the cane");
+      $("connect").hidden = false;
+      $("connectNote").className = "note err";
+      $("connectNote").textContent = why === 403
+        ? "The cane answered but refused the token. Copy the whole link again, including ?token=."
+        : "No answer from that address. Check the cane is on, its tunnel is running and the address is the latest one (a quick tunnel changes address on every start).";
+    }
+
+    async function pollState() {
+      while (!L.stop) {
+        const t0 = performance.now();
+        try {
+          const r = await fetch(base + "/state.json" + q + Date.now(), { cache: "no-store" });
+          if (!r.ok) throw r.status;
+          const st = await r.json();
+          if (L.stop) return;
+          if (!L.got) { L.got = true; $("connectNote").className = "note"; $("connectNote").textContent = ""; }
+          L.fails = 0;
+          setState("live", "Live");
+          render(st);
+        } catch (e) {
+          if (L.stop) return;
+          failed(e);
+          await sleep(L.got ? 1000 : 3000);
+        }
+        await sleep(Math.max(0, 250 - (performance.now() - t0)));
       }
     }
-  }
-}
 
-const es = new EventSource("/events");
-es.onmessage = e => { try { render(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-es.onerror = () => $("live").classList.add("off");
+    async function pollFrames(lane) {
+      await sleep(lane * 160);
+      while (!L.stop) {
+        const t0 = performance.now(), seq = ++L.seq;
+        try {
+          const r = await fetch(base + "/frame.jpg" + q + Date.now() + lane, { cache: "no-store" });
+          if (r.ok) {
+            const blob = await r.blob();
+            if (!L.stop && seq > L.shown) {
+              L.shown = seq;
+              const old = L.url;
+              L.url = URL.createObjectURL(blob);
+              $("frame").src = L.url;
+              if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+            }
+          } else {
+            await sleep(500);   // 503 while the camera starts
+          }
+        } catch (e) {
+          await sleep(1000);
+        }
+        await sleep(Math.max(0, 330 - (performance.now() - t0)));
+      }
+    }
+
+    pollState();
+    pollFrames(0);
+    pollFrames(1);
+  }
+
+  // ---- replay -----------------------------------------------------------
+  function stopReplay() { if (replay && replay.timer) clearTimeout(replay.timer); }
+  async function startReplay() {
+    stopLive();
+    const r = await fetch("replay/replay.json").then((x) => x.ok ? x.json() : null).catch(() => null);
+    if (!r || !r.frames || !r.frames.length) { return false; }
+    mode = "replay";
+    replay = { data: r, i: 0, playing: true, timer: null, clockT: 0 };
+    setState("replay", "Recording " + (r.recorded || "").slice(0, 10));
+    $("scrub").hidden = false;
+    $("seek").max = r.frames.length - 1;
+    // Preload so playback does not stutter.
+    r.frames.forEach((f) => { const im = new Image(); im.src = "replay/" + f.img; });
+    // ?at=12 starts the recording 12 s in, so a link can point at a moment.
+    const at = Number(params.get("at"));
+    if (at > 0) replay.i = Math.max(0, r.frames.findIndex((f) => f.t >= at));
+    step();
+    return true;
+  }
+  function show(i) {
+    const f = replay.data.frames[i];
+    $("frame").src = "replay/" + f.img;
+    replay.clockT = f.state && f.state.t ? f.state.t : 0;
+    $("seek").value = i;
+    $("clock").textContent = f.t.toFixed(1) + " s";
+    render(f.state || {});
+  }
+  function step() {
+    if (!replay) return;
+    const fr = replay.data.frames;
+    show(replay.i);
+    if (!replay.playing) return;
+    const next = (replay.i + 1) % fr.length;
+    const wait = next === 0 ? 1500 : Math.max(60, (fr[next].t - fr[replay.i].t) * 1000);
+    replay.i = next;
+    replay.timer = setTimeout(step, wait);
+  }
+  $("playPause").addEventListener("click", () => {
+    if (!replay) return;
+    replay.playing = !replay.playing;
+    $("playPause").textContent = replay.playing ? "Pause" : "Play";
+    if (replay.playing) step(); else stopReplay();
+  });
+  $("seek").addEventListener("input", (e) => {
+    if (!replay) return;
+    stopReplay(); replay.playing = false; $("playPause").textContent = "Play";
+    replay.i = Number(e.target.value); show(replay.i);
+  });
+
+  // ---- start ------------------------------------------------------------
+  $("connect").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const base = $("cane").value.trim().replace(/\/+$/, "");
+    const token = $("token").value.trim();
+    if (!/^https?:\/\//.test(base)) {
+      $("connectNote").className = "note err";
+      $("connectNote").textContent = "Enter the full address, starting with https://";
+      return;
+    }
+    store.set("base", base); store.set("token", token);
+    connectLive(base, token);
+  });
+  $("playRec").addEventListener("click", () => startReplay());
+
+  async function boot() {
+    $("cane").value = params.get("cane") || store.get("base");
+    $("token").value = params.get("token") || store.get("token");
+    // 1. Opened with ?cane=... : connect to that cane.
+    if (params.get("cane")) return connectLive(params.get("cane").replace(/\/+$/, ""), params.get("token") || "");
+    // 2. Served by the cane itself: its /health answers on this origin.
+    const own = await fetch("health", { cache: "no-store" }).then((x) => x.ok && x.text()).catch(() => "");
+    if (own && own.trim() === "ok") return connectLive("", params.get("token") || "");
+    // 3. Anywhere else: show the connect form, and the recording if there is one.
+    $("connect").hidden = false;
+    const hasRec = await fetch("replay/replay.json", { method: "GET" }).then((x) => x.ok).catch(() => false);
+    $("playRec").hidden = !hasRec;
+    if (hasRec) startReplay(); else setState("", "Not connected");
+  }
+  boot();
+})();
 </script>
 </body>
 </html>
