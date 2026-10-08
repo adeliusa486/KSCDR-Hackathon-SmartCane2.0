@@ -1,5 +1,5 @@
 # Ultralytics dataset descriptor for merged_v2. Put images/ and the
-# unzipped labels/ next to this file.
+# unpacked labels/ (tar -xf labels_train.tar.xz) next to this file.
 path: .
 train: images/train
 val: images/val

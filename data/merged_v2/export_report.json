@@ -2,22 +2,22 @@
  "labels_train": {
   "files": 235951,
   "bytes": 87330039,
-  "zip_bytes": 28758688
+  "packed_bytes": 28758688
  },
  "labels_human_train": {
   "files": 235951,
   "bytes": 69006161,
-  "zip_bytes": 23302460
+  "packed_bytes": 23302460
  },
  "labels_val": {
   "files": 27906,
   "bytes": 10788784,
-  "zip_bytes": 3616604
+  "packed_bytes": 3616604
  },
  "labels_human_val": {
   "files": 27906,
   "bytes": 8622201,
-  "zip_bytes": 2952520
+  "packed_bytes": 2952520
  },
  "sources": {
   "train/coco": 35578,

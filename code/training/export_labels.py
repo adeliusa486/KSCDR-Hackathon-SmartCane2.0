@@ -95,7 +95,7 @@ def main():
             n, size = pack(src, z, f"{folder}/{split}", counts, images,
                            sources if key == "final" else None, key, split)
             report[f"{kind}_{split}"] = {"files": n, "bytes": size,
-                                         "zip_bytes": os.path.getsize(z)}
+                                         "packed_bytes": os.path.getsize(z)}
             print(f"{z}: {n} files, {size / 1e6:.1f} MB -> "
                   f"{os.path.getsize(z) / 1e6:.1f} MB", flush=True)
 
@@ -127,7 +127,7 @@ def main():
     # images are put.
     with open(os.path.join(args.out, "smartcane.yaml"), "w") as fh:
         fh.write("# Ultralytics dataset descriptor for merged_v2. Put images/ and the\n"
-                 "# unzipped labels/ next to this file.\n")
+                 "# unpacked labels/ (tar -xf labels_train.tar.xz) next to this file.\n")
         fh.write("path: .\ntrain: images/train\nval: images/val\nnames:\n")
         for i, n in enumerate(names):
             fh.write(f"  {i}: {n}\n")
