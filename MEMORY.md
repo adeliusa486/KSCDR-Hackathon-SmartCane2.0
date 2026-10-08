@@ -266,13 +266,23 @@ gets a shaky, low view. The "eyes" belong somewhere stable.
 ## 12. Working rules for this project
 
 - **Everything done in any chat gets written into this MEMORY.md file**, in the
-  folder `new smart cane 2.0`. New work goes under the Session log (section 14).
+  folder `D:\smart cane 2.0` (moved there from `E:\Work\new smart cane 2.0` on
+  8 Oct 2026). New work goes under the Session log (section 14).
+- **Everything for the project lives in `D:\smart cane 2.0`**: the git repo,
+  `datasets\` (merged_v2, runs, Hailo build files), `envs\` (training venv,
+  WSL distro with the Hailo compiler), `backups\` (SD image). Nothing anywhere
+  else (Adeel, 8 Oct 2026).
+- **Public repo**: https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0.
+  No AI co-author lines or credits in commits, PRs or files (Adeel, 8 Oct 2026).
 - Code lives in `code/`, step-by-step guides live in `docs/`.
 - Prices in USD, retail target in INR.
 
 ---
 
 ## 13. Repository layout
+
+Current layout: see the "Repository layout" section of README.md (8 Oct 2026).
+The tree below is the 2 Oct 2026 state, kept for history.
 
 ```
 new smart cane 2.0/
@@ -2314,6 +2324,97 @@ tomorrow, then test). Built offline, **not yet run on the Pi**:
   At the venue, Pi and laptop on the same phone hotspot (add its SSID to
   the Pi beforehand with nmcli).
 
+### 7 October 2026 (not logged at the time, reconstructed 8 Oct)
+
+The cane was assembled into the 3D-printed body. Code changed and deployed
+but never committed or logged: a second button on D32 (`J down/up`, reads
+text), `P` (raw button pins), and speak_detect.py keeping the ESP32, buttons
+and Bluetooth up while detect.py is restarted every 10 s. Firmware
+`build_2026-10-07` flashed. Committed on 8 Oct from the Pi's backup copies.
+Journal: boots at 20:29 to 21:30 all ended with a short press of the power
+button. Four of them had "vision stopped (exit 1)" with the reason hidden
+(stderr went to /dev/null). Power-bank attempts left no journal at all.
+
+### 8 October 2026: deep review, vision and link fixes, public repo, one project folder
+
+Adeel reported: only "person" detected (not tables, chairs), "person right"
+when he stood in front, ToF distances wrong, wants meters, ToF 2 misses
+drops, vibration nearly negligible, power bank (amber, red, off), and disk
+space (C: 260 to ~113 GB free, ~400 GB on D:/E:). Asked for a deep plan,
+fixes, a public repo and everything in one folder `D:\smart cane 2.0`.
+
+**Root causes found (measured, details in docs/results.md):**
+- **Serial link dead for whole sessions**: 3.5 h (7 Oct) and 10 h (8 Oct)
+  with no D line reaching the Pi while the ESP32 ran (its uptime proved no
+  reset). Kernel: `cp210x ttyUSB0: failed set request 0x12 status: -110`.
+  Reopening the port fixed it at once. So every spoken distance was the
+  camera's size word. **Fix:** esp32_link.py reopens after 3 s of silence,
+  looks the CP2102 up again by id, and keeps looking if absent at boot.
+- **Picamera2 "RGB888" = B,G,R bytes** (correlation -1.00 against the ISP
+  JPEG, +1.00 for "BGR888"). The model trained on RGB got swapped colours.
+- **16:9 squeezed 1.78x** into 640x640. Now 640x360 lores, letterboxed.
+- A/B on 408 photos cropped to 16:9 on the cane's Hailo: old path 40 %
+  named / 53 % noticed, new 55 % / 66 %. Camera turned 90 deg: 6 % / 13 %.
+- **FOV**: code assumed 120, sensor mode crop gives 98.2, so "ahead" was
+  +-6.7 deg. Now FOV from ScalerCrop, +-15 deg, or any box over the centre.
+- Orientation: lying on the floor the picture is 90 deg turned (that is what
+  the first snapshot showed). Held to walk it is upright: `--rotate 0`.
+- Model weakness, separate from the bugs: desk recall 0.27, cabinet 0.09,
+  curb mAP50 0.24, crosswalk 0.22, manhole 0.23 (per-class val today).
+- Vibration: far pulses 100 ms at 60 % never spun the coin motor up.
+
+**Deployed and verified on the cane (backups in ~/smartcane/backup_2026-10-08):**
+detect.py (letterbox, BGR888, --rotate, FOV, +-15 deg, distance estimate
+in m from box height for 60 classes, cross-class dedupe, upright snapshots,
+one input buffer), speak_detect.py (meters: "1.2 meters", camera "about 2.5
+meters"; ToF given to an object only if the camera estimate agrees within
+2x; per-object repeat timers, duplicates once; detect.py stderr to the
+journal; 3 s start-up grace; "Ground sensor cannot see the ground" after
+20 s; buzz floor B80,200), esp32_link.py, demo_view.py (portrait),
+tools/vision_probe.py, tools/hazard_eval.py (A/B options). Service: explicit
+`--rotate 0`, **dashboard off by default** (it took detect.py from ~12 % to
+73 % of a core). Tests 46/46 on the Pi. Dry run: "chair ahead, 1.3 meters"
+(ToF) and "chair right, about 2 meters" (camera).
+
+**Firmware 2026-10-08** flashed with `tools/flash_2026-10-08.sh` (verify
+running == build_2026-10-07, write, verify, boot report): 40 ms full-power
+kick per buzz, obstacle scale 80-100 % with 150 ms pulses, range-status
+filter (rejects 1, 2, 3, 6, 9), `C<tof>,<mm>` offset calibration, `F0/F1`,
+`Q0/Q1` raw stream, status counts and `fw=` in `S`. 1,514 + 1,515 readings
+all status 11. Boot to ready 0.40 s. Held to walk: ground learned 1,407 mm.
+
+**Lessons:** `pkill -f <pattern>` over SSH killed my own SSH session twice
+(the note from 2 Oct still applies: use `pgrep -f "[n]ame"` or an anchored
+pattern). Two copies of hazard_eval on the Hailo at once segfault. HailoRT
+segfaults in a native thread when the Hailo context closes, so tools must
+write results inside the `with Hailo` block. On this laptop one small file
+takes ~17 ms to open (56 files/s); 32 threads read 884 files/s.
+
+**Power bank:** amber then red = the Pi started and its power controller cut
+out, a 5 V dip at the boot peak. Fix in docs/power.md (USB-C PD 5V 3A+,
+short cable, or PD trigger 9 V + 5.1 V 5 A buck, or a 5 A UPS board).
+
+**Public repo** https://github.com/adeliusa486/KSCDR-Hackathon-SmartCane2.0,
+built in `D:\smart cane 2.0` from a clone of this repo. History rewritten to
+drop the AI co-author trailers (Adeel: no AI attribution in any
+commit) and a stock yolo11m.pt. Merged prep/phase3-150-classes (training
+pipeline), training scripts as run for v3, models (HEF identical to the cane
+by MD5, best.pt, ONNX), all merged_v2 labels as tar.xz, class and source
+counts, docs (README, hardware, software, training, objects, results, power,
+implementation plan), figures (sensor geometry, exploded view, cross-section,
+schematic), MIT licence, data licences (Vistas CC BY-NC-SA 4.0, MTSD research
+terms). Per-class validation: mAP50 0.535, mAP50-95 0.376.
+
+**Disk (one physical SSD, C:/D:/E: are partitions):** project data was
+D:\smartcane-data 425 GB (raw 168, merged_v1 88, merged_v2 88, MTSD/Vistas
+conversions 50, hardlinked to raw), E:\smartcane-data 75.5 GB (FiftyOne cache
+41, oiv7 export 33.5), repo backups 29.8 GB (SD image), WSL Ubuntu 27.9 GB,
+C:\ml\venv 5.5 GB, pip cache 4.2 GB, fiftyone 3.4 GB. Adeel chose: delete
+merged_v1, raw and the conversions, the OIV7 downloads, the training venv
+and the pip cache, move WSL to D:, everything else into `D:\smart cane 2.0`.
+The rest of C:'s growth is not this project (e.g. a 16.9 GB Kali VM in
+Downloads, 33 GB of Windows update files in C:\$WINDOWS.~BT).
+
 ---
 
-*Last updated: 6 October 2026*
+*Last updated: 8 October 2026*

@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" width="1240" height="860" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<title>Smart cane prototype, cross-section along the shaft</title>
+<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#9ca3af" stroke-width="2"/></pattern><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect width="1240" height="860" fill="#ffffff"/>
+<text x="30.0" y="40.0" font-size="22" font-weight="700" fill="#111827" text-anchor="start" >Cross-section A-A through the housing, along the shaft</text>
+<text x="30.0" y="64.0" font-size="14" font-weight="400" fill="#4b5563" text-anchor="start" >Shaft drawn horizontal, tip to the right. The top of the drawing faces forward when walking. Schematic, 2.4 px per mm.</text>
+<rect x="40" y="560" width="1160" height="38" rx="0" fill="#1f2937" stroke="#111827" stroke-width="0"/>
+<rect x="1150" y="560" width="50" height="38" rx="0" fill="#dc2626" stroke="#111827" stroke-width="0"/>
+<text x="1195.0" y="620.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="end" >toward the tip</text>
+<text x="45.0" y="620.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >toward the grip end</text>
+<rect x="60" y="478" width="288" height="82" rx="20" fill="url(#hatch)" stroke="#111827" stroke-width="2"/>
+<rect x="92" y="464" width="34" height="14" rx="4" fill="#111827" stroke="#111827" stroke-width="1.6"/>
+<rect x="152" y="464" width="34" height="14" rx="4" fill="#111827" stroke="#111827" stroke-width="1.6"/>
+<circle cx="250" cy="519" r="20" fill="#a78bfa" stroke="#111827" stroke-width="2"/>
+<path d="M360 560 L360 360 Q360 330 390 330 L900 330 L1000 450 L1000 560 Z" fill="url(#hatch)" fill-opacity="0.45" stroke="#111827" stroke-width="2.5"/>
+<path d="M368 552 L368 362 Q368 338 392 338 L896 338 L992 453 L992 552 Z" fill="#ffffff"/>
+<rect x="436" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="454" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="472" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="490" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="508" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="526" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="544" y="330" width="10" height="8" rx="0" fill="#ffffff" stroke="#111827" stroke-width="0"/>
+<rect x="380" y="513" width="336" height="38" rx="6" fill="#fde68a" stroke="#111827" stroke-width="2"/>
+<rect x="390" y="486" width="204" height="5" rx="0" fill="#22c55e" stroke="#111827" stroke-width="1.6"/>
+<rect x="420" y="462" width="144" height="24" rx="0" fill="#94a3b8" stroke="#111827" stroke-width="1.6"/>
+<rect x="396" y="448" width="7" height="38" rx="0" fill="#d1d5db" stroke="#111827" stroke-width="1"/>
+<rect x="581" y="448" width="7" height="38" rx="0" fill="#d1d5db" stroke="#111827" stroke-width="1"/>
+<rect x="390" y="443" width="156" height="5" rx="0" fill="#4ade80" stroke="#111827" stroke-width="1.6"/>
+<rect x="456" y="431" width="40" height="12" rx="0" fill="#111827" stroke="#111827" stroke-width="0"/>
+<rect x="620" y="486" width="122" height="5" rx="0" fill="#60a5fa" stroke="#111827" stroke-width="1.6"/>
+<rect x="612" y="482" width="14" height="12" rx="0" fill="#9ca3af" stroke="#111827" stroke-width="1"/>
+<g transform="rotate(-55 925 455)"><rect x="895" y="425" width="60" height="60" fill="#fca5a5" stroke="#111827" stroke-width="2"/><circle cx="955" cy="440" r="12" fill="#111827"/><rect x="953" y="460" width="10" height="16" fill="#f59e0b" stroke="#111827"/></g>
+<g transform="rotate(-15 955 528)"><rect x="933" y="518" width="44" height="20" fill="#f87171" stroke="#111827" stroke-width="2"/></g>
+<line x1="968" y1="410" x2="1066" y2="271" stroke="#d97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a)"/>
+<text x="940.0" y="250.0" font-size="14" font-weight="700" fill="#d97706" text-anchor="start" >camera + ToF 1: 55° from the shaft</text>
+<line x1="985" y1="520" x2="1178" y2="468" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a)"/>
+<text x="1010.0" y="452.0" font-size="14" font-weight="700" fill="#dc2626" text-anchor="start" >ToF 2: 15° from the shaft</text>
+<polyline points="905,482 905,505 600,505 594,491" fill="none" stroke="#db2777" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="612,488 600,488" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="380,532 372,532 372,489 390,489" fill="none" stroke="#ca8a04" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="742,486 820,486 895,455" fill="none" stroke="#0891b2" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="742,491 820,491 820,528 935,528" fill="none" stroke="#0891b2" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="660,486 660,350 376,350 376,519 270,519" fill="none" stroke="#9333ea" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="668,486 668,356 382,356 382,470 186,470" fill="none" stroke="#9333ea" stroke-width="2.4" stroke-linejoin="round"/>
+<line x1="139" y1="464" x2="139" y2="418" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="139" cy="464" r="3" fill="#6b7280"/>
+<circle cx="139" cy="418" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="139.0" y="423.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >1</text>
+<line x1="250" y1="499" x2="250" y2="438" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="250" cy="499" r="3" fill="#6b7280"/>
+<circle cx="250" cy="438" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="250.0" y="443.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >2</text>
+<line x1="476" y1="431" x2="440" y2="392" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="476" cy="431" r="3" fill="#6b7280"/>
+<circle cx="440" cy="392" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="440.0" y="397.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >3</text>
+<line x1="500" y1="462" x2="520" y2="392" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="500" cy="462" r="3" fill="#6b7280"/>
+<circle cx="520" cy="392" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="520.0" y="397.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >4</text>
+<line x1="560" y1="486" x2="600" y2="392" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="560" cy="486" r="3" fill="#6b7280"/>
+<circle cx="600" cy="392" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="600.0" y="397.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >5</text>
+<line x1="700" y1="486" x2="720" y2="420" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="700" cy="486" r="3" fill="#6b7280"/>
+<circle cx="720" cy="420" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="720.0" y="425.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >6</text>
+<circle cx="548" cy="532" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="548.0" y="537.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >7</text>
+<line x1="900" y1="430" x2="840" y2="392" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="900" cy="430" r="3" fill="#6b7280"/>
+<circle cx="840" cy="392" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="840.0" y="397.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >8</text>
+<line x1="955" y1="528" x2="900" y2="600" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="955" cy="528" r="3" fill="#6b7280"/>
+<circle cx="900" cy="600" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="900.0" y="605.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >9</text>
+<line x1="960" y1="405" x2="1040" y2="360" stroke="#6b7280" stroke-width="1.2"/>
+<circle cx="960" cy="405" r="3" fill="#6b7280"/>
+<circle cx="1040" cy="360" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="1040.0" y="365.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >10</text>
+<circle cx="300" cy="579" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+<text x="300.0" y="584.0" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" >11</text>
+<text x="60.0" y="672.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >1  Buttons: Assistant (GPIO33), Read text (GPIO32)</text>
+<text x="60.0" y="694.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >2  Vibration motor against the grip wall (GPIO13)</text>
+<text x="60.0" y="716.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >3  AI HAT+ with the Hailo-8L, on spacers</text>
+<text x="60.0" y="738.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >4  Active Cooler, fan under the vent slots</text>
+<text x="60.0" y="760.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >5  Raspberry Pi 5, 85 x 56 mm</text>
+<text x="60.0" y="782.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >6  ESP32 DevKit V1, safety controller</text>
+<text x="620.0" y="672.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >7  Power bank 10,000 mAh on the shaft clamp</text>
+<text x="620.0" y="694.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >8  Camera (IMX708, 120° M12 lens) + ToF 1, forward</text>
+<text x="620.0" y="716.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >9  ToF 2, down, 110 cm from the tip</text>
+<text x="620.0" y="738.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >10 Housing shell, 3D-printed</text>
+<text x="620.0" y="760.0" font-size="14" font-weight="400" fill="#111827" text-anchor="start" >11 Cane shaft</text>
+<line x1="60" y1="813" x2="88" y2="813" stroke="#db2777" stroke-width="3"/>
+<text x="96.0" y="818.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >CSI ribbon: camera to CAM0</text>
+<line x1="450" y1="813" x2="478" y2="813" stroke="#2563eb" stroke-width="3"/>
+<text x="486.0" y="818.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >USB: ESP32 to Pi (power, serial, flashing)</text>
+<line x1="840" y1="813" x2="868" y2="813" stroke="#ca8a04" stroke-width="3"/>
+<text x="876.0" y="818.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >USB-C: power bank to Pi</text>
+<line x1="60" y1="837" x2="88" y2="837" stroke="#0891b2" stroke-width="3"/>
+<text x="96.0" y="842.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >I2C + XSHUT: ESP32 to each ToF, one bus each</text>
+<line x1="450" y1="837" x2="478" y2="837" stroke="#9333ea" stroke-width="3"/>
+<text x="486.0" y="842.0" font-size="13" font-weight="400" fill="#4b5563" text-anchor="start" >Motor and button wires to the grip</text>
+</svg>

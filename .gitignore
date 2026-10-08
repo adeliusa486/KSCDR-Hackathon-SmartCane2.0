@@ -7,3 +7,12 @@ backups/
 *.img
 *.img.gz
 *.img.xz
+
+# D:\smart cane 2.0 is both the git repository and the project's home on disk.
+# These folders hold the large local data and environments, never committed:
+# datasets/: images + labels of merged_v2, training runs, Hailo build files
+# envs/: Python environments, the WSL distro with the Hailo compiler
+datasets/
+envs/
+*.har
+.pytest_cache/
