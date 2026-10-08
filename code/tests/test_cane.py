@@ -32,7 +32,9 @@ import speak_detect as sd                           # noqa: E402
 
 LABELS = os.path.join(os.path.dirname(HERE), "smartcane152.txt")
 if not os.path.exists(LABELS):
-    LABELS = r"D:\smartcane-data\hailo\smartcane152.txt"
+    # In the repository the label file sits with the model.
+    LABELS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "models",
+                          "smartcane152_v3", "smartcane152.txt")
 
 # What a blind pedestrian must hear by name. Losing any of these to
 # "obstacle" removes the reason the model was retrained.
