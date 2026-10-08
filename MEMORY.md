@@ -2485,6 +2485,40 @@ supplies a new image (prompt given to him).
 cane (his decision), docs/hardware.md and software.md still hold the full
 assembly and setup steps, re-record the demo, earbud mic test.
 
+### 8 October 2026 (16:30 to 16:45): "the live dashboard sticks on the chair"
+
+Adeel: the live dashboard stays on the chair and does not move when the cane
+moves. **Cause: the page was not connected to the cane at all.** It was
+playing the 30 s chair recording (web/replay, 15:31) in a loop, the
+website's fallback when no cane answers. Proof: the cane touches
+/dev/shm/cane_view.jpg.watch on every dashboard request, and its last touch
+was 16:20:57 (the earlier session's own test). No request for 12 minutes.
+No tunnel was running, and the https website cannot reach the cane's
+http://...:8080 on the LAN (browsers block that). The cane itself was fine:
+frames advancing about 4 a second, boxes moving. The only label was the small
+amber "Recording 2026-10-08" pill, easy to read as live.
+
+**Fix in code/demo_dashboard.html:** the recording says "Recording from
+<date time>, not live" on the picture and in the pill, with a note to connect.
+Opening the page tries the last saved cane address first (/health, 4 s) and
+plays the recording only if it does not answer. Connect live clears the
+recording's picture and panels. A cane that stops answering greys the picture
+with "Lost the cane. This picture is frozen until it answers again."
+Tested in headless Chrome with a fake cane (recording, connect, picture
+changes, lost, back, reopen with saved cane, reopen with cane off: all as
+expected) and against the real cane on the LAN (Live, 10.6 fps, picture
+changed 5 times in 3 s). Copied to the cane (old page in
+~/smartcane/backup_2026-10-08b). The server reads the page per request, so no
+restart.
+
+**To watch live:** same Wi-Fi: http://192.168.3.51:8080/?token=<token>
+(token in ~/.config/smartcane/demo_token on the Pi). Anywhere else: run
+tools/go_live.sh on the Pi and open the link it prints.
+
+Noted, not changed: the model calls the plain wall "bathtub" at 0.6 to 0.8
+in this room. (`systemctl is-active smartcane` says inactive because it is a
+user service: use `systemctl --user`. It was active since 15:57.)
+
 ---
 
 *Last updated: 8 October 2026*

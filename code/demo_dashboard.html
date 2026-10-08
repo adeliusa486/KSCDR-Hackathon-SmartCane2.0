@@ -66,6 +66,11 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; pa
 .video img:not([src]) { visibility: hidden; }
 .video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); text-align: center;
                 padding: 20px; font-size: 15px; }
+/* A frozen picture must never pass for live: grey it and say why. */
+.video.stale img { filter: grayscale(1) brightness(.4); }
+.video.stale .empty { color: var(--fg); font-weight: 600; }
+.rec { position: absolute; left: 12px; top: 12px; padding: 7px 10px; border-radius: 6px; background: var(--warn);
+       color: #1d1300; font: 600 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; }
 .banner { position: absolute; left: 0; right: 0; top: 0; padding: 12px 18px; background: var(--bad); color: #fff;
           font-weight: 700; font-size: 20px; letter-spacing: .3px; transform: translateY(-110%); transition: transform .25s; }
 .banner.show { transform: none; }
@@ -149,6 +154,7 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     <div class="video" id="video">
       <img id="frame" alt="Live camera view of the cane with detected objects outlined">
       <div class="empty" id="empty">Waiting for the camera</div>
+      <div class="rec" id="rec" hidden>Recording, not live</div>
       <div class="banner" id="banner">Drop ahead</div>
       <div class="caption" id="caption"><small id="captionKind">Cane says</small><span id="captionText"></span></div>
     </div>
@@ -223,6 +229,13 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     $("state").className = "state " + kind;
     $("stateText").textContent = text;
   }
+  // Text over the picture, or null for a clear live picture. With text, the
+  // last picture stays visible but greyed, so it cannot be taken for live.
+  function freeze(text) {
+    $("video").classList.toggle("stale", !!text);
+    $("empty").hidden = !text;
+    if (text) $("empty").textContent = text;
+  }
 
   // Same rule as speak_detect.tof_measures(): the ToF reading belongs to an
   // object ahead only if the camera's own estimate agrees within 2x.
@@ -244,8 +257,8 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     $("temp").textContent = st.temp != null ? Number(st.temp).toFixed(0) : "–";
     $("uptime").textContent = fmtUp(st.uptime);
     $("model").textContent = st.classes ? `${st.classes} classes` : "–";
-    $("empty").hidden = mode === "replay" || (st.vision_age != null && st.vision_age < 3);
-    if (!$("empty").hidden) $("empty").textContent = st.vision_age >= 3 ? "Camera paused or starting" : "Waiting for the camera";
+    if (mode === "replay" || (st.vision_age != null && st.vision_age < 3)) freeze(null);
+    else freeze(st.vision_age >= 3 ? "Camera paused or starting" : "Waiting for the camera");
 
     // zones
     for (const z of ["left", "ahead", "right"]) {
@@ -387,10 +400,26 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     mode = "live";
     setState("", "Connecting");
     $("scrub").hidden = true;
+    // Drop whatever the recording left on screen: until the cane answers,
+    // nothing here may look like its camera.
+    $("rec").hidden = true;
+    $("frame").removeAttribute("src");
+    $("caption").classList.remove("show");
+    $("log").innerHTML = '<li><time></time><span style="color:var(--dim)">Nothing yet</span></li>';
+    lastSaidId = 0;
+    render({});
+    freeze("Connecting to the cane");
 
     function failed(why) {
       L.fails++;
-      if (L.got) { if (L.fails >= 2) setState("", "Reconnecting"); return; }
+      if (L.got) {
+        if (L.fails >= 2) {
+          setState("", "Reconnecting");
+          freeze("Lost the cane. This picture is frozen until it answers again.");
+        }
+        return;
+      }
+      freeze("Not connected to a cane");
       setState("", "Cannot reach the cane");
       $("connect").hidden = false;
       $("connectNote").className = "note err";
@@ -458,7 +487,17 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     if (!r || !r.frames || !r.frames.length) { return false; }
     mode = "replay";
     replay = { data: r, i: 0, playing: true, timer: null, clockT: 0 };
-    setState("replay", "Recording " + (r.recorded || "").slice(0, 10));
+    // Say on the picture itself that this is not the cane in your hand.
+    const when = new Date(r.recorded || "");
+    const at0 = isNaN(when) ? "" : " from " + when.toLocaleString(undefined,
+      { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    setState("replay", "Recording, not live");
+    $("rec").textContent = "Recording" + at0 + ", not live";
+    $("rec").hidden = false;
+    freeze(null);
+    $("connect").hidden = false;
+    $("connectNote").className = "note";
+    $("connectNote").textContent = "This is a recording, so it does not follow the cane. To watch the cane live, enter the address and token the cane gave when it went online, then press Connect live.";
     $("scrub").hidden = false;
     $("seek").max = r.frames.length - 1;
     // Preload so playback does not stutter.
@@ -514,6 +553,20 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
   });
   $("playRec").addEventListener("click", () => startReplay());
 
+  // True if a cane's /health answers "ok" within 4 s. Quick tunnels change
+  // address on every start, so a saved address is often dead.
+  async function answers(base) {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), 4000);
+    try {
+      const r = await fetch(base + "/health", { cache: "no-store", signal: ac.signal });
+      return r.ok && (await r.text()).trim() === "ok";
+    } catch (e) {
+      return false;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   async function boot() {
     $("cane").value = params.get("cane") || store.get("base");
     $("token").value = params.get("token") || store.get("token");
@@ -522,7 +575,13 @@ footer { color: var(--faint); font-size: 12px; padding-top: 14px; }
     // 2. Served by the cane itself: its /health answers on this origin.
     const own = await fetch("health", { cache: "no-store" }).then((x) => x.ok && x.text()).catch(() => "");
     if (own && own.trim() === "ok") return connectLive("", params.get("token") || "");
-    // 3. Anywhere else: show the connect form, and the recording if there is one.
+    // 3. The cane connected from this browser before and still answers there.
+    const saved = store.get("base");
+    if (saved) {
+      setState("", "Looking for the cane");
+      if (await answers(saved)) return connectLive(saved, store.get("token"));
+    }
+    // 4. Anywhere else: show the connect form, and the recording if there is one.
     $("connect").hidden = false;
     const hasRec = await fetch("replay/replay.json", { method: "GET" }).then((x) => x.ok).catch(() => false);
     $("playRec").hidden = !hasRec;
