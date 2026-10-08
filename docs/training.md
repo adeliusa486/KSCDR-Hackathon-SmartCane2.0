@@ -23,7 +23,18 @@ Sources, merged into one YOLO dataset by `code/training/build_dataset.py` with t
 | [Mapillary Traffic Sign Dataset](https://www.mapillary.com/dataset/trafficsign) (`convert_mtsd.py`) | Traffic sign types, stop signs | Free for research, commercial use needs a licence from Mapillary |
 | 20 [Roboflow Universe](https://universe.roboflow.com) projects (`roboflow_sources.yaml`, `roboflow_fetch.py`) | Assistive-navigation sets: pedestrian signals, crosswalk buttons, ATMs, wet floor signs, potholes, open holes and others | 19 CC BY 4.0, 1 Public Domain, recorded per project in `roboflow_sources.yaml` |
 
-Images per source are counted in `data/merged_v2/source_counts.csv`.
+Images per source (from `data/merged_v2/source_counts.csv`, which also splits the 20 Roboflow projects):
+
+| Source | Train | Validation | Total |
+|---|---|---|---|
+| Open Images V7 | 107,712 | 13,422 | 121,134 |
+| Roboflow (20 projects) | 48,154 | 4,569 | 52,723 |
+| COCO 2017 | 35,578 | 4,422 | 40,000 |
+| Mapillary Traffic Sign Dataset | 26,733 | 3,267 | 30,000 |
+| Mapillary Vistas v2 | 17,774 | 2,226 | 20,000 |
+| **Total** | **235,951** | **27,906** | **263,857** |
+
+The training split has 2,168,416 labelled boxes.
 
 ### Pseudo-labelling and cleaning
 

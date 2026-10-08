@@ -1,0 +1,158 @@
+# Ultralytics dataset descriptor for merged_v2. Put images/ and the
+# unzipped labels/ next to this file.
+path: .
+train: images/train
+val: images/val
+names:
+  0: person
+  1: child
+  2: cyclist
+  3: motorcyclist
+  4: wheelchair
+  5: stroller
+  6: dog
+  7: cat
+  8: bird
+  9: horse
+  10: cow
+  11: sheep
+  12: goat
+  13: camel
+  14: car
+  15: bus
+  16: truck
+  17: van
+  18: taxi
+  19: ambulance
+  20: motorcycle
+  21: bicycle
+  22: e-scooter
+  23: skateboard
+  24: train
+  25: golf cart
+  26: shopping cart
+  27: trailer
+  28: traffic light
+  29: pedestrian signal
+  30: crosswalk button
+  31: stop sign
+  32: traffic sign
+  33: crosswalk
+  34: street light
+  35: utility pole
+  36: pole
+  37: yield sign
+  38: do not enter sign
+  39: one way sign
+  40: pedestrian crossing sign
+  41: speed limit sign
+  42: construction sign
+  43: sidewalk closed sign
+  44: bus stop sign
+  45: exit sign
+  46: wet floor sign
+  47: fire hydrant
+  48: parking meter
+  49: bench
+  50: trash can
+  51: bike rack
+  52: mailbox
+  53: utility box
+  54: billboard
+  55: fountain
+  56: potted plant
+  57: barrel
+  58: traffic cone
+  59: bollard
+  60: sidewalk sign
+  61: kiosk
+  62: barrier
+  63: fence
+  64: ladder
+  65: tent
+  66: sculpture
+  67: pillar
+  68: curb
+  69: curb ramp
+  70: stairs
+  71: escalator
+  72: ramp
+  73: pothole
+  74: manhole
+  75: storm drain
+  76: sidewalk crack
+  77: speed bump
+  78: rail track
+  79: tactile paving
+  80: open hole
+  81: swimming pool
+  82: door
+  83: door handle
+  84: window
+  85: building
+  86: elevator
+  87: atm
+  88: tree
+  89: palm tree
+  90: plant
+  91: backpack
+  92: handbag
+  93: suitcase
+  94: umbrella
+  95: bottle
+  96: cup
+  97: box
+  98: plastic bag
+  99: tire
+  100: ball
+  101: cell phone
+  102: glasses
+  103: book
+  104: can
+  105: toy
+  106: chair
+  107: couch
+  108: bed
+  109: table
+  110: desk
+  111: coffee table
+  112: nightstand
+  113: chest of drawers
+  114: wardrobe
+  115: toilet
+  116: sink
+  117: tv
+  118: laptop
+  119: refrigerator
+  120: microwave
+  121: oven
+  122: stove
+  123: washing machine
+  124: bathtub
+  125: shower
+  126: shelf
+  127: bookcase
+  128: stool
+  129: mirror
+  130: curtain
+  131: cabinet
+  132: countertop
+  133: lamp
+  134: ceiling fan
+  135: pillow
+  136: clock
+  137: keyboard
+  138: mouse
+  139: remote
+  140: scissors
+  141: knife
+  142: fork
+  143: spoon
+  144: bowl
+  145: plate
+  146: kettle
+  147: toothbrush
+  148: towel
+  149: banana
+  150: apple
+  151: orange
