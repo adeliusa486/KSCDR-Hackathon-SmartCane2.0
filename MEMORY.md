@@ -2415,6 +2415,21 @@ and the pip cache, move WSL to D:, everything else into `D:\smart cane 2.0`.
 The rest of C:'s growth is not this project (e.g. a 16.9 GB Kali VM in
 Downloads, 33 GB of Windows update files in C:\$WINDOWS.~BT).
 
+**Cleanup done (after the labels were pushed):** deleted merged_v1, raw,
+mtsd_yolo, vistas_yolo, E:\smartcane-data, C:\Users\adeel\fiftyone,
+C:\ml\venv, pip cache. WSL Ubuntu moved to `envs\wsl-ubuntu` (`wsl --manage
+--move` moved the vhdx and then failed with E_ACCESSDENIED, registration
+fixed by hand in HKCU Lxss BasePath, backup `envs\wsl-ubuntu-registry-backup.reg`,
+tested: starts, ~/hailo_dfc 6.2 GB). The distro also holds Adeel's other
+projects. D:\smartcane-data is now `datasets\` (merged_v2.yaml path
+updated), SD image in `backups\` (sha256 verified), DFC wheel in `envs\`,
+C:\ml leftovers in `datasets\from_c_ml` (a few KB of read-only .git files
+stay in C:\ml\smartcane). Free space: C: 113 -> 157 GB, D: 531 -> 730 GB,
+E: 175 -> 281 GB. The training venv must be recreated in `envs\venv`
+(docs/training.md) before the next training run.
+`E:\Work\new smart cane 2.0` is now a stale copy without backups: delete it
+after VS Code is reopened at `D:\smart cane 2.0`.
+
 ---
 
 *Last updated: 8 October 2026*
