@@ -2519,6 +2519,14 @@ Noted, not changed: the model calls the plain wall "bathtub" at 0.6 to 0.8
 in this room. (`systemctl is-active smartcane` says inactive because it is a
 user service: use `systemctl --user`. It was active since 15:57.)
 
+18:09: Adeel said it was still the same picture. Again no request had reached
+the cane since 16:39 (the camera itself showed his desk room, live), so his
+browser was still on a page that cannot reach the cane. Opened
+http://192.168.3.51:8080/?token=... in his default browser from the laptop:
+the watch file was then touched every second and frames advanced ~3.5 a
+second. Lesson: on the same Wi-Fi, always give Adeel the cane's own link with
+the token, not the website.
+
 ---
 
 *Last updated: 8 October 2026*
