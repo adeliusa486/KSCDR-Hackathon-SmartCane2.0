@@ -38,10 +38,12 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/state.jso
   exit 1
 fi
 
-LOG=$(mktemp)
+# Kept after the demo for diagnosis (one tunnel per file, overwritten next time).
+LOG=$HOME/.cache/smartcane/cloudflared.log
+mkdir -p "$(dirname "$LOG")"
 cloudflared tunnel --no-autoupdate --url "http://localhost:$PORT" > "$LOG" 2>&1 &
 PID=$!
-trap 'kill $PID 2>/dev/null; rm -f "$LOG"; echo; echo "Tunnel closed. The dashboard is no longer public."' EXIT INT TERM
+trap 'kill $PID 2>/dev/null; echo; echo "Tunnel closed. The dashboard is no longer public."' EXIT INT TERM
 
 URL=""
 for _ in $(seq 1 40); do
@@ -59,7 +61,7 @@ fi
 # tunnel answers from outside (Cloudflare's resolver as a fallback check).
 echo "Tunnel $URL opened, waiting for it to come online..."
 ONLINE=""
-for _ in $(seq 1 30); do
+for _ in $(seq 1 45); do
   if curl -sf -m 5 "$URL/health" >/dev/null 2>&1 \
      || curl -sf -m 5 --doh-url https://1.1.1.1/dns-query "$URL/health" >/dev/null 2>&1; then
     ONLINE=1
@@ -67,7 +69,10 @@ for _ in $(seq 1 30); do
   fi
   sleep 2
 done
-[ -z "$ONLINE" ] && echo "Not answering yet after 60 s. Try the links in a minute."
+if [ -z "$ONLINE" ]; then
+  echo "Not answering yet after 90 s. Try the links in a minute. cloudflared says:"
+  grep -E "ERR|WRN" "$LOG" | tail -3
+fi
 
 echo
 echo "Live dashboard, direct:   $URL/?token=$TOKEN"
