@@ -566,6 +566,11 @@ class SensorWatch:
     # so the cane no longer says "distance sensors not responding" at every
     # start just because the first reading has not arrived yet.
     STARTUP_GRACE_S = 3.0
+    # Silence that counts as a dead link. Esp32Link reopens the port after 3 s
+    # of silence and the readings were back within 1 to 10 s every time on
+    # 8 Oct 2026, so a spoken warning at 2 s only announced stalls that heal
+    # themselves. The ESP32 keeps vibrating on its own meanwhile.
+    SILENT_WARN_S = 6.0
     # Ground sensor working but no ground learned for this long: it cannot
     # reach the ground (aimed too far ahead, dark asphalt) and no drop will
     # ever be reported. Before 8 Oct 2026 that state was silent.
@@ -595,7 +600,7 @@ class SensorWatch:
             time.sleep(0.2)
             if time.time() - self.started < self.STARTUP_GRACE_S:
                 continue
-            if not self.link.alive(within=2.0):
+            if not self.link.alive(within=self.SILENT_WARN_S):
                 if was_alive:
                     print("  ESP32 LINK SILENT", file=sys.stderr)
                 was_alive = False

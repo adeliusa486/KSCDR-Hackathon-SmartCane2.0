@@ -326,7 +326,7 @@ class Esp32Serial(unittest.TestCase):
         try:
             w = sd.SensorWatch(self.link, s, 1000, stop)
             threading.Thread(target=w.run, daemon=True).start()
-            time.sleep(3.6)                        # no D lines, past start-up grace
+            time.sleep(9.6)                        # no D lines: grace 3 s + 6 s silence
             stop.set()
             self.assertIn("Warning, distance sensors not responding", s.heard)
         finally:
