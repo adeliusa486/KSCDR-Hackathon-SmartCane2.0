@@ -48,6 +48,18 @@ def main():
                          "SGD measured faster on the laptop: MuSGD's step took ~30%% of "
                          "the CPU-bound main process (py-spy, 3 Oct 2026)")
     ap.add_argument("--resume", action="store_true")
+    # Fine-tune controls (4 Oct 2026). The v2 run fell from mAP50 0.40 to 0.22
+    # once warm-up ended at lr0 0.01, so the v3 run restarts from the best
+    # checkpoint with a lower, cosine-decaying rate and a hard time budget.
+    ap.add_argument("--lr0", type=float, default=0.01)
+    ap.add_argument("--lrf", type=float, default=0.01)
+    ap.add_argument("--cos-lr", action="store_true")
+    ap.add_argument("--warmup-epochs", type=float, default=3.0)
+    ap.add_argument("--close-mosaic", type=int, default=10)
+    ap.add_argument("--patience", type=int, default=25)
+    ap.add_argument("--time", type=float, default=None,
+                    help="hours. Ultralytics fits the run (and its LR schedule) "
+                         "into this budget, overriding --epochs")
     ap.add_argument("--export", action="store_true",
                     help="skip training, just export existing weights to ONNX")
     ap.add_argument("--weights", default="",
@@ -96,9 +108,14 @@ def main():
             scale=0.5,
             fliplr=0.5,
             mosaic=1.0,
-            close_mosaic=10,   # last 10 epochs without mosaic, steadier boxes
+            close_mosaic=args.close_mosaic,   # last 10 epochs without mosaic, steadier boxes
             hsv_v=0.5,         # Indian sunlight to deep shade is a huge range
-            patience=25,
+            patience=args.patience,
+            lr0=args.lr0,
+            lrf=args.lrf,
+            cos_lr=args.cos_lr,
+            warmup_epochs=args.warmup_epochs,
+            time=args.time,
             amp=True,
         )
         weights = f"runs/detect/{args.name}/weights/best.pt"
