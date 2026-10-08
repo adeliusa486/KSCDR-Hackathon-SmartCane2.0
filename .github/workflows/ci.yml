@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.11"          # same as Raspberry Pi OS Bookworm
       - name: Install test dependencies
-        run: pip install numpy pillow pyserial pytest flake8 pyyaml
+        run: pip install numpy pillow pyserial pytest flake8 pyyaml opencv-python-headless
       - name: Syntax errors and undefined names
         run: flake8 code docs web --count --select=E9,F63,F7,F82 --show-source --statistics
       - name: Cane tests (camera, Hailo, ESP32 and audio simulated)
