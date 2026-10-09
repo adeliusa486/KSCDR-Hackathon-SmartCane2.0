@@ -63,4 +63,4 @@ jobs:
       - name: Build
         run: python web/build.py
       - name: Check the pages exist
-        run: test -s web/_site/index.html && test -s web/_site/live.html
+        run: test -s web/_site/index.html && test -s web/_site/live.html && test -s web/_site/admin.html

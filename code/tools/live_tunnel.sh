@@ -76,21 +76,45 @@ for _ in $(seq 1 60); do
 done
 # The website checks the address answers before using it, so posting one
 # that is still slow to resolve does no harm.
-echo "${ONLINE:+online}${ONLINE:-not answering yet} at $URL"
+if [ -n "$ONLINE" ]; then echo "online at $URL"; else echo "not answering yet at $URL"; fi
+
+# The time to sign with. The Pi has no clock battery: until NTP answers, its
+# clock is the moment it was last switched off (17 h behind on 9 Oct 2026),
+# and the website ignores a post signed more than 13 h ago. NTP took 87 and
+# 130 s after power-on that day, the tunnel only 31 and 45 s, and waiting for
+# NTP left the website on the examples for two minutes. So until NTP has
+# synced, take the time from the relay's own HTTPS answer (its Date header,
+# equal to the synced clock to the second), and post at once.
+clock_ok() {
+  [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] \
+    || [ -e /run/systemd/timesync/synchronized ]
+}
+relay_time() {
+  local d
+  d=$(curl -sI -m 5 "$RELAY" | tr -d '\r' | sed -n 's/^[Dd]ate: //p' | head -1)
+  [ -n "$d" ] && date -d "$d" +%s
+}
 
 MSG=$(mktemp)
 trap 'kill $PID 2>/dev/null; rm -f "$MSG"' EXIT INT TERM
 post() {
-  local sig
+  local sig ts clock=ntp
+  if clock_ok; then
+    ts=$(date +%s)
+  else
+    clock=relay
+    ts=$(relay_time) || { echo "no trusted time yet, not posting"; return 1; }
+  fi
   # From a file: openssl pkeyutl -rawin signs nothing when read from a pipe
   # (an empty signature on 8 Oct 2026).
-  printf '%s' "$URL $(date +%s)" > "$MSG"
+  printf '%s' "$URL $ts" > "$MSG"
   sig=$(openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$MSG" | base64 -w0)
   if [ ${#sig} -ne 88 ]; then
     echo "signing failed, not posting"
     return 1
   fi
-  curl -sf -m 10 -d "$(cat "$MSG") $sig" "$RELAY/$TOPIC" >/dev/null
+  curl -sf -m 10 -d "$(cat "$MSG") $sig" "$RELAY/$TOPIC" >/dev/null || return 1
+  echo "posted, signed $(date -d "@$ts" '+%F %T') ($clock time)"
 }
 
 while kill -0 $PID 2>/dev/null; do

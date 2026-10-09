@@ -73,10 +73,14 @@ class Esp32Link:
         self.down_mm = None            # distance to the ground
         self.ground_mm = None          # learned normal ground distance
         self.fwd_ok = self.down_ok = False
-        self.last_data = 0.0           # last D line
-        self.last_line = time.time()   # last line of any kind, or the open
+        # Intervals use time.monotonic(). The Pi has no clock battery: it
+        # starts at the time it was switched off and jumps when NTP answers
+        # (17 h on 9 Oct 2026), which time.time() counted as 17 h of silence:
+        # a port reopen and a spoken "distance sensors not responding".
+        self.last_data = float("-inf")  # last D line
+        self.last_line = time.monotonic()  # last line of any kind, or the open
         self.reopens = 0
-        self._last_reopen = time.time()
+        self._last_reopen = time.monotonic()
         self._stop = False
         self._thread = threading.Thread(target=self._reader, daemon=True)
         self._thread.start()
@@ -90,7 +94,7 @@ class Esp32Link:
         return ser
 
     def _reopen(self, why):
-        now = time.time()
+        now = time.monotonic()
         if now - self._last_reopen < self.REOPEN_EVERY_S:
             return
         self._last_reopen = now
@@ -103,7 +107,7 @@ class Esp32Link:
                 pass
             try:
                 self.ser = self._open()
-                self.last_line = time.time()
+                self.last_line = time.monotonic()
             except (serial.SerialException, OSError) as e:
                 print(f"  ESP32 reopen failed: {e}")
 
@@ -122,7 +126,7 @@ class Esp32Link:
                 time.sleep(0.5)
                 self._reopen("port error")
                 continue
-            if time.time() - self.last_line > self.SILENT_REOPEN_S:
+            if time.monotonic() - self.last_line > self.SILENT_REOPEN_S:
                 buf = b""
                 self._reopen(f"silent for {self.SILENT_REOPEN_S:g} s")
                 continue
@@ -131,7 +135,7 @@ class Esp32Link:
                 line = raw.decode(errors="replace").strip()
                 if not line:
                     continue
-                self.last_line = time.time()
+                self.last_line = time.monotonic()
                 if line.startswith("D "):
                     self._parse_data(line)
                 elif line.startswith("H ") and self.on_hazard:
@@ -158,13 +162,13 @@ class Esp32Link:
             mm = lambda v: None if int(v) < 0 else int(v)
             self.fwd_mm, self.down_mm, self.ground_mm = mm(fwd), mm(down), mm(base)
             self.fwd_ok, self.down_ok = fok == "1", dok == "1"
-            self.last_data = time.time()
+            self.last_data = time.monotonic()
         except ValueError:
             pass
 
     def alive(self, within=0.5):
         """False if the ESP32 has gone quiet, which must never be silent."""
-        return time.time() - self.last_data < within
+        return time.monotonic() - self.last_data < within
 
     def send(self, cmd):
         with self._lock:

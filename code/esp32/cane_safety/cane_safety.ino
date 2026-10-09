@@ -52,7 +52,7 @@
 #include <VL53L0X.h>
 #include <Preferences.h>
 
-const char *FW_VERSION = "2026-10-08b";
+const char *FW_VERSION = "2026-10-08c";
 
 const int PIN_SDA1 = 21, PIN_SCL1 = 22, PIN_XSHUT1 = 26;
 const int PIN_SDA2 = 18, PIN_SCL2 = 19, PIN_XSHUT2 = 27;
@@ -98,7 +98,8 @@ const uint32_t BLOCKED_RELEARN_MS = 5000;  // same, for "something in the beam"
 const uint32_t PREV_BASE_MS = 10000;  // going back to the ground known before a
                                       // relearn, within this long, is silent
 const uint32_t HAZARD_HOLDOFF_MS = 2500;
-const uint32_t HAZARD_MS = 500;    // ground alarm: ONE long hard pulse (Adeel, 3 Oct)
+const uint32_t HAZARD_MS = 700;    // ground alarm: ONE long hard pulse (Adeel, 3 Oct),
+                                   // 500 ms until 8 Oct 2026 ("make it strong")
 const float BASE_ALPHA = 0.05;     // how fast the baseline follows slow drift
 
 const uint32_t STALE_MS = 300;     // no new reading for this long = sensor dead
@@ -177,9 +178,11 @@ void motor(int dutyPct) {
 }
 
 // Obstacle feel is parking-sensor style, from the forward sensor (ToF 1) only:
-// the nearer, the stronger and faster, on a smooth scale from FAR_MM (80 %
-// duty, 150 ms on / 600 ms off) to CLOSE_MM, then a solid buzz. It was three
-// fixed steps until 3 Oct 2026, and 60 % / 100 ms at the far end until 8 Oct.
+// always full power, the nearer the faster, on a smooth scale from FAR_MM
+// (250 ms on / 700 ms off) to CLOSE_MM, then a solid buzz. It was three fixed
+// steps until 3 Oct 2026, 60 % / 100 ms at the far end until fw 2026-10-08,
+// and 80-100 % with 150 ms pulses until fw 2026-10-08c, which Adeel felt as
+// "very low" once the motor was in the cane body (8 Oct 2026).
 // The ground alarm is deliberately different, one long hard pulse, so a hole
 // never feels like "something in front of you".
 void updateMotor(uint32_t now) {
@@ -194,9 +197,9 @@ void updateMotor(uint32_t now) {
   if (mm < CLOSE_MM) { motor(100); return; }
 
   float c = float(FAR_MM - mm) / (FAR_MM - CLOSE_MM);   // 0 far .. 1 close
-  int duty = 80 + int(20 * c);
-  int onMs = 150;
-  int offMs = 60 + int(540 * (1 - c));
+  int duty = 100;
+  int onMs = 250;
+  int offMs = 100 + int(600 * (1 - c));
   motor((now % (onMs + offMs)) < (uint32_t)onMs ? duty : 0);
 }
 

@@ -1,0 +1,26 @@
+// OmniWalk - let the cane's service save and join Wi-Fi networks without sudo.
+//
+// wifi_qr.py adds the network from a scanned Wi-Fi QR code with nmcli. The
+// service runs as pi with no login session, so NetworkManager refuses it
+// ("Insufficient privileges"). Through sudo it works, but sudo logs every
+// command line to the journal, password included. This rule allows only the
+// Wi-Fi actions, only for pi, who already has sudo, so nothing new is opened.
+//
+// The number matters: polkit takes the first rule that answers, and
+// 49-polkit-pkla-compat applies Raspberry Pi OS's NetworkManager.pkla, which
+// says no to settings.modify.system for anyone without an active login
+// session (ResultInactive=no), so a 50- rule never ran (9 Oct 2026).
+//
+// Install:  sudo install -m 644 10-omniwalk-wifi.rules /etc/polkit-1/rules.d/
+// (polkitd reads the folder by itself, no restart needed)
+// wifi.share.*: the setup hotspot (wifi_hotspot.py) shares the connection.
+polkit.addRule(function (action, subject) {
+  if (subject.user == "pi" &&
+      (action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+       action.id == "org.freedesktop.NetworkManager.network-control" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.share.open" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.share.protected")) {
+    return polkit.Result.YES;
+  }
+});

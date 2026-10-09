@@ -1,0 +1,21 @@
+[Unit]
+# Smart cane - the setup hotspot "OmniWalk-Setup" when no known Wi-Fi is in
+# reach (wifi_hotspot.py). Join it with a phone, then open
+# http://10.42.0.1:8080/admin to choose a network (admin password needed).
+#
+# Install:  cp smartcane-hotspot.service ~/.config/systemd/user/
+#           systemctl --user daemon-reload
+#           systemctl --user enable --now smartcane-hotspot
+# Off:      systemctl --user disable --now smartcane-hotspot
+Description=Smart cane setup hotspot when no known Wi-Fi is in reach
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u /home/pi/smartcane/wifi_hotspot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

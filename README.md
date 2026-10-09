@@ -55,9 +55,10 @@ Working prototype built for the KSCDR Hackathon, tested indoors and on the bench
 
 **[adeliusa486.github.io/OmniWalk/live.html](https://adeliusa486.github.io/OmniWalk/live.html)** works in any browser, on any network:
 
-- **Cane on:** about 1.5 minutes after power-on the page shows the cane's camera live, with its own boxes, each object's bearing and distance, the forward ToF reading next to the camera's estimate, the ground sensor and everything the cane says. Nothing to type: the cane goes online by itself and the page finds it.
+- **Cane on:** about a minute after power-on the page shows the cane's camera live, with its own boxes, each object's bearing and distance, the forward ToF reading next to the camera's estimate, the ground sensor and everything the cane says. Nothing to type: the cane goes online by itself and the page finds it.
 - **Cane off:** the page shows the same model on street photos from Saudi Arabia, and switches to live without a reload as soon as the cane comes on. [`live.html?example`](https://adeliusa486.github.io/OmniWalk/live.html?example) shows the examples at any time.
 - **Same Wi-Fi as the cane:** `http://smartcane.local:8080` is the cane's own page, at the full camera rate.
+- **Owner:** [admin.html](https://adeliusa486.github.io/OmniWalk/admin.html) ("Owner login" on the website). After logging in: the live view, the cane's Wi-Fi (join, forget) and Bluetooth (scan, pair, choose the earbuds). The password is checked on the cane itself. At a new place without Wi-Fi the cane opens its own network, **OmniWalk-Setup**, with the same page at `http://10.42.0.1:8080/admin`.
 
 | | Measured 8 October 2026 |
 |---|---|
@@ -129,6 +130,7 @@ One push button on the handle (ESP32 pin D33) runs the assistant. The cane check
 |---|---|---|
 | **Short** | "Looking", then a description of the scene. One buzz, then it listens 5 s on the earbud microphone. Ask anything, for example "read the sign", and it answers from a fresh photo | Says at once what the cane's own detector sees, then reads any text with Tesseract |
 | **Hold 1 s** (a short buzz says you can let go) | "Reading", then the text word for word | Tesseract reads the text on the cane |
+| **Hold 1 s facing a Wi-Fi QR code** | Saves that Wi-Fi and joins it, then says "Connected to" and its name | The same, no internet needed |
 
 ## Hardware
 
@@ -209,10 +211,18 @@ code/
   demo_server.py         live dashboard server (state, frames, optional token)
   demo_view.py           draws the cane's boxes on the camera frame, only while watched
   demo_dashboard.html    the dashboard page, also the website's live.html
+  admin_dashboard.html   the owner's page (website admin.html): login, live view, Wi-Fi, Bluetooth
+  admin_api.py           its API on the cane: password, sessions, browser checks
+  wifi_net.py            Wi-Fi through NetworkManager: scan, join, forget, setup hotspot
+  wifi_qr.py             joins a Wi-Fi network from a QR code held up to the camera
+  wifi_hotspot.py        opens the OmniWalk-Setup hotspot when no known Wi-Fi is in reach
+  bt_admin.py            Bluetooth: paired devices, scan, pair, the earbuds the cane speaks through
   esp32/cane_safety/     ESP32 firmware: sensors, ground watch, vibration, button
   smartcane.service      systemd user service that starts the cane at boot
   smartcane-live.service puts the dashboard online at every boot (tools/live_tunnel.sh)
-  tests/                 64 simulation tests, no hardware needed
+  smartcane-hotspot.service runs wifi_hotspot.py
+  10-omniwalk-wifi.rules lets the cane manage Wi-Fi without sudo (polkit)
+  tests/                 99 simulation tests, no hardware needed
   tools/                 live_tunnel.sh, photo_demo.py, record_demo.py, probes, evaluation, verified flashing, backups
   training/              dataset build, pseudo-labelling, training, validation, label export
 models/smartcane152_v3/  HEF for the Hailo-8L, PyTorch weights, ONNX, class names
@@ -227,7 +237,7 @@ MEMORY.md                engineering log, every session since 19 September 2026
 ## Quality: tests and CI/CD
 
 ```bash
-cd ~/smartcane && python3 -m unittest tests/test_cane.py    # on the cane: 64 tests
+cd ~/smartcane && python3 -m unittest tests/test_cane.py    # on the cane: 99 tests
 python -m pytest code/tests/test_cane.py -q                  # on a PC: 58 pass, 6 need a Linux pty
 ```
 
@@ -235,7 +245,7 @@ The tests simulate blind-user scenarios without a camera, Hailo, ESP32 or audio:
 
 | Workflow | Runs on | What it does |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | Every push and pull request | flake8 for syntax errors and undefined names, all 64 tests, the training-pipeline tests, an ESP32 firmware compile with the exact core and library versions on the cane, and a website build |
+| [`ci.yml`](.github/workflows/ci.yml) | Every push and pull request | flake8 for syntax errors and undefined names, all 99 tests, the training-pipeline tests, an ESP32 firmware compile with the exact core and library versions on the cane, and a website build |
 | [`pages.yml`](.github/workflows/pages.yml) | Every push to `main` that touches the website, docs or dashboard | Builds the website with `web/build.py` and deploys it to GitHub Pages |
 
 ## Troubleshooting
@@ -248,7 +258,8 @@ The tests simulate blind-user scenarios without a camera, Hailo, ESP32 or audio:
 | The vibration is weak | Mount the motor against the grip wall where the hand presses. Test with `python3 esp32_link.py --send B100,1000` |
 | The Pi LED turns red and it switches off | The power bank cannot hold 5 V under load. See [docs/power.md](docs/power.md) |
 | No speech | `pactl info \| grep "Default Sink"` shows `auto_null`: the earbuds are disconnected. Run `bluetoothctl connect <address>` |
-| The live page shows the street examples although the cane is on | It is not online yet: allow about 1.5 minutes after power-on, and check it has Wi-Fi with internet. On the cane: `systemctl --user status smartcane-live` |
+| The live page shows the street examples although the cane is on | It is not online yet: allow about 1 minute after power-on (the page goes live by itself), and check it has Wi-Fi with internet. On the cane: `systemctl --user status smartcane-live` |
+| It does not join Wi-Fi from a QR code | Hold the code steady, filling more of the view. A code on a laptop screen or printed large reads best. "Code not readable" means it saw a code but could not decode it |
 
 ## Limitations
 

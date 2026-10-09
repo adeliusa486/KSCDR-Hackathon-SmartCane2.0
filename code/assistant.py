@@ -13,6 +13,8 @@ Short press   AI assistant.
 Long press    Read text straight away, word for word (a short buzz at 1 s says
 (1 s or more) "you can let go"). Gemini online, Tesseract offline, and
               Tesseract also when Gemini fails.
+              With a Wi-Fi QR code in view (a phone's "share Wi-Fi" code), it
+              saves and joins that network instead (wifi_qr.py).
 
 Presses while it is answering are ignored. A "press" longer than 15 s is a
 stuck or latched switch and is ignored too.
@@ -346,6 +348,8 @@ class Assistant:
         self.busy = threading.Lock()
         self.listening = threading.Event()
         self.stop_listening = threading.Event()
+        import wifi_qr
+        threading.Thread(target=wifi_qr.warm_up, daemon=True).start()
 
     # ---- button ---------------------------------------------------------
 
@@ -405,7 +409,8 @@ class Assistant:
                 return
             print(f"  ASSISTANT {mode}, {'online' if net else 'offline'}")
             if mode == "read":
-                self._read(key if net else "", jpeg)
+                if not self._wifi_code(jpeg):
+                    self._read(key if net else "", jpeg)
             elif net:
                 self._assist_online(key, jpeg)
             else:
@@ -427,6 +432,29 @@ class Assistant:
                     raise
                 self.speak("Still looking")
                 time.sleep(2)
+
+    def _wifi_code(self, jpeg):
+        """A Wi-Fi QR code in view: save and join that network, and return
+        True. Otherwise False, and the long press reads text as before. A code
+        that is seen but not readable gets up to 3 more photos (the user may
+        still be steadying it). Without OpenCV nothing changes."""
+        import wifi_qr
+        found, state = wifi_qr.look(jpeg)
+        for _ in range(3):
+            if state != "unreadable":
+                break
+            more = self.snapshot()
+            if more:
+                found, state = wifi_qr.look(more)
+        if found is None:
+            if state == "unreadable":
+                print("  ASSISTANT saw a QR code but could not decode it")
+                self.speak("Code not readable")
+            return False
+        print(f"  ASSISTANT Wi-Fi code for {found['ssid']!r}")
+        self.speak(f"Wi-Fi code. Network {found['ssid']}. Joining")
+        self.speak(wifi_qr.join(found))
+        return True
 
     def _read(self, key, jpeg):
         self.speak("Reading")

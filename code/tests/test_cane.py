@@ -185,9 +185,9 @@ class Distance(unittest.TestCase):
         _, b = sd.with_tof(["chair left, near 3.4m"], None)
         self.assertEqual(a, b)
 
-    def test_buzz_stronger_when_closer(self):
-        self.assertEqual(sd.tof_buzz(2000), "B80,200")
-        self.assertEqual(sd.tof_buzz(300), "B100,450")
+    def test_buzz_full_power_and_longer_when_closer(self):
+        self.assertEqual(sd.tof_buzz(2000), "B100,300")
+        self.assertEqual(sd.tof_buzz(300), "B100,500")
         self.assertEqual(sd.sync_buzz(["car left, far"], 500), sd.LIGHT_BUZZ)
         self.assertIsNone(sd.sync_buzz([], 500))
 
@@ -328,10 +328,26 @@ class Esp32Serial(unittest.TestCase):
         stop = threading.Event()
         try:
             w = sd.SensorWatch(self.link, s, 1000, stop)
+            w.STARTUP_GRACE_S = 3.0                # the real 20 s would slow the test
             threading.Thread(target=w.run, daemon=True).start()
             time.sleep(9.6)                        # no D lines: grace 3 s + 6 s silence
             stop.set()
             self.assertIn("Warning, distance sensors not responding", s.heard)
+        finally:
+            s._restore()
+
+    def test_start_up_stall_is_not_announced(self):
+        # Every start on 8 and 9 Oct 2026: no data for ~10 s after power-on.
+        s = speaker()
+        stop = threading.Event()
+        try:
+            w = sd.SensorWatch(self.link, s, 1000, stop)
+            threading.Thread(target=w.run, daemon=True).start()
+            time.sleep(9.0)                        # silent, like the first open
+            for _ in range(5):
+                self.feed("D 1000 640 1350 1 1 1300")
+            stop.set()
+            self.assertNotIn("Warning, distance sensors not responding", s.heard)
         finally:
             s._restore()
 
@@ -355,6 +371,17 @@ class Esp32Serial(unittest.TestCase):
         self.link.REOPEN_EVERY_S = 0.5
         time.sleep(1.5)                            # nothing arrives
         self.assertGreaterEqual(self.link.reopens, 1)
+
+    def test_clock_jump_is_not_silence(self):
+        # 9 Oct 2026: NTP moved the clock 17 h forward after a cold start and
+        # the cane said "distance sensors not responding" with both working.
+        from unittest import mock
+        self.feed("D 1000 640 1350 1 1 1300")
+        later = time.time() + 17 * 3600
+        with mock.patch("time.time", return_value=later):
+            self.assertTrue(self.link.alive(within=6))
+            time.sleep(0.5)
+        self.assertEqual(self.link.reopens, 0)
         self.feed("D 1000 640 1350 1 1 1300")      # and it still reads after
         self.assertEqual(self.link.fwd_mm, 640)
 
@@ -813,6 +840,450 @@ class DemoDashboard(unittest.TestCase):
         self.assertTrue(b > 200 and r < 50 and g < 50, (r, g, b))
         os.remove(view)
         os.remove(os.path.splitext(view)[0] + ".json")
+
+
+class WifiQr(unittest.TestCase):
+    """Joining Wi-Fi from a phone's QR code: parsing, decoding a real QR
+    image, the nmcli calls (faked), and the long press that triggers it."""
+
+    def setUp(self):
+        import wifi_qr
+        self.w = wifi_qr
+
+    def qr_jpeg(self, text, module_px=6, size=(1280, 720)):
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            self.skipTest("OpenCV not installed")
+        if not hasattr(cv2, "QRCodeEncoder"):
+            self.skipTest("this OpenCV cannot draw QR codes")
+        code = cv2.QRCodeEncoder.create().encode(text)
+        code = cv2.resize(code, None, fx=module_px, fy=module_px,
+                          interpolation=cv2.INTER_NEAREST)
+        canvas = np.full((size[1], size[0]), 200, np.uint8)
+        y, x = (size[1] - code.shape[0]) // 2, (size[0] - code.shape[1]) // 2
+        canvas[y:y + code.shape[0], x:x + code.shape[1]] = code
+        return cv2.imencode(".jpg", canvas)[1].tobytes()
+
+    # -- the QR text --
+
+    def test_parse_android_code(self):
+        self.assertEqual(self.w.parse_wifi("WIFI:S:Home Net;T:WPA;P:secret 1;H:false;;"),
+                         {"ssid": "Home Net", "password": "secret 1",
+                          "security": "wpa", "hidden": False})
+
+    def test_parse_escapes_and_order(self):
+        n = self.w.parse_wifi(r'WIFI:P:a\;b\:c\\d;T:SAE;S:Caf\;e;H:true;;')
+        self.assertEqual((n["ssid"], n["password"], n["security"], n["hidden"]),
+                         ("Caf;e", "a;b:c\\d", "sae", True))
+
+    def test_parse_kinds(self):
+        p = self.w.parse_wifi
+        self.assertEqual(p("WIFI:S:Free;T:nopass;;")["security"], "open")
+        self.assertEqual(p("WIFI:S:Free;;")["security"], "open")
+        self.assertEqual(p("WIFI:S:Old;T:WEP;P:abcde;;")["security"], "wep")
+        self.assertEqual(p("WIFI:S:Work;T:WPA2-EAP;E:PEAP;I:me;P:x;;")["security"], "enterprise")
+        self.assertEqual(p('WIFI:S:"Quoted";T:WPA;P:"pw";;')["ssid"], "Quoted")
+        self.assertIsNone(p("https://example.com"))
+        self.assertIsNone(p("WIFI:T:WPA;P:x;;"))           # no network name
+
+    # -- the photo --
+
+    def test_wifi_code_is_read_from_a_photo(self):
+        net, state = self.w.look(self.qr_jpeg("WIFI:S:Test Net;T:WPA;P:pa:ss;;"))
+        self.assertEqual(state, "wifi")
+        self.assertEqual((net["ssid"], net["password"]), ("Test Net", "pa:ss"))
+
+    def test_small_code_is_enlarged_until_it_reads(self):
+        net, state = self.w.look(self.qr_jpeg("WIFI:S:Far;T:WPA;P:secret;;", module_px=2))
+        self.assertEqual((state, net and net["ssid"]), ("wifi", "Far"))
+
+    def test_other_codes_and_no_code(self):
+        import cv2
+        import numpy as np
+        self.assertEqual(self.w.look(self.qr_jpeg("https://example.com"))[1], "other")
+        blank = cv2.imencode(".jpg", np.full((720, 1280), 200, np.uint8))[1].tobytes()
+        self.assertEqual(self.w.look(blank)[1], "none")
+        self.assertEqual(self.w.look(b"\xff\xd8not a jpeg")[1], "none")
+
+    # -- nmcli (faked) --
+
+    def fake_nmcli(self, profiles=(), ssids=None, visible=("Cafe",), active=None,
+                   up_rc=0, up_err=""):
+        calls = []
+        ssids = ssids or {}
+
+        class R:
+            def __init__(self, rc=0, out="", err=""):
+                self.returncode, self.stdout, self.stderr = rc, out, err
+
+        def run(cmd, **kw):
+            calls.append(cmd)
+            a = cmd[1:]
+            if a[:5] == ["-t", "-f", "NAME,TYPE", "connection", "show"]:
+                return R(out="".join(f"{p}:802-11-wireless\n" for p in profiles) + "lo:loopback\n")
+            if a[:2] == ["-g", "802-11-wireless.ssid"]:
+                return R(out=ssids.get(a[-1], "") + "\n")
+            if a[:2] == ["-t", "-f"] and "wifi" in a:
+                return R(out="".join(f"{'yes' if s == active else 'no'}:{s}:70:WPA2\n" for s in visible))
+            if "up" in a:
+                return R(rc=up_rc, err=up_err)
+            return R()
+        return run, calls
+
+    def net(self, **kw):
+        n = {"ssid": "Cafe", "password": "hunter22", "security": "wpa", "hidden": False}
+        n.update(kw)
+        return n
+
+    def test_new_network_is_saved_and_joined(self):
+        run, calls = self.fake_nmcli()
+        self.assertEqual(self.w.join(self.net(), run=run), "Connected to Cafe.")
+        add = next(c for c in calls if "add" in c)
+        self.assertEqual(add[0], "nmcli")                  # never through sudo
+        self.assertIn("hunter22", add)
+        self.assertIn("wpa-psk", add)
+        self.assertTrue(any("up" in c for c in calls))
+
+    def test_saved_network_gets_the_new_password(self):
+        run, calls = self.fake_nmcli(profiles=["preconfigured"], ssids={"preconfigured": "Cafe"})
+        self.w.join(self.net(), run=run)
+        self.assertFalse(any("add" in c for c in calls))
+        mod = next(c for c in calls if "modify" in c)
+        self.assertIn("preconfigured", mod)
+        self.assertIn("hunter22", mod)
+
+    def test_out_of_range_is_saved_without_dropping_wifi(self):
+        run, calls = self.fake_nmcli(visible=("Home",))
+        said = self.w.join(self.net(), run=run)
+        self.assertIn("not in range", said)
+        self.assertFalse(any("up" in c for c in calls))
+
+    def test_already_connected_is_not_rejoined(self):
+        run, calls = self.fake_nmcli(active="Cafe")
+        self.assertIn("Already connected", self.w.join(self.net(), run=run))
+        self.assertFalse(any("up" in c for c in calls))
+
+    def test_wrong_password_is_said(self):
+        run, _ = self.fake_nmcli(up_rc=4, up_err="Error: Secrets were required, but not provided.")
+        self.assertIn("did not accept the password", self.w.join(self.net(), run=run))
+
+    def test_enterprise_is_refused_without_nmcli(self):
+        run, calls = self.fake_nmcli()
+        self.assertIn("user name", self.w.join(self.net(security="enterprise"), run=run))
+        self.assertEqual(calls, [])
+
+    def test_password_is_never_printed(self):
+        import contextlib
+        import io
+        out = io.StringIO()
+        run, _ = self.fake_nmcli(up_rc=4, up_err="Error: Connection activation failed.")
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            said = self.w.join(self.net(), run=run)
+        self.assertNotIn("hunter22", out.getvalue() + said)
+
+    # -- the button --
+
+    def test_long_press_on_a_wifi_code_joins_instead_of_reading(self):
+        jpeg = self.qr_jpeg("WIFI:S:Cafe;T:WPA;P:hunter22;;")
+        said, joined = [], []
+        a = assistant.Assistant(lambda: jpeg, lambda: "", said.append, "00:00:00:00:00:00",
+                                mic=object(), is_online=lambda: False)
+        orig = (self.w.join, assistant.load_key, assistant.ocr_offline)
+        self.w.join = lambda n: joined.append(n["ssid"]) or "Connected to Cafe."
+        assistant.load_key = lambda: ""
+        assistant.ocr_offline = lambda j: "SHOULD NOT READ"
+        try:
+            a._handle("read")
+        finally:
+            self.w.join, assistant.load_key, assistant.ocr_offline = orig
+        self.assertEqual(joined, ["Cafe"])
+        self.assertEqual(said, ["Wi-Fi code. Network Cafe. Joining", "Connected to Cafe."])
+        self.assertNotIn("hunter22", " ".join(said))
+
+
+class AdminPage(unittest.TestCase):
+    """The owner's page: password on the cane, sessions, browser checks, and
+    the Wi-Fi and Bluetooth actions (faked), plus the real HTTP server."""
+
+    SITE = {"Host": "abc-def.trycloudflare.com", "Origin": "https://adeliusa486.github.io",
+            "Cf-Connecting-Ip": "203.0.113.9"}
+    HOME = {"Host": "192.168.3.51:8080", "Origin": "http://192.168.3.51:8080"}
+
+    def setUp(self):
+        import tempfile
+        import types
+        import admin_api
+        import bt_admin
+        import wifi_net
+        self.dir = tempfile.mkdtemp()
+        self.calls, self.said, self.ears, self.later = [], [], [], []
+        calls = self.calls
+        self.plan = "join"
+        wifi = types.SimpleNamespace(
+            HOTSPOT="OmniWalk-Setup",
+            device_status=lambda: {"connected": True, "connection": "preconfigured",
+                                   "ip": "192.168.3.51"},
+            networks=lambda: [{"ssid": "Cafe", "signal": 70, "security": "WPA2", "active": False}],
+            wifi_profiles=lambda: [("preconfigured", "Home")],
+            security_from_scan=wifi_net.security_from_scan,
+            save=lambda net: calls.append(("save", net["ssid"], net["security"])) or net["ssid"],
+            plan=lambda net: self.plan,
+            activate=lambda name, ssid: calls.append(("up", name)) or ("connected", f"Connected to {ssid}."),
+            forget=lambda name: (True, f"Removed {name}."))
+        bt = types.SimpleNamespace(
+            valid_mac=bt_admin.valid_mac,
+            paired=lambda: [{"mac": "AA:BB:CC:DD:EE:FF", "name": "Buds", "icon": "audio-headset",
+                             "paired": True, "connected": True, "earbuds": True}],
+            earbuds=lambda: "AA:BB:CC:DD:EE:FF",
+            scan=lambda seconds: [{"mac": "11:22:33:44:55:66", "name": "New buds", "icon": "audio-headset"}],
+            pair=lambda mac: calls.append(("pair", mac)) or (True, "Paired and connected."),
+            connect=lambda mac: (True, "Connected."),
+            forget=lambda mac: (False, "The cane speaks through this device."),
+            save_earbuds=lambda mac: calls.append(("save_earbuds", mac)))
+        self.api = admin_api.AdminAPI(password_file=os.path.join(self.dir, "pw"),
+                                      say=self.said.append, set_earbuds=self.ears.append,
+                                      wifi=wifi, bt=bt, background=self.later.append)
+
+    def call(self, path, body=None, headers=None, ip="127.0.0.1", session=None):
+        import json
+        h = dict(headers or self.SITE)
+        if session:
+            h["Authorization"] = "Bearer " + session
+        method = "GET" if body is None else "POST"
+        return self.api.handle(method, "/admin/api/" + path, h,
+                               b"" if body is None else json.dumps(body).encode(), ip)
+
+    def logged_in(self):
+        code, r = self.call("setup", {"password": "correct horse"}, self.HOME, "192.168.3.13")
+        self.assertEqual(code, 200, r)
+        return r["session"]
+
+    # -- password and sessions --
+
+    def test_first_password_only_from_the_home_network(self):
+        self.assertEqual(self.call("setup", {"password": "correct horse"})[0], 403)   # tunnel
+        self.assertEqual(self.call("setup", {"password": "correct horse"}, self.HOME,
+                                   "203.0.113.5")[0], 403)                           # not private
+        self.assertEqual(self.call("status")[1]["password_set"], False)
+        self.logged_in()
+        self.assertEqual(self.call("setup", {"password": "another one"}, self.HOME,
+                                   "192.168.3.13")[0], 409)
+
+    def test_short_password_is_refused(self):
+        self.assertEqual(self.call("setup", {"password": "short"}, self.HOME, "192.168.3.13")[0], 400)
+
+    def test_password_file_holds_no_password(self):
+        self.logged_in()
+        with open(os.path.join(self.dir, "pw")) as fh:
+            self.assertNotIn("correct horse", fh.read())
+        if os.name == "posix":
+            self.assertEqual(os.stat(os.path.join(self.dir, "pw")).st_mode & 0o777, 0o600)
+
+    def test_login_logout_and_wrong_passwords(self):
+        self.logged_in()
+        self.assertEqual(self.call("login", {"password": "wrong one!"})[0], 401)
+        code, r = self.call("login", {"password": "correct horse"})
+        self.assertEqual(code, 200)
+        s = r["session"]
+        self.assertTrue(self.call("status", session=s)[1]["logged_in"])
+        self.assertEqual(self.call("logout", {}, session=s)[0], 200)
+        self.assertEqual(self.call("wifi", session=s)[0], 401)
+
+    def test_five_wrong_passwords_pause_logins(self):
+        self.logged_in()
+        for _ in range(5):
+            self.call("login", {"password": "wrong one!"})
+        self.assertEqual(self.call("login", {"password": "correct horse"})[0], 429)
+
+    def test_changing_the_password_logs_others_out(self):
+        s1 = self.logged_in()
+        s2 = self.call("login", {"password": "correct horse"})[1]["session"]
+        self.assertEqual(self.call("password", {"old": "nope nope", "new": "brand new pw"}, session=s1)[0], 401)
+        self.assertEqual(self.call("password", {"old": "correct horse", "new": "brand new pw"}, session=s1)[0], 200)
+        self.assertEqual(self.call("wifi", session=s2)[0], 401)
+        self.assertEqual(self.call("wifi", session=s1)[0], 200)
+        self.assertEqual(self.call("login", {"password": "brand new pw"})[0], 200)
+
+    def test_nothing_changes_without_login(self):
+        self.logged_in()
+        for path, body in (("wifi", None), ("wifi/join", {"ssid": "x"}), ("bt", None),
+                           ("bt/pair", {"mac": "11:22:33:44:55:66"})):
+            self.assertEqual(self.call(path, body)[0], 401, path)
+        self.assertEqual(self.calls, [])
+
+    # -- browser checks --
+
+    def test_other_sites_and_rebinding_are_refused(self):
+        s = self.logged_in()
+        evil = dict(self.SITE, Origin="https://evil.example")
+        self.assertEqual(self.call("wifi", headers=evil, session=s)[0], 403)
+        rebound = {"Host": "evil.example:8080", "Origin": "http://evil.example:8080"}
+        self.assertEqual(self.call("setup", {"password": "correct horse"}, rebound, "192.168.3.13")[0], 403)
+        self.assertEqual(self.api.cors_headers(evil), {})
+        self.assertEqual(self.api.cors_headers(self.SITE)["Access-Control-Allow-Origin"],
+                         "https://adeliusa486.github.io")
+
+    # -- Wi-Fi --
+
+    def test_join_answers_first_then_switches(self):
+        s = self.logged_in()
+        code, r = self.call("wifi/join", {"ssid": "Cafe", "password": "hunter22", "security": "WPA2"},
+                            session=s)
+        self.assertEqual((code, r["code"]), (200, "joining"))
+        self.assertEqual(self.calls, [("save", "Cafe", "wpa")])          # not joined yet
+        self.later[0]()                                                   # the background part
+        self.assertEqual(self.calls[-1], ("up", "Cafe"))
+        self.assertEqual(self.said, ["Connected to Cafe."])
+        self.assertNotIn("hunter22", str(r))
+
+    def test_join_out_of_range_or_already_on_it(self):
+        s = self.logged_in()
+        self.plan = "away"
+        self.assertEqual(self.call("wifi/join", {"ssid": "Cafe", "password": "hunter22"},
+                                   session=s)[1]["code"], "away")
+        self.plan = "already"
+        self.assertEqual(self.call("wifi/join", {"ssid": "Cafe", "password": "hunter22"},
+                                   session=s)[1]["code"], "already")
+        self.assertEqual(self.later, [])
+
+    def test_join_checks_its_input(self):
+        s = self.logged_in()
+        self.assertEqual(self.call("wifi/join", {"ssid": "", "password": "hunter22"}, session=s)[0], 400)
+        self.assertEqual(self.call("wifi/join", {"ssid": "Cafe", "password": "short",
+                                                 "security": "WPA2"}, session=s)[0], 400)
+        r = self.call("wifi/join", {"ssid": "Work", "password": "x" * 9,
+                                    "security": "WPA2 802.1X"}, session=s)[1]
+        self.assertEqual(r["code"], "enterprise")
+        self.call("wifi/join", {"ssid": "Free", "password": "", "security": "--"}, session=s)
+        self.assertEqual(self.calls[-1], ("save", "Free", "open"))
+
+    def test_wifi_status_marks_saved_networks(self):
+        s = self.logged_in()
+        w = self.call("wifi", session=s)[1]
+        self.assertEqual((w["connection"], w["ssid"]), ("preconfigured", "Home"))
+        self.assertEqual(w["networks"][0]["saved"], False)
+        self.assertEqual(w["saved"], [{"name": "preconfigured", "ssid": "Home", "active": True}])
+
+    # -- Bluetooth --
+
+    def test_pairing_makes_it_the_earbuds(self):
+        s = self.logged_in()
+        r = self.call("bt/pair", {"mac": "11:22:33:44:55:66"}, session=s)[1]
+        self.assertTrue(r["ok"])
+        self.assertIn(("save_earbuds", "11:22:33:44:55:66"), self.calls)
+        self.assertEqual(self.ears, ["11:22:33:44:55:66"])
+
+    def test_bad_address_and_forgetting_the_earbuds(self):
+        s = self.logged_in()
+        self.assertEqual(self.call("bt/pair", {"mac": "not-a-mac"}, session=s)[0], 400)
+        self.assertFalse(self.call("bt/forget", {"mac": "AA:BB:CC:DD:EE:FF"}, session=s)[1]["ok"])
+
+    # -- the real server --
+
+    def test_server_serves_page_preflight_and_api(self):
+        import json
+        import socket
+        import urllib.error
+        import urllib.request
+        import demo_server
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        d = demo_server.DemoServer(port, os.path.join(assistant.SHM, "nothing.jpg"),
+                                   host="127.0.0.1", admin=self.api)
+        httpd = d.start()
+        try:
+            url = f"http://127.0.0.1:{port}"
+            self.assertIn("OmniWalk Admin", urllib.request.urlopen(url + "/admin").read().decode())
+            site = {"Origin": "https://adeliusa486.github.io"}
+            r = urllib.request.urlopen(urllib.request.Request(
+                url + "/admin/api/login", method="OPTIONS", headers=dict(
+                    site, **{"Access-Control-Request-Method": "POST",
+                             "Access-Control-Request-Headers": "authorization, content-type"})))
+            self.assertEqual(r.status, 204)
+            self.assertEqual(r.headers["Access-Control-Allow-Origin"], site["Origin"])
+            self.assertIn("Authorization", r.headers["Access-Control-Allow-Headers"])
+            st = json.loads(urllib.request.urlopen(urllib.request.Request(
+                url + "/admin/api/status", headers=site)).read())
+            self.assertEqual((st["password_set"], st["local"]), (False, False))   # 127.0.0.1 = tunnel
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(urllib.request.Request(url + "/admin/api/wifi", headers=site))
+            self.assertEqual(e.exception.code, 401)
+            self.assertEqual(e.exception.headers["Access-Control-Allow-Origin"], site["Origin"])
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(urllib.request.Request(
+                    url + "/admin/api/status", headers={"Origin": "https://evil.example"}))
+            self.assertEqual(e.exception.code, 403)
+            self.assertIsNone(e.exception.headers["Access-Control-Allow-Origin"])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+class SetupHotspot(unittest.TestCase):
+    """No known Wi-Fi for a while: the cane opens OmniWalk-Setup, and closes it
+    again to look for known networks."""
+
+    def make(self, phones=0):
+        import types
+        import wifi_hotspot
+        self.H = wifi_hotspot
+        self.t = 0.0
+        self.st = {"connected": True, "connection": "preconfigured", "ip": ""}
+        self.log = []
+
+        def up():
+            self.log.append("up")
+            self.st.update(connected=True, connection="OmniWalk-Setup")
+            return True
+
+        def down():
+            self.log.append("down")
+            self.st.update(connected=False, connection="")
+            return True
+        wifi = types.SimpleNamespace(HOTSPOT="OmniWalk-Setup", device_status=lambda: dict(self.st),
+                                     hotspot_up=up, hotspot_down=down)
+        return wifi_hotspot.Manager(wifi=wifi, clock=lambda: self.t, phones=lambda: phones)
+
+    def run_for(self, m, seconds):
+        end = self.t + seconds
+        while self.t < end:
+            m.step()
+            self.t += 5
+
+    def test_on_wifi_nothing_happens(self):
+        m = self.make()
+        self.run_for(m, 600)
+        self.assertEqual(self.log, [])
+
+    def test_hotspot_after_90_s_without_wifi_then_a_new_search(self):
+        m = self.make()
+        self.st.update(connected=False, connection="")
+        self.run_for(m, 85)
+        self.assertEqual(self.log, [])
+        self.run_for(m, 10)
+        self.assertEqual(self.log, ["up"])
+        self.run_for(m, self.H.HOTSPOT_MIN_S)
+        self.assertEqual(self.log, ["up", "down"])          # nobody on it
+
+    def test_a_phone_on_the_hotspot_keeps_it_open(self):
+        m = self.make(phones=1)
+        self.st.update(connected=False, connection="")
+        self.run_for(m, 95)
+        self.run_for(m, self.H.HOTSPOT_MIN_S + 60)
+        self.assertEqual(self.log, ["up"])
+        self.run_for(m, self.H.HOTSPOT_MAX_S)
+        self.assertEqual(self.log[:2], ["up", "down"])       # but not for ever
+
+    def test_joining_a_network_from_the_hotspot_ends_it(self):
+        m = self.make()
+        self.st.update(connected=False, connection="")
+        self.run_for(m, 95)
+        self.st.update(connected=True, connection="Cafe")
+        self.assertEqual(m.step(), "connected")
+        self.assertIsNone(m.hotspot_since)
 
 
 if __name__ == "__main__":

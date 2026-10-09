@@ -372,6 +372,21 @@ class AudioLink:
             run(["pactl", "set-default-sink", sink], timeout=5)
             print(f"  reconnected, sink is {sink}")
 
+    def use(self, mac):
+        """Speak through other earbuds from now on (admin page). Connects them
+        and makes their sink the default as soon as it appears."""
+        self.mac = mac
+        self.last_attempt = time.time()        # no reconnect race meanwhile
+        run(["bluetoothctl", "connect", mac], timeout=20)
+        want = "bluez_sink." + mac.replace(":", "_") + ".a2dp_sink"
+        for _ in range(16):
+            if run(["pactl", "set-default-sink", want], timeout=5):
+                print(f"  earbuds now {mac}, sink {want}")
+                return True
+            time.sleep(0.5)
+        print(f"  earbuds now {mac}, not connected yet", file=sys.stderr)
+        return False
+
     def keepalive(self, path):
         """Near-silent blip so idle earbuds do not fall asleep."""
         if not os.path.exists(path):
@@ -554,17 +569,18 @@ def watchdog(link, speaker, keepalive_after, stop):
 # cane_safety.ino): the nearer, the stronger and longer. A camera guess is not
 # a measured distance, so it never makes the buzz stronger (Adeel, 3 Oct 2026).
 # 8 Oct 2026: Adeel felt the old 60 % / 150 ms floor as "nearly negligible".
-# A coin motor barely spins up in 150 ms at 60 %, so the floor is now 80 % for
-# 200 ms, and the firmware kicks the motor at full power for its first 40 ms.
+# A coin motor barely spins up in 150 ms at 60 %, so the floor became 80 % for
+# 200 ms. Later that day, with the motor in the cane body, even that was "very
+# low": every buzz is now full power and only the length says how near.
 BUZZ_CLOSE_MM, BUZZ_FAR_MM = 400, 1500
-LIGHT_BUZZ = "B80,200"   # named, but not measured by ToF 1
+LIGHT_BUZZ = "B100,300"   # named, but not measured by ToF 1
 
 
 def tof_buzz(mm):
-    """Buzz for a forward ToF distance, on a smooth scale: 80 % for 200 ms at
-    1.5 m and beyond, up to 100 % for 450 ms at 0.4 m and nearer."""
+    """Buzz for a forward ToF distance: always full power, 300 ms at 1.5 m and
+    beyond, growing smoothly to 500 ms at 0.4 m and nearer."""
     c = min(1.0, max(0.0, (BUZZ_FAR_MM - mm) / (BUZZ_FAR_MM - BUZZ_CLOSE_MM)))
-    return f"B{round(80 + 20 * c)},{round(200 + 250 * c)}"
+    return f"B100,{round(300 + 200 * c)}"
 
 
 def sync_buzz(phrases, fwd_mm):
@@ -594,9 +610,12 @@ class SensorWatch:
     """
 
     # The link gets this long after start-up before silence counts as a fault,
-    # so the cane no longer says "distance sensors not responding" at every
-    # start just because the first reading has not arrived yet.
-    STARTUP_GRACE_S = 3.0
+    # so the cane does not say "distance sensors not responding" at every
+    # start. The first port open after power-on gives no data (the CP2102
+    # times out, -110), Esp32Link reopens at ~5 s and readings flow by ~10 s:
+    # every start on 8 and 9 Oct 2026. 3 s, the value until 9 Oct, always
+    # fired. A link that never comes up is still announced, at 20 s.
+    STARTUP_GRACE_S = 20.0
     # Silence that counts as a dead link. Esp32Link reopens the port after 3 s
     # of silence and the readings were back within 1 to 10 s every time on
     # 8 Oct 2026, so a spoken warning at 2 s only announced stalls that heal
@@ -616,7 +635,8 @@ class SensorWatch:
                                      # named object ahead
         self.bad_since = {}          # sensor name -> when it started failing
         self.no_ground_since = None
-        self.started = time.time()
+        # Monotonic like Esp32Link: the clock jumps when NTP first answers.
+        self.started = time.monotonic()
         link.on_hazard = self.on_hazard
 
     def on_hazard(self, kind, mm):
@@ -629,7 +649,7 @@ class SensorWatch:
         was_alive = True
         while not self.stop.is_set():
             time.sleep(0.2)
-            if time.time() - self.started < self.STARTUP_GRACE_S:
+            if time.monotonic() - self.started < self.STARTUP_GRACE_S:
                 continue
             if not self.link.alive(within=self.SILENT_WARN_S):
                 if was_alive:
@@ -645,7 +665,7 @@ class SensorWatch:
             # user must know they have lost pothole or obstacle warnings. The
             # ESP32 re-inits a dead sensor every second, so 3 s of failure is
             # a real fault, not a hiccup.
-            now = time.time()
+            now = time.monotonic()
             for name, ok in (("ground", self.link.down_ok),
                              ("obstacle", self.link.fwd_ok)):
                 if ok:
@@ -690,8 +710,10 @@ def main():
                     help="seconds before the same phrase may be repeated")
     ap.add_argument("--voice", default="en-us")
     ap.add_argument("--speed", type=int, default=165, help="words per minute")
-    ap.add_argument("--bt-mac", default="B0:38:E2:19:DC:CC",
-                    help="Bluetooth headset to reconnect, empty to disable")
+    ap.add_argument("--bt-mac", default=None,
+                    help="Bluetooth headset to reconnect, empty to disable. "
+                         "Default: ~/.config/smartcane/earbuds, which the "
+                         "admin page sets (bt_admin.py)")
     ap.add_argument("--retry-every", type=float, default=20.0,
                     help="seconds between reconnect attempts")
     ap.add_argument("--keepalive-after", type=float, default=45.0,
@@ -747,6 +769,9 @@ def main():
                     help="print what would be spoken, play no audio")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
+    if args.bt_mac is None:
+        from bt_admin import earbuds
+        args.bt_mac = earbuds()
 
     link = AudioLink(args.bt_mac, args.retry_every, args.verbose)
     speaker = Speaker(args.voice, args.speed, args.repeat_after, link,
@@ -754,6 +779,7 @@ def main():
     confirmer = Confirmer(max(1, args.confirm))
 
     stop = threading.Event()
+    parts = {}                 # pieces made later that earlier ones reach
 
     # The ESP32 owns the ToF sensors and the motor. Optional: if it is not
     # plugged in, the cane still speaks what the camera sees.
@@ -833,8 +859,22 @@ def main():
             except OSError as e:
                 print(f"dashboard token not saved ({e}), the dashboard "
                       "stays locked until the cane restarts with one")
+        # The owner's control page (admin.html): Wi-Fi, Bluetooth, behind a
+        # password checked here on the cane, whatever --demo-public says.
+        admin = None
+        try:
+            from admin_api import AdminAPI
+
+            def set_earbuds(mac):
+                link.use(mac)
+                if parts.get("assistant") is not None:
+                    parts["assistant"].mic.card = "bluez_card." + mac.replace(":", "_")
+            admin = AdminAPI(say=lambda text: speaker.say(text, repeat_after=0),
+                             set_earbuds=set_earbuds)
+        except Exception as e:
+            print(f"admin page unavailable ({e})", file=sys.stderr)
         demo = DemoServer(args.demo_port, view, esp, args.model, n,
-                          token="" if args.demo_public else token)
+                          token="" if args.demo_public else token, admin=admin)
         try:
             demo.start()
             speaker.on_speak = demo.spoken
@@ -895,12 +935,13 @@ def main():
             return summarize(latest["body"], None if args.no_filter else relevant,
                              args.name_conf, fwd)
 
-        cues = {"listen": "B100,150",     # speak now
+        cues = {"listen": "B100,250",     # speak now
                 "hold": "B70,60"}         # long press reached, let go to read
         helper = Assistant(snapshot, context, speaker.say_blocking, args.bt_mac,
                            cue=lambda kind: esp.send(cues[kind]),
                            local_summary=local_summary,
                            hold_speech=speaker.hold)
+        parts["assistant"] = helper              # the admin page swaps its mic
         # One button does everything (Adeel, 8 Oct 2026). It is wired to D33
         # ("K"). D32 ("J") gets the same behaviour in case a button is ever
         # wired there instead.

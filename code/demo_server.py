@@ -14,6 +14,9 @@ address (docs/deployment.md) from anywhere:
     /stream.mjpg  the frames as one MJPEG stream (for VLC or a plain <img>)
     /events       the state as server-sent events, 4 per second
     /health       "ok", for tunnel and uptime checks
+    /admin        the owner's control page (admin_dashboard.html): live view,
+                  Wi-Fi, Bluetooth. Its API, /admin/api/..., is admin_api.py
+                  and needs the admin password whatever the token says.
 
 The dashboard itself polls /state.json and /frame.jpg. Tunnels such as
 Cloudflare's hold long-lived streams back (tested: /events delivered 0 bytes
@@ -56,7 +59,7 @@ def cpu_temp():
 
 class DemoServer:
     def __init__(self, port, view_path, esp=None, model="", n_classes=0,
-                 token="", host="0.0.0.0"):
+                 token="", host="0.0.0.0", admin=None):
         self.port = port
         self.host = host
         self.view_path = view_path
@@ -68,6 +71,7 @@ class DemoServer:
         self.model = os.path.basename(model or "")
         self.n_classes = n_classes
         self.token = token or ""
+        self.admin = admin               # admin_api.AdminAPI, or None
         self.started = time.time()
         self.frame_wait = FRAME_WAIT_S
         self.said = collections.deque(maxlen=14)
@@ -127,10 +131,52 @@ class DemoServer:
     def start(self):
         server = self
         page = os.path.join(HERE, "demo_dashboard.html")
+        admin_page = os.path.join(HERE, "admin_dashboard.html")
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *a):
                 pass
+
+            # ---- admin: its own CORS (the website only), never "*" -------
+            def _admin(self, method, path):
+                if server.admin is None:
+                    return self._send(404, "text/plain", b"no admin page on this cane")
+                body = b""
+                if method == "POST":
+                    n = int(self.headers.get("Content-Length") or 0)
+                    if n > 65536:
+                        return self._send(413, "text/plain", b"too large")
+                    body = self.rfile.read(n)
+                code, data = server.admin.handle(method, path, self.headers, body,
+                                                 self.client_address[0])
+                out = json.dumps(data).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(out)))
+                for k, v in server.admin.cors_headers(self.headers).items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(out)
+
+            def do_OPTIONS(self):
+                cors = server.admin.cors_headers(self.headers) if server.admin else {}
+                if not urlsplit(self.path).path.startswith("/admin/api/") or not cors:
+                    self.send_response(403)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                self.send_response(204)
+                for k, v in cors.items():
+                    self.send_header(k, v)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def do_POST(self):
+                path = urlsplit(self.path).path
+                if path.startswith("/admin/api/"):
+                    return self._admin("POST", path)
+                self.send_error(404)
 
             def _headers(self, code, ctype, length=None, frame=None):
                 self.send_response(code)
@@ -153,6 +199,11 @@ class DemoServer:
                 path = url.path
                 if path == "/health":
                     return self._send(200, "text/plain", b"ok")
+                if path.startswith("/admin/api/"):
+                    return self._admin("GET", path)
+                if path in ("/admin", "/admin/", "/admin.html"):
+                    with open(admin_page, "rb") as fh:
+                        return self._send(200, "text/html; charset=utf-8", fh.read())
                 if not server.allowed(url.query):
                     return self._send(403, "text/plain",
                                       b"token required: add ?token=... to the address")

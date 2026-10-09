@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>OmniWalk Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Same instrument console as the live page (demo_dashboard.html). */
+:root {
+  color-scheme: dark;
+  --bg: #0b0e12; --panel: #12171d; --panel-2: #171d25; --line: #222b36;
+  --fg: #e6ebf1; --dim: #8a96a5; --faint: #5b6674; --accent: #4cc9d8;
+  --ok: #3ecf73; --warn: #f5a524; --bad: #ff5a4f;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 10px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 14px/1.45 var(--sans); min-height: 100vh; padding: 0 16px 24px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 0 12px;
+         border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+.brand svg { width: 26px; height: 26px; }
+.brand small { font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--dim); }
+.state { display: inline-flex; align-items: center; gap: 7px; font: 600 11px/1 var(--mono); letter-spacing: 1.4px;
+         text-transform: uppercase; padding: 6px 10px; border-radius: 999px; background: var(--panel);
+         border: 1px solid var(--line); color: var(--dim); }
+.state i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.state.ok { color: var(--ok); } .state.ok i { background: var(--ok); }
+.state.bad { color: var(--bad); } .state.bad i { background: var(--bad); }
+.head-right { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; padding-top: 14px; }
+@media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; min-width: 0; }
+.card h2 { margin: 0 0 12px; font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase;
+           color: var(--dim); display: flex; align-items: center; gap: 8px; }
+.card h2 .spacer { flex: 1; }
+.narrow { max-width: 440px; margin: 40px auto 0; }
+
+.btn { background: var(--accent); color: #06232a; border: 0; border-radius: 6px; padding: 8px 14px;
+       font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn.danger { background: transparent; color: var(--bad); border: 1px solid rgba(255, 90, 79, .4); }
+input[type=text], input[type=password], input[type=url] {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; width: 100%; min-width: 0; }
+label.f { display: block; font: 600 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim);
+          margin: 12px 0 6px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > input { flex: 1 1 200px; }
+.check { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: 13px; margin-top: 10px; }
+.note { color: var(--dim); font-size: 13px; margin: 8px 0 0; }
+.msg { margin-top: 10px; padding: 9px 11px; border-radius: 6px; font-size: 13px; background: var(--panel-2);
+       border: 1px solid var(--line); }
+.msg.ok { border-color: rgba(62, 207, 115, .4); color: var(--ok); }
+.msg.bad { border-color: rgba(255, 90, 79, .4); color: var(--bad); }
+.msg.wait { color: var(--dim); }
+
+.video { position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--line);
+         aspect-ratio: 16 / 9; }
+.video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.video img:not([src]) { visibility: hidden; }
+.video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); padding: 20px; text-align: center; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.fact { font: 12px/1 var(--mono); color: var(--dim); background: var(--panel-2); border: 1px solid var(--line);
+        border-radius: 6px; padding: 6px 9px; white-space: nowrap; }
+.fact b { color: var(--fg); font-weight: 600; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); min-width: 0; }
+.list li:first-child { border-top: 0; }
+.list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .sub { color: var(--faint); font: 11px var(--mono); }
+.list .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 10px/1.5 var(--mono); letter-spacing: .8px;
+        text-transform: uppercase; white-space: nowrap; }
+.pill.ok { background: rgba(62, 207, 115, .14); color: var(--ok); }
+.pill.warn { background: rgba(245, 165, 36, .14); color: var(--warn); }
+.pill.dim { background: var(--panel-2); color: var(--dim); }
+.bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.bars i { width: 3px; background: var(--faint); border-radius: 1px; }
+.bars i.on { background: var(--accent); }
+.joinbox { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 4px 0 10px; }
+h3.sub-h { font: 600 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint); margin: 16px 0 6px; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent);
+        border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+footer { color: var(--faint); font-size: 12px; padding-top: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#4cc9d8" stroke-width="2"/><path d="M11 25 L19 7" stroke="#e6ebf1" stroke-width="3" stroke-linecap="round"/><path d="M11 25 L13 21" stroke="#ff5a4f" stroke-width="3" stroke-linecap="round"/></svg>
+    OmniWalk <small>Admin</small>
+  </div>
+  <span class="state" id="state"><i></i><span id="stateText">Looking for the cane</span></span>
+  <div class="head-right">
+    <a class="btn ghost small" id="openLive" href="live.html" target="_blank" rel="noopener">Full live view</a>
+    <button class="btn ghost small" id="logout" hidden>Log out</button>
+  </div>
+</header>
+
+<!-- Connect to the cane: shown until a cane answers -->
+<section class="card narrow" id="cCane">
+  <h2>Connect to the cane</h2>
+  <p class="note" id="caneNote">Looking for the cane on the internet…</p>
+  <form id="caneForm">
+    <label class="f" for="caneAddr">Cane address (optional)</label>
+    <div class="row">
+      <input type="url" id="caneAddr" placeholder="https://….trycloudflare.com or http://192.168.x.x:8080" autocomplete="off">
+      <button class="btn" type="submit">Connect</button>
+    </div>
+  </form>
+  <p class="note">Leave it empty and this page finds the cane by itself once it is switched on and online. At a new place without Wi-Fi, the cane opens its own network <b>OmniWalk-Setup</b>: join it, then open <b>http://10.42.0.1:8080/admin</b>.</p>
+</section>
+
+<!-- Log in, or create the first password -->
+<section class="card narrow" id="cLogin" hidden>
+  <h2>Log in</h2>
+  <form id="loginForm">
+    <label class="f" for="pw">Admin password</label>
+    <div class="row">
+      <input type="password" id="pw" autocomplete="current-password" required>
+      <button class="btn" type="submit">Log in</button>
+    </div>
+  </form>
+  <div class="msg" id="loginMsg" hidden></div>
+</section>
+
+<section class="card narrow" id="cSetup" hidden>
+  <h2>Create the admin password</h2>
+  <form id="setupForm">
+    <p class="note">This password protects the cane's Wi-Fi and Bluetooth settings. The camera view stays public. At least 8 characters.</p>
+    <label class="f" for="newPw1">New password</label>
+    <input type="password" id="newPw1" autocomplete="new-password" minlength="8" required>
+    <label class="f" for="newPw2">Repeat it</label>
+    <input type="password" id="newPw2" autocomplete="new-password" minlength="8" required>
+    <div class="row" style="margin-top:12px"><button class="btn" type="submit">Create password</button></div>
+  </form>
+  <p class="note" id="setupRemote" hidden>For safety the first password can only be created on the cane's own network. On the same Wi-Fi as the cane, open <b id="localHint">http://smartcane.local:8080/admin</b> (or the cane's address with <b>:8080/admin</b>), create it there, then come back here.</p>
+  <div class="msg" id="setupMsg" hidden></div>
+</section>
+
+<!-- The admin dashboard -->
+<main id="dash" hidden>
+  <div class="col">
+    <section class="card">
+      <h2>Live view <span class="spacer"></span><span class="pill dim" id="liveFps">–</span></h2>
+      <div class="video"><img id="frame" alt="Live camera view of the cane"><div class="empty" id="frameEmpty">Waiting for the camera</div></div>
+      <div class="facts">
+        <span class="fact">Ahead <b id="fFwd">–</b></span>
+        <span class="fact">Ground <b id="fDown">–</b></span>
+        <span class="fact">Temp <b id="fTemp">–</b></span>
+        <span class="fact">Last said <b id="fSaid">–</b></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bluetooth <span class="spacer"></span><button class="btn ghost small" id="btRefresh">Refresh</button></h2>
+      <p class="note">The cane speaks through: <b id="btEarbuds">–</b></p>
+      <h3 class="sub-h">Paired devices</h3>
+      <ul class="list" id="btPaired"><li><span class="note">Loading…</span></li></ul>
+      <h3 class="sub-h">Add a device</h3>
+      <p class="note">Put the earbuds or speaker in pairing mode (usually: hold the button until the light flashes), then scan.</p>
+      <div class="row" style="margin-top:8px"><button class="btn" id="btScan">Scan for devices</button><span class="note" id="btScanNote"></span></div>
+      <ul class="list" id="btFound"></ul>
+      <div class="msg" id="btMsg" hidden></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Wi-Fi <span class="spacer"></span><button class="btn ghost small" id="wfRefresh">Refresh</button></h2>
+      <p class="note" id="wfNow">Loading…</p>
+      <h3 class="sub-h">Networks in range</h3>
+      <ul class="list" id="wfNets"></ul>
+      <button class="btn ghost small" id="wfOther" style="margin-top:8px">Other network (hidden name)</button>
+      <h3 class="sub-h">Saved networks</h3>
+      <ul class="list" id="wfSaved"></ul>
+      <div class="msg" id="wfMsg" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Account</h2>
+      <form id="pwForm">
+        <label class="f" for="oldPw">Current password</label>
+        <input type="password" id="oldPw" autocomplete="current-password" required>
+        <label class="f" for="chPw">New password</label>
+        <input type="password" id="chPw" autocomplete="new-password" minlength="8" required>
+        <div class="row" style="margin-top:12px"><button class="btn ghost" type="submit">Change password</button></div>
+      </form>
+      <div class="msg" id="pwMsg" hidden></div>
+      <p class="note">Cane: <span id="caneName">–</span> at <span id="caneBase">–</span></p>
+    </section>
+  </div>
+</main>
+<footer>OmniWalk admin. Changes go to the cane itself and need the admin password. A cane restart logs you out.</footer>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const store = {
+    get(k) { try { return localStorage.getItem("omniwalk." + k) || ""; } catch (e) { return ""; } },
+    set(k, v) { try { v ? localStorage.setItem("omniwalk." + k, v) : localStorage.removeItem("omniwalk." + k); } catch (e) {} },
+  };
+  // Names of Wi-Fi networks and Bluetooth devices come from strangers nearby:
+  // they only ever go into the page as text, never as HTML.
+  function el(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === "class") e.className = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+      else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat()) if (k != null) e.append(k instanceof Node ? k : String(k));
+    return e;
+  }
+  function msg(id, text, kind) {
+    const m = $(id);
+    m.hidden = !text;
+    m.className = "msg " + (kind || "");
+    m.textContent = text || "";
+  }
+  function setState(kind, text) { $("state").className = "state " + kind; $("stateText").textContent = text; }
+
+  let base = "";          // the cane's address, "" until found
+  let session = store.get("session");
+  let onCane = false;     // this page was served by the cane itself
+
+  // ---- talking to the cane ------------------------------------------------
+  async function api(path, body) {
+    const headers = {};
+    if (session) headers.Authorization = "Bearer " + session;
+    const opt = { headers, cache: "no-store" };
+    if (body !== undefined) {
+      opt.method = "POST";
+      headers["Content-Type"] = "application/json";
+      opt.body = JSON.stringify(body);
+    }
+    let r;
+    try { r = await fetch(base + "/admin/api/" + path, opt); }
+    catch (e) { throw new Error("The cane does not answer. It may be changing networks or switched off."); }
+    let data = {};
+    try { data = await r.json(); } catch (e) {}
+    if (r.status === 401 && session && !["login", "password"].includes(path)) { loggedOut(); }
+    if (!r.ok) throw new Error(data.error || ("The cane answered " + r.status));
+    return data;
+  }
+  async function answers(b) {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), 4000);
+    try {
+      const r = await fetch(b + "/health", { cache: "no-store", signal: ac.signal });
+      return r.ok && (await r.text()).trim() === "ok";
+    } catch (e) { return false; } finally { clearTimeout(t); }
+  }
+
+  // The cane's address from the signed relay post (same as the live page).
+  const RELAY = "https://ntfy.sh/omniwalk-c3b2b75649938dd6";
+  const PUBKEY = "u6/0dBdBFSgb0TR14GE03KlXrsU6BOh1BFV1Ki08hUs=";
+  const TUNNEL = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  let caneKey = null;
+  async function signedByCane(text, sig) {
+    try {
+      caneKey = caneKey || await crypto.subtle.importKey("raw", unb64(PUBKEY), { name: "Ed25519" }, false, ["verify"]);
+      return await crypto.subtle.verify({ name: "Ed25519" }, caneKey, unb64(sig), new TextEncoder().encode(text));
+    } catch (e) { return false; }
+  }
+  async function announced() {
+    if (!(window.crypto && crypto.subtle)) return "";
+    try {
+      const r = await fetch(RELAY + "/json?poll=1&since=12h", { cache: "no-store" });
+      if (!r.ok) return "";
+      const msgs = (await r.text()).split("\n").map((l) => { try { return JSON.parse(l); } catch (e) { return null; } })
+        .filter((m) => m && m.event === "message").reverse().slice(0, 500);
+      for (const m of msgs) {
+        const [url, t, sig] = String(m.message || "").trim().split(" ");
+        const age = Date.now() / 1000 - Number(t);
+        if (TUNNEL.test(url || "") && sig && age > -600 && age < 13 * 3600 && await signedByCane(url + " " + t, sig)) return url;
+      }
+    } catch (e) {}
+    return "";
+  }
+  async function findCane() {
+    if (onCane) return location.origin;
+    const url = await announced();
+    if (url && await answers(url)) return url;
+    const saved = store.get("base");
+    return saved && await answers(saved) ? saved : "";
+  }
+
+  // ---- screens -------------------------------------------------------------
+  function show(which) {
+    $("cCane").hidden = which !== "cane";
+    $("cLogin").hidden = which !== "login";
+    $("cSetup").hidden = which !== "setup";
+    $("dash").hidden = which !== "dash";
+    $("logout").hidden = which !== "dash";
+  }
+  function loggedOut() {
+    session = ""; store.set("session", "");
+    stopLive();
+    show("login");
+    setState("ok", "Cane online");
+  }
+
+  async function connect(b) {
+    base = b.replace(/\/+$/, "");
+    if (!onCane) store.set("base", base);
+    $("caneBase").textContent = base;
+    $("openLive").href = onCane ? "/" : "live.html";
+    setState("ok", "Cane online");
+    let st;
+    try { st = await api("status"); }
+    catch (e) { setState("bad", "No answer"); $("caneNote").textContent = e.message; show("cane"); return; }
+    $("caneName").textContent = st.name || "cane";
+    if (st.logged_in) return enterDash();
+    if (session) { session = ""; store.set("session", ""); }
+    if (!st.password_set) {
+      show("setup");
+      $("setupForm").hidden = !st.local;
+      $("setupRemote").hidden = st.local;
+      return;
+    }
+    show("login");
+    $("pw").focus();
+  }
+
+  let looking = false;
+  async function lookForCane() {
+    show("cane");
+    setState("", "Looking for the cane");
+    if (looking) return;
+    looking = true;
+    try {
+      for (;;) {
+        const found = await findCane();
+        if (found) return connect(found);
+        setState("bad", "Cane offline");
+        $("caneNote").textContent = "The cane is not online yet. This page keeps looking every 10 seconds and connects by itself.";
+        await sleep(10000);
+        if (base) return;
+      }
+    } finally { looking = false; }
+  }
+
+  $("caneForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const a = $("caneAddr").value.trim().replace(/\/+$/, "");
+    if (!a) return lookForCane();
+    if (!/^https?:\/\//.test(a)) { $("caneNote").textContent = "Enter the full address, starting with https:// or http://"; return; }
+    $("caneNote").textContent = "Trying " + a + " …";
+    if (await answers(a)) connect(a);
+    else $("caneNote").textContent = "No answer from " + a + ". A web page from https cannot open a plain http address: on the home Wi-Fi, open the cane's own page instead.";
+  });
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msg("loginMsg", "Checking…", "wait");
+    try {
+      const r = await api("login", { password: $("pw").value });
+      session = r.session; store.set("session", session);
+      $("pw").value = "";
+      msg("loginMsg", "");
+      enterDash();
+    } catch (err) { msg("loginMsg", err.message, "bad"); }
+  });
+
+  $("setupForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("newPw1").value !== $("newPw2").value) return msg("setupMsg", "The two passwords are not the same.", "bad");
+    try {
+      const r = await api("setup", { password: $("newPw1").value });
+      session = r.session; store.set("session", session);
+      $("newPw1").value = $("newPw2").value = "";
+      msg("setupMsg", "");
+      enterDash();
+    } catch (err) { msg("setupMsg", err.message, "bad"); }
+  });
+
+  $("logout").addEventListener("click", async () => {
+    try { await api("logout", {}); } catch (e) {}
+    loggedOut();
+  });
+
+  $("pwForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api("password", { old: $("oldPw").value, new: $("chPw").value });
+      $("oldPw").value = $("chPw").value = "";
+      msg("pwMsg", r.message, "ok");
+    } catch (err) { msg("pwMsg", err.message, "bad"); }
+  });
+
+  function enterDash() {
+    show("dash");
+    setState("ok", "Logged in");
+    startLive();
+    loadWifi();
+    loadBt();
+  }
+
+  // ---- live view: one picture at a time, each new frame once --------------
+  let live = null;
+  function stopLive() { if (live) live.stop = true; live = null; }
+  function startLive() {
+    stopLive();
+    const L = live = { stop: false, shown: "", url: "" };
+    (async () => {                       // the state, twice a second
+      while (!L.stop) {
+        try {
+          const r = await fetch(base + "/state.json?n=" + Date.now(), { cache: "no-store" });
+          const s = await r.json();
+          const se = s.sensors || {};
+          $("liveFps").textContent = (s.vision && s.vision.fps ? s.vision.fps.toFixed(1) : "–") + " fps";
+          $("fFwd").textContent = se.fwd_mm != null ? (se.fwd_mm / 1000).toFixed(2) + " m" : "–";
+          $("fDown").textContent = se.down_mm != null ? (se.down_mm / 1000).toFixed(2) + " m" : "–";
+          $("fTemp").textContent = s.temp != null ? s.temp + " °C" : "–";
+          const said = (s.said || []).slice(-1)[0];
+          $("fSaid").textContent = said ? said.text : "–";
+        } catch (e) {}
+        await sleep(500);
+      }
+    })();
+    const lanes = onCane ? 1 : 3;
+    for (let lane = 0; lane < lanes; lane++) (async () => {
+      await sleep(lane * 150);
+      while (!L.stop) {
+        try {
+          const r = await fetch(base + "/frame.jpg?n=" + Date.now() + lane + "&after=" + L.shown, { cache: "no-store" });
+          const id = r.headers.get("X-Frame");
+          if (r.status === 200) {
+            const blob = await r.blob();
+            if (!L.stop && (id === null || !L.shown || Number(id) > Number(L.shown))) {
+              if (id !== null) L.shown = id;
+              const old = L.url;
+              L.url = URL.createObjectURL(blob);
+              $("frame").src = L.url;
+              $("frameEmpty").hidden = true;
+              if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+            }
+          } else if (r.status !== 204) await sleep(500);
+        } catch (e) { await sleep(1000); }
+        await sleep(30);
+      }
+    })();
+  }
+
+  // ---- Wi-Fi -----------------------------------------------------------
+  function bars(signal) {
+    const n = signal >= 75 ? 4 : signal >= 50 ? 3 : signal >= 25 ? 2 : 1;
+    return el("span", { class: "bars", title: signal + " %" },
+      [6, 9, 12, 14].map((h, i) => el("i", { class: i < n ? "on" : "", style: "height:" + h + "px" })));
+  }
+  function joinBox(net) {
+    const open = net && (net.security === "--" || net.security === "");
+    const pw = el("input", { type: "password", placeholder: "Wi-Fi password", autocomplete: "off", "aria-label": "Wi-Fi password" });
+    const name = el("input", { type: "text", placeholder: "Network name", "aria-label": "Network name", value: net ? net.ssid : "" });
+    const hidden = el("input", { type: "checkbox" });
+    const go = el("button", { class: "btn", type: "submit" }, "Join");
+    const box = el("form", { class: "joinbox", onsubmit: async (e) => {
+      e.preventDefault();
+      go.disabled = true;
+      msg("wfMsg", "Saving and joining " + name.value + " …", "wait");
+      try {
+        const r = await api("wifi/join", { ssid: name.value.trim(), password: pw.value,
+          security: net ? net.security : "", hidden: !net && hidden.checked });
+        msg("wfMsg", r.message, r.ok ? "ok" : "bad");
+        if (r.code === "joining") { stopLive(); setState("", "Cane changing network"); setTimeout(() => { base = ""; lookForCane(); }, 20000); }
+        else loadWifi();
+      } catch (err) { msg("wfMsg", err.message, "bad"); go.disabled = false; }
+    } },
+      net ? null : name,
+      open ? el("p", { class: "note" }, "Open network, no password.") : pw,
+      net ? null : el("label", { class: "check" }, hidden, "Hidden network"),
+      el("div", { class: "row", style: "margin-top:10px" }, go,
+        el("button", { class: "btn ghost", type: "button", onclick: () => box.remove() }, "Cancel")));
+    return box;
+  }
+  async function loadWifi() {
+    $("wfNow").textContent = "Scanning…";
+    let w;
+    try { w = await api("wifi"); } catch (e) { $("wfNow").textContent = e.message; return; }
+    $("wfNow").replaceChildren(
+      w.hotspot ? el("span", {}, "Setup hotspot is on: the cane has no other Wi-Fi now. Choose a network below.")
+        : w.connection ? el("span", {}, "Connected to ", el("b", {}, w.ssid || w.connection), w.ip ? " (" + w.ip + ")" : "")
+        : el("span", {}, "Not connected to Wi-Fi."));
+    $("wfNets").replaceChildren(...(w.networks.length ? w.networks.map((n) => {
+      const li = el("li", {},
+        bars(n.signal),
+        el("span", { class: "name" }, n.ssid, el("div", { class: "sub" }, n.security && n.security !== "--" ? n.security : "open")),
+        n.active ? el("span", { class: "pill ok" }, "connected") : n.saved ? el("span", { class: "pill dim" }, "saved") : null,
+        n.active ? null : el("span", { class: "acts" }, el("button", { class: "btn small", onclick: () => {
+          document.querySelectorAll("#wfNets .joinbox").forEach((b) => b.remove());
+          li.after(joinBox(n));
+        } }, n.saved ? "Join" : "Connect")));
+      return li;
+    }) : [el("li", {}, el("span", { class: "note" }, "No networks found."))]));
+    $("wfSaved").replaceChildren(...(w.saved.length ? w.saved.map((s) => el("li", {},
+      el("span", { class: "name" }, s.ssid || s.name, s.name !== s.ssid ? el("div", { class: "sub" }, "profile " + s.name) : null),
+      s.active ? el("span", { class: "pill ok" }, "in use") : null,
+      el("span", { class: "acts" }, el("button", { class: "btn danger small", disabled: s.active, onclick: async () => {
+        if (!confirm("Forget " + (s.ssid || s.name) + "? The cane will no longer join it by itself.")) return;
+        try { const r = await api("wifi/forget", { name: s.name }); msg("wfMsg", r.message, r.ok ? "ok" : "bad"); loadWifi(); }
+        catch (e) { msg("wfMsg", e.message, "bad"); }
+      } }, "Forget")))) : [el("li", {}, el("span", { class: "note" }, "None yet."))]));
+  }
+  $("wfRefresh").addEventListener("click", loadWifi);
+  $("wfOther").addEventListener("click", () => {
+    if (!document.querySelector("#wfOther + .joinbox")) $("wfOther").after(joinBox(null));
+  });
+
+  // ---- Bluetooth ---------------------------------------------------------
+  function btIcon(icon) {
+    return icon.startsWith("audio") ? "audio" : icon.startsWith("phone") ? "phone" : icon || "device";
+  }
+  async function btAction(path, mac, button, busyText) {
+    const label = button.textContent;
+    button.disabled = true;
+    button.replaceChildren(el("span", { class: "spin" }), " " + busyText);
+    try { const r = await api(path, { mac }); msg("btMsg", r.message, r.ok ? "ok" : "bad"); }
+    catch (e) { msg("btMsg", e.message, "bad"); }
+    button.disabled = false;
+    button.textContent = label;
+    loadBt();
+  }
+  async function loadBt() {
+    let b;
+    try { b = await api("bt"); } catch (e) { $("btPaired").replaceChildren(el("li", {}, el("span", { class: "note" }, e.message))); return; }
+    const ear = b.devices.find((d) => d.earbuds);
+    $("btEarbuds").textContent = ear ? ear.name + (ear.connected ? " (connected)" : " (not connected)") : b.earbuds;
+    $("btPaired").replaceChildren(...(b.devices.length ? b.devices.map((d) => el("li", {},
+      el("span", { class: "name" }, d.name, el("div", { class: "sub" }, btIcon(d.icon) + " · " + d.mac)),
+      d.earbuds ? el("span", { class: "pill ok" }, "speech") : null,
+      d.connected ? el("span", { class: "pill ok" }, "connected") : el("span", { class: "pill dim" }, "off"),
+      el("span", { class: "acts" },
+        d.earbuds ? null : el("button", { class: "btn small", onclick: (e) => btAction("bt/use", d.mac, e.currentTarget, "Switching") }, "Use for speech"),
+        d.connected ? null : el("button", { class: "btn ghost small", onclick: (e) => btAction("bt/connect", d.mac, e.currentTarget, "Connecting") }, "Connect"),
+        d.earbuds ? null : el("button", { class: "btn danger small", onclick: (e) => {
+          if (confirm("Forget " + d.name + "? It must be paired again to use it.")) btAction("bt/forget", d.mac, e.currentTarget, "Removing");
+        } }, "Forget"))))
+      : [el("li", {}, el("span", { class: "note" }, "No paired devices."))]));
+  }
+  $("btRefresh").addEventListener("click", loadBt);
+  $("btScan").addEventListener("click", async () => {
+    $("btScan").disabled = true;
+    $("btScanNote").replaceChildren(el("span", { class: "spin" }), " Scanning for 10 seconds…");
+    $("btFound").replaceChildren();
+    try {
+      const r = await api("bt/scan", { seconds: 10 });
+      $("btFound").replaceChildren(...(r.found.length ? r.found.map((d) => el("li", {},
+        el("span", { class: "name" }, d.name, el("div", { class: "sub" }, btIcon(d.icon) + " · " + d.mac)),
+        el("span", { class: "acts" }, el("button", { class: "btn small", onclick: (e) => btAction("bt/pair", d.mac, e.currentTarget, "Pairing") }, "Pair")))) :
+        [el("li", {}, el("span", { class: "note" }, "Nothing new found. Is the device in pairing mode and close to the cane?"))]));
+      $("btScanNote").textContent = "";
+    } catch (e) { $("btScanNote").textContent = e.message; }
+    $("btScan").disabled = false;
+  });
+
+  // ---- start -------------------------------------------------------------
+  async function boot() {
+    // Served by the cane itself (home Wi-Fi or the setup hotspot)?
+    const own = await fetch("/health", { cache: "no-store" }).then((r) => r.ok && r.text()).catch(() => "");
+    onCane = !!own && own.trim() === "ok";
+    if (onCane) return connect(location.origin);
+    lookForCane();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

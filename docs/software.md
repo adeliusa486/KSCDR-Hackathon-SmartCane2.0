@@ -71,12 +71,35 @@ Example sentences: "chair ahead, 1.3 meters", "chair right, about 2 meters", "ob
 |---|---|---|
 | **Short** | "Looking", then Gemini describes the scene. One buzz, then the cane listens 5 s on the earbud mic. Ask anything, for example "read the sign", and it answers from a fresh photo. Silence ends it. A press ends listening early | Says at once what the cane's own detector sees ("chair ahead, 1.2 meters. backpack left, about 1.5 meters"), then reads any text with Tesseract |
 | **Long, 1 s** (a short buzz says you can let go) | "Reading", then Gemini reads the text word for word | Tesseract reads the text. Also used when Gemini fails |
+| **Long, 1 s, with a Wi-Fi QR code in view** | "Wi-Fi code. Network Home. Joining", then "Connected to Home" | Same, it needs no internet |
+
+### Wi-Fi from a QR code
+
+`wifi_qr.py`. Show the cane a Wi-Fi QR code (Android: Wi-Fi settings, the gear next to the network, QR code) and hold the button for 1 s. The long press checks the photo for a `WIFI:` code before reading text. The cane saves the network with NetworkManager and joins it at once. A network out of range is only saved, so the current Wi-Fi is not dropped for nothing, and the cane joins it later by itself. A wrong password, a network it is already on, and enterprise networks (user name needed) each get their own sentence. The password is never printed, logged or spoken.
+
+The camera's lens is fixed-focus for 2 to 4 m, so a small phone code close up is soft and far away is small. Each photo is tried as it is, enlarged, sharpened and centre-cropped, and a code that is seen but not readable gets up to three more photos ("Code not readable" if none works). A code on a laptop screen or printed large reads best. The check adds about 0.6 s to a long press.
+
+Decoding uses zbar (`python3-pyzbar`): Debian's OpenCV 4.6 on the cane is built without its QR decoder. nmcli runs without sudo, because sudo logs the whole command line, password included. `10-omniwalk-wifi.rules` gives the `pi` user the three NetworkManager Wi-Fi rights instead. It must sort before `49-polkit-pkla-compat.rules`, whose `NetworkManager.pkla` refuses those rights to a service with no login session.
 
 While the assistant works, the routine object announcements pause so the microphone never records the cane's own voice. Warnings and ground hazards still speak, and the ESP32 never stops vibrating. Presses while it answers are ignored, and a "press" longer than 15 s (a stuck switch) is ignored too.
 
 Failure handling, all covered by tests: the internet check takes at most 2 s and runs while the photo is taken; a slow model hands over to the next one; a garbled reply falls back offline; every path ends in something spoken ("Camera not ready", "Assistant error", the reason the online assistant failed). Models are tried in order `gemini-flash-lite-latest`, `gemini-flash-latest`, `gemini-3.8-flash`, with a 25 s overall limit. The API key lives only on the Pi at `~/.config/smartcane/gemini_key`.
 
 Measured on the cane with `tools/assistant_check.py` (real camera, Gemini, Tesseract): short press 3.4 s to the end of the description, long press 3.4 s, offline 0.5 s. The earbud microphone has not been tested yet.
+
+### Owner admin page
+
+`admin_dashboard.html` + `admin_api.py`. On the website it is `admin.html` (the footer's "Owner login"), on the cane `http://<cane>:8080/admin`, and on the setup hotspot `http://10.42.0.1:8080/admin`. After logging in: the live view, Wi-Fi (networks in range with signal, join, a hidden network, saved networks, forget) and Bluetooth (paired devices, which one the cane speaks through, scan, pair, connect, forget), plus changing the password.
+
+The website is static, so the password is checked on the cane. It is stored as PBKDF2-SHA256 (200,000 rounds) in `~/.config/smartcane/admin_password` (0600). A login gives a 12-hour session kept in the cane's memory. Five wrong passwords in five minutes pause logins for a minute. The camera view stays public, everything that changes the cane needs the login.
+
+The first password can only be created from the cane's own network (home Wi-Fi or the hotspot), never through the tunnel, so nobody on the internet can claim the cane first. Requests with an `Origin` must come from the website or the cane's own page, and the `Host` must be an IP address, a `.local` name or the tunnel, which stops a page on another site, or DNS rebinding, from driving the cane through the owner's browser. Wi-Fi and Bluetooth names come from strangers' devices, so the page only ever inserts them as text. Joining another network answers first and switches 1.5 s later, because the switch cuts the tunnel the answer travels on. The cane says the result in the earbuds.
+
+Pairing runs one interactive `bluetoothctl` with a `NoInputNoOutput` agent (`bt_admin.py`). The device the cane speaks through is `~/.config/smartcane/earbuds`: `speak_detect.py` and the service's start-up reconnect read it, and the admin page switches it while the cane runs. Forgot the password: `python3 admin_api.py --reset-password` on the cane, then create a new one from the home Wi-Fi.
+
+### Setup hotspot
+
+`wifi_hotspot.py` (`smartcane-hotspot.service`). After 90 s without any Wi-Fi connection the cane opens an open network called **OmniWalk-Setup** (NetworkManager shared mode, the cane at 10.42.0.1). It stays at least 5 minutes, longer while a phone is on it (up to 20), then closes so the cane can look for known networks again. Detection, speech and vibration never need Wi-Fi, so the hotspot changes nothing else.
 
 ### Live dashboard
 
@@ -90,9 +113,9 @@ Measured on the cane with `tools/assistant_check.py` (real camera, Gemini, Tesse
 
 | Behaviour | Detail |
 |---|---|
-| Obstacle feel | Forward ToF only. Silent beyond 1.5 m. From 1.5 m to 0.4 m: pulses of 150 ms, 80 % to 100 % strength, faster as it gets closer. Under 0.4 m: solid |
+| Obstacle feel | Forward ToF only. Silent beyond 1.5 m. From 1.5 m to 0.4 m: pulses of 250 ms at full strength, faster as it gets closer. Under 0.4 m: solid. The buzz with speech is also full strength, 300 ms far to 500 ms close |
 | Motor kick | Every buzz from rest starts with 40 ms at full power so the coin motor spins up |
-| Ground watch | Down ToF learns the normal ground distance (median of 10 readings), follows slow drift, and alarms on a drop of more than 150 mm, "nothing in range", or a rise of more than 120 mm. One 500 ms full-strength pulse, 2.5 s hold-off. A change lasting 2 s is a new grip angle and is relearned. Things nearer than 0.7x the ground distance, or rises while ToF 1 sees something within 1.5 m, are obstacles, not steps |
+| Ground watch | Down ToF learns the normal ground distance (median of 10 readings), follows slow drift, and alarms on a drop of more than 150 mm, "nothing in range", or a rise of more than 120 mm. One 700 ms full-strength pulse, 2.5 s hold-off. A change lasting 2 s is a new grip angle and is relearned. Things nearer than 0.7x the ground distance, or rises while ToF 1 sees something within 1.5 m, are obstacles, not steps |
 | Filtering | Median of 3. Readings the sensor itself flags as hardware or phase failures (range status 1, 2, 3, 6, 9) count as nothing in range. 1,514 of 1,514 bench readings had status 11 (valid) |
 | Self-healing | A sensor silent for 300 ms is reset through XSHUT and re-initialised every second |
 | Both sensors | Long-range mode (signal rate limit 0.1 MCPS, VCSEL 18/14, 33 ms budget), about 2 m indoors, less in sunlight |
@@ -120,9 +143,11 @@ The cane starts on its own at boot through a systemd user service:
 
 ```bash
 sudo loginctl enable-linger pi
-cp ~/smartcane/smartcane.service ~/.config/systemd/user/
+sudo apt install python3-pyzbar                     # Wi-Fi QR codes
+sudo install -m 644 ~/smartcane/10-omniwalk-wifi.rules /etc/polkit-1/rules.d/
+cp ~/smartcane/smartcane.service ~/smartcane/smartcane-hotspot.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now smartcane
+systemctl --user enable --now smartcane smartcane-hotspot
 sudo journalctl _SYSTEMD_USER_UNIT=smartcane.service -f    # live log
 ```
 
@@ -154,7 +179,7 @@ systemctl --user stop smartcane && nohup ~/smartcane/tools/flash_NEW.sh &
 `code/tests/test_cane.py` simulates the blind-user scenarios without a camera, Hailo, ESP32 or audio: names for every safety class, urgency order, flicker, the obstacle fallback, distances in metres, the ToF consistency check, per-object repeat timers, picture geometry (letterbox, rotation, FOV, distance estimate), the real `Esp32Link` on a pseudo-terminal (hazards, buttons, silence, reopen), and every assistant path and failure (online, offline, no key, quota, busy retry, slow model, silence, a spoken question, early stop, long press, stuck switch, no mic, camera failure, a crash), and the dashboard server.
 
 ```bash
-cd ~/smartcane && python3 -m unittest tests/test_cane.py      # 62 tests, all pass on the Pi
+cd ~/smartcane && python3 -m unittest tests/test_cane.py      # 99 tests, all pass on the Pi
 python -m pytest code/tests/test_cane.py -q                    # Windows: 56 pass, 6 pty tests skip (all 62 run on Linux and in CI)
 ```
 

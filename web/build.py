@@ -7,6 +7,8 @@ Writes web/_site/, which GitHub Actions deploys to GitHub Pages:
   index.html   the project page
   live.html    the cane's live dashboard: connects to a cane through its
                tunnel, or plays web/replay/ if present
+  admin.html   the owner's page: log in (the cane checks the password),
+               live view, Wi-Fi, Bluetooth (code/admin_dashboard.html)
   assets/      figures and charts from docs/
 
 The objects list is generated from the model's label file, the training
@@ -61,6 +63,7 @@ def main():
                  'and distance, obstacle and drop-off alerts by vibration, a one-button assistant.">\n'
                  f"{head}\n</head>\n<body>\n{body}\n</body>\n</html>\n")
     shutil.copy2(os.path.join(ROOT, "code", "demo_dashboard.html"), os.path.join(site, "live.html"))
+    shutil.copy2(os.path.join(ROOT, "code", "admin_dashboard.html"), os.path.join(site, "admin.html"))
     if os.path.isdir(os.path.join(WEB, "replay")):
         shutil.copytree(os.path.join(WEB, "replay"), os.path.join(site, "replay"))
     open(os.path.join(site, ".nojekyll"), "w").close()

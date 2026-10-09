@@ -22,7 +22,8 @@ ExecStartPre=/bin/sleep 8
 # Hard 10 s limit: with the earbuds off or unpaired, bluetoothctl connect can
 # hang until systemd's start timeout kills the whole unit, so the cane would
 # not start at all. Earbuds being off must never stop the cane from running.
-ExecStartPre=-/usr/bin/timeout 10 /usr/bin/bluetoothctl connect B0:38:E2:19:DC:CC
+# Which earbuds: ~/.config/smartcane/earbuds, set from the admin page.
+ExecStartPre=-/bin/sh -c 'exec /usr/bin/timeout 10 /usr/bin/bluetoothctl connect "$(cat %h/.config/smartcane/earbuds 2>/dev/null || echo B0:38:E2:19:DC:CC)"'
 
 # --conf low and --name-conf high on purpose. The detector sees almost
 # everything, and only confident detections get a name. Anything in between is
