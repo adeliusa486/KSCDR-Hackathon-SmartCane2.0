@@ -2840,6 +2840,13 @@ tested (MEMORY.md is public in the repo, accepted).
   fixed to the SSID.
 - Not testable without Adeel: pairing new earbuds, joining another network,
   the hotspot with a phone.
+- **Pushed** bda06a8 (code, docs, web) + d5ccab0 (MEMORY), no AI trailers.
+  Website and CI runs both success. https://adeliusa486.github.io/OmniWalk/admin.html
+  in headless Chrome over the internet: cane found via the relay 3.5 s, login,
+  dashboard 4.5 s, live 10.0 fps, "Connected to HUAWEI-1CFS1N", earbuds listed.
+- **Test password removed** (`admin_api.py --reset-password`) and the cane
+  restarted so its test sessions are gone: password_set false. Adeel creates
+  his own on the home Wi-Fi at http://192.168.3.51:8080/admin.
   Also seen: a hailo_pci find_vma kernel WARNING at every
 vision start (not related).
 
