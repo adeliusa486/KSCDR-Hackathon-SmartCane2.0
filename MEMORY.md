@@ -2599,6 +2599,250 @@ README: website and live links at the top, "Watch the cane live" section,
 the four charts moved up to "Measured results" right after it. No AI credit
 in any file or in the 77 commits (checked).
 
+### 8 October 2026 (20:42): "why tof sensors not working" (diagnosis only)
+
+Both ToF read fine when checked (fwd ~370 mm, down ~330 mm, both ok, steady
+over 5 s). What failed was around them:
+- **USB to the ESP32 dropped out physically** at 20:41:46 (`usb 1-1: USB
+  disconnect`, CP2102 gone 9 s, link back 20:42:03). throttled=0x0, EXT5V
+  4.80 V, so not a Pi undervoltage. Likely the USB plug/cable in the new
+  3D-printed body. Pi had no distances for ~17 s and said "distance sensors
+  not responding".
+- **Previous boot (20:10 to 20:40): earbuds never connected**
+  (br-connection-page-timeout, retry every 10 s). Nothing spoken for 30 min.
+  Speaker.say() returns before on_start when audio is dead, so the Pi's ToF
+  obstacle buzz never fired either. ESP32 auto buzz (< 1.5 m) and ground
+  alarms still ran. ToF data was arriving (ground drops logged 20:39).
+- **Start-up warning still spoken**: STARTUP_GRACE_S 3 s < SILENT_WARN_S 6 s,
+  and the port stalls at every start (reopened at 3 s, back after 5 to 10 s).
+- The drop calls in this boot (-1, 303, 642, 609 mm) were the cane being moved
+  in a room after learning a ~290 mm ground. -1 = nothing in range, by design.
+
+Not changed yet. Offered: buzz without audio, longer start-up grace, strain
+relief on the ESP32 USB lead.
+
+### 8 October 2026 (20:46 to 20:48): "motor is not working"
+
+Service stopped 20:46:53, five `B100,1000` sent 20:46:59 to 20:47:07, service
+back 20:47:20. ESP32 (fw 2026-10-08b, auto=1) answered `I buzz 100% 1000ms`
+and `motor=100` in `S` every time, so the firmware drives GPIO13. Fault, if
+the buzzes were not felt, is downstream: module VCC (VIN), GND, IN wire to
+D13, or the motor. No USB drop during the five buzzes, so the 20:41:46 USB
+drop (1 s after a B100,450) is not reproduced by buzzing alone. SSH reset at
+the end was Wi-Fi only (uptime unbroken, throttled=0x0). **Adeel: not felt.**
+Firmware ruled out: running fw = source (2026-10-08b), PWM 8-bit 200 Hz,
+100 % = 255, motorTick() writes the pin every loop, no other use of GPIO13.
+So it is hardware. Auto mode holds D13 solid at < 400 mm forward, used for
+the checks given to Adeel (LED, 5 V on VCC, 3.3 V on IN, IN to 3V3 jumper,
+coin motor leads). Earlier "nearly negligible" fits a joint failing. Adeel
+then: "all wires on place" (visual). No firmware command reads D13 (P reads
+only D33/D32), so a remote check needs a small test command and a reflash:
+offered, not done. Adeel then asked if it works without GND (no) and
+reconnected the motor GND, cane rebooted ~21:09.
+
+### 8 October 2026 (21:12 to 21:15): ToF 1 (forward) drops out after the rewire
+
+state.json: fwd_ok false in 9 of 10 samples, "Warning, obstacle sensor not
+working" spoken from 21:09. Service stopped twice briefly (scripts ran under
+nohup on the Pi so it restarts even if SSH drops). `T`: both buses answer
+0x29, both IDs EE AA 10. `S`: tof1 reinits=25 in ~4 min (0 at 20:47, before
+the rewire), tof2 reinits=0. Good readings when it answers (status 11).
+Motor A/B with A0 + manual B100,1000: motor off 12 s 97 % ok / 1 error,
+buzzing 12 s 100 % / 0, off again 8 s 33 % / 6. So not the motor: an
+intermittent ToF 1 contact (its own VCC/GND branch, SDA D21, SCL D22 or
+XSHUT D26), likely disturbed while the motor GND was rewired. ToF 2 fine.
+21:18 recheck (after Adeel's fix attempt): worse. Live fwd_ok 1/20. Scan
+3 of 3: bus1 0x29 and ID EE AA 10 every time, yet 0 % ok over 10 s, 10 tof1
+errors ("init failed, no reply" / "stopped answering"), reinits 70 -> 73,
+range counts frozen (no measurement at all). ToF 2 reinits 0. Reading: light
+register reads work, starting the laser fails, which points at a weak VCC or
+GND contact on ToF 1 (marginal SDA/SCL would garble the ID). XSHUT D26 next.
+21:43 recheck after Adeel reseated wires (cane not rebooted, up 33 min):
+**ToF 1 fixed.** Live 20/20 ok, last warning 21:36:33. 12 s scan 100 % ok,
+357 to 1239 mm, 0 errors, reinits flat at 185 (it climbed 73 -> 185 while he
+worked on it). ToF 2: answers, ID ok, reinits 1, but "nothing in range" the
+whole check: status 4 (no target) ~35/s, status 11 almost frozen since ~21:15
+(10975 -> 11305). Electrically fine, so likely aim/pose (cane lying down or
+held up). Asked Adeel to put a hand under it. Three B100,1000 at 21:43:39,
+:41, :43, firmware motor=100, waiting on whether he felt them.
+
+### 8 October 2026 (21:45 to 21:55): motor works but "very low", fw 2026-10-08c
+
+Adeel: the motor now vibrates (motor GND was the fault) but feels very low,
+make it strong. The 21:43 test buzzes were already 100 % for 1 s, so code
+can only lift everyday buzzes to that level. Changed:
+- Firmware 2026-10-08c: obstacle pulses 100 % always, 250 ms on, off 700 ms
+  (far) to 100 ms (near 0.4 m), solid under 0.4 m (was 80-100 %, 150 ms on,
+  60-600 ms off). Ground pulse HAZARD_MS 500 -> 700.
+- speak_detect.py: tof_buzz B100,300 (far) to B100,500 (close), was
+  B80,200 to B100,450. LIGHT_BUZZ B80,200 -> B100,300. Assistant "listen"
+  cue B100,150 -> B100,250. Test renamed and updated. 58 passed, 6 skipped
+  on the laptop.
+- Note: ~/smartcane/esp32/cane_safety/ on the Pi is an OLD sketch. The real
+  sources are src_<version>/. src_2026-10-08b matched git HEAD.
+- Compiled on the Pi (323,456 bytes, 08b was 323,472). New
+  tools/flash_2026-10-08c.sh (rollback = build_2026-10-08b). Flashed 21:51:
+  running == 08b verified, write, verify, boot fw=2026-10-08c, both ToF ready
+  and IDs EE AA 10, reinits 0. speak_detect.py deployed (old copy in
+  ~/smartcane/backup_2026-10-08c), md5 ca6f5286 on both sides, service active.
+- docs/software.md and docs/implementation-plan.md updated. Not committed.
+Beyond this it is hardware: implementation-plan B2 (motor glued to the grip
+wall under the hand, bigger ERM or DRV2605L + LRA, capacitor).
+
+### 9 October 2026 (15:09 to 15:20): live website blank after a cold start, ToF ok
+
+Adeel: are the ToF working, the motor works loose but not when screwed down,
+and the website's live page does not show the camera (it did yesterday).
+- **ToF:** both ok 20/20 live, down sees the floor 1.3-2.0 m.
+- **Website cause:** no RTC battery. Cane off from 8 Oct 21:55 to 9 Oct
+  ~15:05; booted with fake-hwclock time 8 Oct 21:55, live_tunnel.sh posted at
+  15:05:45 real time signed "21:56:17" (17 h old), NTP synced only at
+  15:07:25 (first servers timed out). demo_dashboard.html drops posts older
+  than 13 h, next post was 30 min later. Yesterday it worked because the
+  reboot test was minutes after a shutdown. ntfy keeps 12 h, so only 1 post.
+- **Same jump, second bug:** esp32_link used time.time(), so at 15:07:25 the
+  link "went silent for 17 h": port reopen and a spoken "Warning, distance
+  sensors not responding" with both sensors fine. Every cold start did this.
+- **Fixed:** esp32_link.py intervals on time.monotonic() (last_data starts
+  at -inf), SensorWatch start-up grace and failure timers too (camera_ahead_at
+  left on time.time()). New test test_clock_jump_is_not_silence. live_tunnel.sh
+  waits up to 3 min for NTPSynchronized (or /run/systemd/timesync/synchronized)
+  before the first post, and if it had to post unsynced, posts again the
+  moment the clock syncs. Laptop 58 passed / 7 skipped, Pi 7/7 serial tests
+  (4 errors there only from files missing in the /tmp copy). Deployed (old
+  copies in ~/smartcane/backup_2026-10-09), md5 match, both services restarted.
+  New post signed 15:16:14, age 8 s. Through the tunnel: /health 200, frames
+  advancing at 10 fps, a live room picture. Site live.html PUBKEY and RELAY
+  match the cane. Not committed.
+- **Lesson:** overwriting live_tunnel.sh under the running bash made it read
+  the new file at an old offset ("line 108: So: No such file") while it was
+  being stopped. Deploy shell scripts by copy to a temp name and `mv`.
+- Cosmetic, not fixed: the tunnel log says "online1" (${ONLINE:-...} prints 1).
+- **Motor + screw:** no ESP32 reset or USB drop in the log since 15:05. Advice
+  given: never clamp the coin motor (thin can, weight rubs), metal screw can
+  short the module's pads (nylon screw or plastic washer), slack in the motor
+  leads.
+
+### 9 October 2026 (15:28 to 15:32): temperature, "stops after ~20 min then restarts"
+
+- Temp 60.9 C (cpu_thermal 59 C), fan 5,500 rpm. Fine.
+- **Yesterday's stops were clean shutdowns by "Power key pressed short"**:
+  20:39:47, 21:07:07, 21:55:47 (sessions 30, 27, 47 min). At 20:39 the
+  earbuds were not connected (no AVRCP device that boot), so that press was
+  the Pi's own button. At 21:07 and 21:55 the cane was speaking normally up
+  to the press. 20:09 was a `reboot`. logind also watches "Soundcore Life P2
+  Mini (AVRCP)" as a power-switch device, so the earbuds could send one too
+  (not shown). Either Adeel pressed it or the body presses it. Possible fix
+  if needed (not done): udev rule TAG-="power-switch" for *AVRCP* devices.
+- **Undervoltage today**: none 15:05 to 15:17, first at 15:17:09, then 1 to 8
+  a minute (throttled=0x50000), with earbud drops (AUDIO DEAD/reconnect) at
+  the same moments. Started when the dashboard began being watched (detect.py
+  80 % CPU watched vs ~10 %, cloudflared streaming). Supply negotiated only
+  3000 mA (chosen/power/max_current), usb_max_current_enable=0, EXT5V 4.78 to
+  4.82 V. Board rails 3.1 W excluding USB devices and the AI HAT+. The full-
+  power vibration (fw 08c) ran 15:05 to 15:17 with no dips, so it is not the
+  main trigger but adds to it. Fix is the supply (docs/power.md, plan B1).
+  Asked Adeel what "stops" looks like (Pi off vs voice stops) and the supply.
+
+### 9 October 2026 (20:09 to 20:35): website live within a minute of power-on, start-up warning, Wi-Fi QR
+
+Adeel (angry): website still not live after restarting the cane, it must
+work by itself every time; why "distance sensors not working" at every start;
+then: add Wi-Fi by scanning a QR code with the camera.
+- **Website:** the 15:16 fix waited for NTP before posting. Measured: tunnel
+  online 31 s / 45 s after power-on, NTP synced 87 s / 130 s (first servers
+  time out), so the site showed the examples ~2 min after every switch-on,
+  exactly when Adeel looked (boot 20:06:54, post 20:09:01). Log times before
+  the sync are fake-hwclock times (boot -1 looked like 15:34 to 20:05, really
+  ~19:57 to 20:05). Fix in live_tunnel.sh: until NTP has synced, sign with
+  the relay's HTTPS Date header (equal to the synced clock to the second,
+  checked 3 times) and post at once. Every post is now logged ("posted,
+  signed ... (ntp|relay time)"). "online1" log fixed. Reboot test 20:16:
+  online 39.7 s, posted 40.4 s (NTP happened to win at 35.9 s). Headless
+  Chrome (CDP over websocket-client, scratchpad site_check.py) on the real
+  site: Live at 3.1 s, 10 fps, blob frames. Before that: Live in 4.0 s.
+- **Start-up warning:** every boot the first port open gives no data
+  (CP2102 -110), reopen at ~5 s, data by ~10 s, and STARTUP_GRACE_S was 3 s.
+  Now 20 s. New test test_start_up_stall_is_not_announced (fails on 3 s), the
+  dead-link test sets 3 s on its instance. Reboot test: no warning.
+- Deploys now copy to `<file>.new` and `mv` (backups ~/smartcane/
+  backup_2026-10-09b).
+- **Wi-Fi QR (new code/wifi_qr.py):** hold 1 s ("read text") checks the photo
+  for a WIFI: code first (look(): wifi/other/unreadable/none, tries the photo,
+  2x, sharpened, centre crop, up to 3 more photos if seen but unreadable),
+  else reads text as before. join(): finds an existing profile by SSID and
+  modifies it, else adds one, then scans: already on it = no rejoin, out of
+  range = saved only (joining drops the current Wi-Fi), else `connection up
+  --wait 25`. Wrong password and enterprise get their own sentence. Password
+  never printed/logged/spoken (test). 14 tests in class WifiQr.
+  - Debian's OpenCV 4.6 on the cane has NO QR decoding ("Library QUIRC is not
+    linked"): it locates codes only. Installed python3-pyzbar 0.1.9 (libzbar0
+    was already there), zbar first, OpenCV decoder only as fallback (works in
+    pip wheels, laptop OpenCV 5.0).
+  - nmcli as pi without sudo said "Insufficient privileges" (no login session);
+    sudo logs full command lines (21 that boot) so the password would land in
+    the journal. code/10-omniwalk-wifi.rules (polkit, pi only, settings.modify.
+    system, network-control, wifi.scan) installed in /etc/polkit-1/rules.d.
+    A 50- name did not work: 49-polkit-pkla-compat applies
+    /var/lib/polkit-1/localauthority/10-vendor.d/org.freedesktop.NetworkManager.pkla
+    (ResultInactive=no for modify.system). Real nmcli test with a dummy
+    profile: add, find, modify, switch to open, delete all rc 0, 5 networks in
+    scan, password not in journal.
+  - look() 0.6 s per long press (1.7 s first, so warm_up() preloads in a
+    thread at Assistant start). speak_detect.py RSS 28 -> 142 MB, Pi has 2 GB,
+    1.4 GB available, swap unused.
+  - NOT yet tested with a real phone code in front of the camera: fixed focus
+    2-4 m makes small close codes soft. Asked Adeel to try.
+- **Mistake:** `pgrep -f "[d]etect.py"` also matched speak_detect.py and my
+  SIGUSR1 killed it (systemd restarted it in 5 s, NRestarts=1). Use the
+  anchored `^/usr/bin/python3 -u /home/pi/smartcane/detect.py`.
+- Undervoltage still 1-8 a minute while the dashboard is watched, SSH resets
+  twice. Tests: laptop 72 passed / 8 skipped, Pi 41/41 (WifiQr, buttons,
+  serial). Docs: software.md, README. Nothing committed.
+
+### 9 October 2026 (20:35 to 21:10): owner admin page, setup hotspot
+
+Adeel: a website login with his own password, then live view, connect to
+cane, Wi-Fi and Bluetooth (pair in real time). His answers: login page (his
+words, not one of the offered options), setup hotspot when no Wi-Fi, push when
+tested (MEMORY.md is public in the repo, accepted).
+- **Design:** the website is static, so the cane checks the password
+  (admin_api.py, served by demo_server.py under /admin/api/). Camera stays
+  public. PBKDF2-SHA256 200k in ~/.config/smartcane/admin_password (0600),
+  12 h in-memory sessions (Bearer), 5 wrong in 5 min = 1 min pause. First
+  password only from a local address (10/8, 172.16/12, 192.168/16, not
+  127.0.0.1 = cloudflared, no Cf-* headers). Origin must be the site or the
+  cane's own page, Host must be an IP, .local or *.trycloudflare.com
+  (DNS rebinding). CORS for /admin/api only, never "*". Names from Wi-Fi and
+  Bluetooth only inserted as text (XSS). Join answers first, switches 1.5 s
+  later (it cuts the tunnel), result spoken. `admin_api.py --reset-password`.
+- **New code:** wifi_net.py (nmcli: networks with signal/security, saved,
+  save/plan/activate/join_result, forget, hotspot up/down; wifi_qr.py now only
+  QR), bt_admin.py (bluetoothctl list/scan/info, pairing in one interactive
+  bluetoothctl with agent NoInputNoOutput, connect, forget, earbuds file
+  ~/.config/smartcane/earbuds), admin_api.py, admin_dashboard.html (website
+  admin.html, footer "Owner login"), wifi_hotspot.py + smartcane-hotspot.service
+  (OmniWalk-Setup, open, 10.42.0.1, after 90 s without Wi-Fi, >= 5 min, up to
+  20 min while a phone is on it). speak_detect: --bt-mac default from the
+  earbuds file, AudioLink.use(mac) switches live (sink bluez_sink.<MAC_>.a2dp_sink),
+  assistant mic card updated. smartcane.service ExecStartPre reads the earbuds
+  file. Polkit rule + wifi.share.open/protected. web/build.py, pages.yml, ci.yml.
+- **Bug caught by a test:** ipaddress is_private is True for 203.0.113.x
+  (documentation range), so the local check uses explicit networks.
+- **Tests:** 19 new (AdminPage incl. the real server with preflight, SetupHotspot).
+  Laptop 91 passed / 8 skipped (99 total), Pi 96 + 3 label-file errors from
+  the /tmp copy only. CI flake8 selection clean.
+- **On the cane:** deployed (backups ~/smartcane/backup_2026-10-09c), all md5
+  match, smartcane-hotspot enabled ("on Wi-Fi"). Headless Chrome on the LAN
+  (http://192.168.3.51:8080/admin): first-password form shown (local), created
+  a TEMPORARY random test password, dashboard in 3.1 s, live 10.1 fps, Wi-Fi
+  list and saved list, Soundcore as speech earbuds. "Connected to preconfigured"
+  fixed to the SSID.
+- Not testable without Adeel: pairing new earbuds, joining another network,
+  the hotspot with a phone.
+  Also seen: a hailo_pci find_vma kernel WARNING at every
+vision start (not related).
+
 ---
 
 *Last updated: 8 October 2026*
